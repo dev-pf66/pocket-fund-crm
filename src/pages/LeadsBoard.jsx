@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, moveLead } from '../../lib/crm-api'
-import { useApp } from '../../App'
-import LeadCard from '../../components/CRM/LeadCard'
+import { getLeads, moveLead } from '../lib/crm-api'
+import { useApp } from '../App'
+import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
 import { Plus } from 'lucide-react'
 

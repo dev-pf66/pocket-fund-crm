@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { createLead } from '../../lib/crm-api'
-import { useApp } from '../../App'
+import { createLead } from '../lib/crm-api'
+import { useApp } from '../App'
 
 function LeadForm({ onClose, onSave, lead = null }) {
   const { currentPerson } = useApp()

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { getCRMDashboardData } from '../../lib/crm-api'
+import { getCRMDashboardData } from '../lib/crm-api'
 import { TrendingUp, AlertCircle, Calendar, FileText, Phone } from 'lucide-react'
 
 function Dashboard() {

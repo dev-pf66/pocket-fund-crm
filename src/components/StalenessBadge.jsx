@@ -1,4 +1,4 @@
-import { calculateStaleness } from '../../lib/crm-api'
+import { calculateStaleness } from '../lib/crm-api'
 
 function StalenessBadge({ lead, settings }) {
   if (!lead || !settings) return null

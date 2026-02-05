@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getCRMSettings, calculateStaleness } from '../../lib/crm-api'
+import { getCRMSettings, calculateStaleness } from '../lib/crm-api'
 import StalenessBadge from './StalenessBadge'
 
 function LeadCard({ lead, onDragStart, onClick, onRefresh }) {
