@@ -1,0 +1,682 @@
+/**
+ * CRM API - Sales lead management for Pocket Fund
+ */
+
+import { supabase } from './supabase'
+
+// ============================================================================
+// LEADS API
+// ============================================================================
+
+/**
+ * Get all leads with optional filters
+ */
+export async function getLeads(filters = {}) {
+  let query = supabase
+    .from('crm_leads')
+    .select(`
+      *,
+      created_by_person:created_by(id, name, email)
+    `)
+    .order('updated_at', { ascending: false })
+
+  if (filters.stage) query = query.eq('stage', filters.stage)
+  if (filters.lead_type) query = query.eq('lead_type', filters.lead_type)
+  if (filters.needs_sample_deals !== undefined) query = query.eq('needs_sample_deals', filters.needs_sample_deals)
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Get lead by ID with full details
+ */
+export async function getLeadById(id) {
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .select(`
+      *,
+      created_by_person:created_by(id, name, email)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create new lead
+ */
+export async function createLead(leadData, currentPersonId) {
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .insert([{
+      ...leadData,
+      created_by: currentPersonId,
+      last_activity_date: new Date().toISOString(),
+      last_activity_type: 'created'
+    }])
+    .select()
+    .single()
+
+  if (error) throw error
+
+  // Log creation activity
+  await logActivity(data.id, {
+    activity_type: 'note',
+    activity_date: new Date().toISOString(),
+    notes: 'Lead created in CRM'
+  }, currentPersonId)
+
+  return data
+}
+
+/**
+ * Update lead
+ */
+export async function updateLead(id, updates) {
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Move lead to new stage
+ */
+export async function moveLead(id, newStage, currentPersonId) {
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .update({ stage: newStage })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  // Log stage change
+  await logActivity(id, {
+    activity_type: 'note',
+    activity_date: new Date().toISOString(),
+    notes: `Moved to ${newStage.replace('_', ' ')}`
+  }, currentPersonId)
+
+  return data
+}
+
+/**
+ * Delete lead
+ */
+export async function deleteLead(id) {
+  const { error } = await supabase
+    .from('crm_leads')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+// ============================================================================
+// ACTIVITIES API
+// ============================================================================
+
+/**
+ * Get activities for a lead
+ */
+export async function getLeadActivities(leadId) {
+  const { data, error } = await supabase
+    .from('crm_lead_activities')
+    .select(`
+      *,
+      logged_by_person:logged_by(id, name)
+    `)
+    .eq('lead_id', leadId)
+    .order('activity_date', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Log activity for a lead
+ */
+export async function logActivity(leadId, activityData, currentPersonId) {
+  // Insert activity
+  const { data: activity, error: activityError } = await supabase
+    .from('crm_lead_activities')
+    .insert([{
+      lead_id: leadId,
+      ...activityData,
+      logged_by: currentPersonId
+    }])
+    .select()
+    .single()
+
+  if (activityError) throw activityError
+
+  // Update lead's last activity
+  await supabase
+    .from('crm_leads')
+    .update({
+      last_activity_date: activityData.activity_date,
+      last_activity_type: activityData.activity_type
+    })
+    .eq('id', leadId)
+
+  return activity
+}
+
+/**
+ * Delete activity
+ */
+export async function deleteActivity(id) {
+  const { error } = await supabase
+    .from('crm_lead_activities')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+// ============================================================================
+// SAMPLE DEALS API
+// ============================================================================
+
+/**
+ * Get all sample deals
+ */
+export async function getSampleDeals(filters = {}) {
+  let query = supabase
+    .from('crm_sample_deals')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+
+  if (filters.industry) query = query.eq('industry', filters.industry)
+  if (filters.client_type) query = query.eq('client_type', filters.client_type)
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Get sample deal by ID
+ */
+export async function getSampleDealById(id) {
+  const { data, error } = await supabase
+    .from('crm_sample_deals')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create sample deal
+ */
+export async function createSampleDeal(dealData, currentPersonId) {
+  const { data, error } = await supabase
+    .from('crm_sample_deals')
+    .insert([{
+      ...dealData,
+      created_by: currentPersonId
+    }])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update sample deal
+ */
+export async function updateSampleDeal(id, updates) {
+  const { data, error } = await supabase
+    .from('crm_sample_deals')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Delete (deactivate) sample deal
+ */
+export async function deleteSampleDeal(id) {
+  const { data, error } = await supabase
+    .from('crm_sample_deals')
+    .update({ is_active: false })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Send sample deals to a lead
+ */
+export async function sendSampleDeals(leadId, sampleDealIds, currentPersonId) {
+  // Log activity
+  await logActivity(leadId, {
+    activity_type: 'sample_sent',
+    activity_date: new Date().toISOString(),
+    notes: `Sent ${sampleDealIds.length} sample deals`,
+    sample_deals_sent: sampleDealIds
+  }, currentPersonId)
+
+  // Clear needs_sample_deals flag
+  await updateLead(leadId, {
+    needs_sample_deals: false
+  })
+
+  // Return the deals that were sent
+  const { data, error } = await supabase
+    .from('crm_sample_deals')
+    .select('*')
+    .in('id', sampleDealIds)
+
+  if (error) throw error
+  return data || []
+}
+
+// ============================================================================
+// SETTINGS API
+// ============================================================================
+
+/**
+ * Get CRM settings
+ */
+export async function getCRMSettings() {
+  const { data, error } = await supabase
+    .from('crm_settings')
+    .select('*')
+    .eq('id', 1)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update CRM settings
+ */
+export async function updateCRMSettings(updates) {
+  const { data, error } = await supabase
+    .from('crm_settings')
+    .update(updates)
+    .eq('id', 1)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// ============================================================================
+// DASHBOARD/ANALYTICS API
+// ============================================================================
+
+/**
+ * Get stale leads (exceeded threshold since last activity)
+ */
+export async function getStaleLeads() {
+  const settings = await getCRMSettings()
+  const leads = await getLeads()
+
+  return leads.filter(lead => {
+    if (!lead.last_activity_date) return false
+    if (lead.stage === 'client' || lead.stage === 'passed') return false
+
+    const daysSince = getDaysBetween(
+      new Date(lead.last_activity_date),
+      new Date()
+    )
+
+    const thresholds = {
+      cold_outreach: settings.cold_outreach_threshold,
+      warm_lead: settings.warm_lead_threshold,
+      active_conversation: settings.active_conversation_threshold,
+      reach_out_later: 999 // Use exact date instead
+    }
+
+    return daysSince > thresholds[lead.stage]
+  })
+}
+
+/**
+ * Get leads with follow-ups due today
+ */
+export async function getFollowUpsDueToday() {
+  const today = new Date().toISOString().split('T')[0]
+
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .select('*')
+    .or(`next_follow_up_date.eq.${today},reach_out_later_date.eq.${today}`)
+    .neq('stage', 'passed')
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Get leads needing sample deals
+ */
+export async function getLeadsNeedingSamples() {
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .select('*')
+    .eq('needs_sample_deals', true)
+    .neq('stage', 'passed')
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Get active conversations gone stale (CRITICAL)
+ */
+export async function getActiveConversationsGoneStale() {
+  const settings = await getCRMSettings()
+  const leads = await getLeads({ stage: 'active_conversation' })
+
+  return leads.filter(lead => {
+    if (!lead.last_activity_date) return false
+
+    const daysSince = getDaysBetween(
+      new Date(lead.last_activity_date),
+      new Date()
+    )
+
+    return daysSince > settings.active_conversation_threshold
+  })
+}
+
+/**
+ * Get weekly call count
+ */
+export async function getWeeklyCallCount() {
+  const weekAgo = new Date()
+  weekAgo.setDate(weekAgo.getDate() - 7)
+
+  const { data, error } = await supabase
+    .from('crm_lead_activities')
+    .select('id')
+    .in('activity_type', ['call', 'meeting'])
+    .gte('activity_date', weekAgo.toISOString())
+
+  if (error) throw error
+  return data?.length || 0
+}
+
+/**
+ * Get pipeline statistics
+ */
+export async function getPipelineStats() {
+  const leads = await getLeads()
+
+  const stats = {
+    cold_outreach: 0,
+    warm_lead: 0,
+    active_conversation: 0,
+    client: 0,
+    reach_out_later: 0,
+    passed: 0,
+    total: leads.length
+  }
+
+  leads.forEach(lead => {
+    stats[lead.stage] = (stats[lead.stage] || 0) + 1
+  })
+
+  // Calculate percentages
+  stats.cold_pct = (stats.cold_outreach / stats.total) * 100
+  stats.warm_pct = (stats.warm_lead / stats.total) * 100
+  stats.active_pct = (stats.active_conversation / stats.total) * 100
+  stats.client_pct = (stats.client / stats.total) * 100
+
+  return stats
+}
+
+/**
+ * Get weekly stats
+ */
+export async function getWeeklyStats() {
+  const weekAgo = new Date()
+  weekAgo.setDate(weekAgo.getDate() - 7)
+
+  const [activities, leads] = await Promise.all([
+    supabase
+      .from('crm_lead_activities')
+      .select('activity_type')
+      .gte('activity_date', weekAgo.toISOString()),
+    supabase
+      .from('crm_leads')
+      .select('stage, created_at, updated_at')
+  ])
+
+  const stats = {
+    discovery_calls: activities.data?.filter(a =>
+      ['call', 'meeting'].includes(a.activity_type)
+    ).length || 0,
+    proposals_sent: activities.data?.filter(a =>
+      a.activity_type === 'proposal_sent'
+    ).length || 0,
+    new_leads: leads.data?.filter(l =>
+      new Date(l.created_at) >= weekAgo
+    ).length || 0,
+    closed_clients: leads.data?.filter(l =>
+      l.stage === 'client' && new Date(l.updated_at) >= weekAgo
+    ).length || 0
+  }
+
+  return stats
+}
+
+/**
+ * Get conversion funnel stats
+ */
+export async function getConversionFunnelStats() {
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .select('stage')
+
+  if (error) throw error
+
+  const stages = data.reduce((acc, lead) => {
+    acc[lead.stage] = (acc[lead.stage] || 0) + 1
+    return acc
+  }, {})
+
+  return {
+    cold_outreach: stages.cold_outreach || 0,
+    warm_lead: stages.warm_lead || 0,
+    active_conversation: stages.active_conversation || 0,
+    client: stages.client || 0
+  }
+}
+
+/**
+ * Get complete CRM dashboard data
+ */
+export async function getCRMDashboardData() {
+  const [
+    leads,
+    staleLeads,
+    followUps,
+    needsSamples,
+    activeStale,
+    weeklyStats,
+    pipelineStats,
+    settings
+  ] = await Promise.all([
+    getLeads(),
+    getStaleLeads(),
+    getFollowUpsDueToday(),
+    getLeadsNeedingSamples(),
+    getActiveConversationsGoneStale(),
+    getWeeklyStats(),
+    getPipelineStats(),
+    getCRMSettings()
+  ])
+
+  return {
+    leads,
+    staleLeads,
+    followUps,
+    needsSamples,
+    activeStale,
+    weeklyStats,
+    pipelineStats,
+    settings
+  }
+}
+
+/**
+ * Get CRM heartbeat for Sage monitoring
+ */
+export async function getCRMHeartbeat() {
+  const { data, error } = await supabase.rpc('get_crm_heartbeat')
+
+  if (error) throw error
+  return data
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Calculate days between two dates
+ */
+function getDaysBetween(date1, date2) {
+  const diffTime = Math.abs(date2 - date1)
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  return diffDays
+}
+
+/**
+ * Calculate staleness for a lead
+ */
+export function calculateStaleness(lead, settings) {
+  if (!lead.last_activity_date) {
+    return { color: 'gray', days: null, status: 'no_activity' }
+  }
+
+  const daysSince = getDaysBetween(
+    new Date(lead.last_activity_date),
+    new Date()
+  )
+
+  const thresholds = {
+    cold_outreach: settings.cold_outreach_threshold,
+    warm_lead: settings.warm_lead_threshold,
+    active_conversation: settings.active_conversation_threshold,
+    client: 999,
+    reach_out_later: 999,
+    passed: 999
+  }
+
+  const threshold = thresholds[lead.stage]
+
+  if (daysSince <= threshold * 0.5) {
+    return { color: 'green', days: daysSince, status: 'fresh' }
+  } else if (daysSince <= threshold) {
+    return { color: 'yellow', days: daysSince, status: 'aging' }
+  } else {
+    return { color: 'red', days: daysSince, status: 'stale' }
+  }
+}
+
+/**
+ * Filter sample deals by lead criteria
+ */
+export function filterSampleDealsByLead(sampleDeals, lead) {
+  if (!lead.deal_criteria && !lead.lead_type) return sampleDeals
+
+  return sampleDeals.filter(deal => {
+    let matches = false
+
+    // Match by lead type
+    if (lead.lead_type && deal.client_type === lead.lead_type) {
+      matches = true
+    }
+
+    // Match by deal criteria keywords
+    if (lead.deal_criteria) {
+      const criteria = lead.deal_criteria.toLowerCase()
+      const industry = deal.industry?.toLowerCase() || ''
+      const description = deal.description?.toLowerCase() || ''
+
+      if (industry && criteria.includes(industry)) {
+        matches = true
+      }
+      if (description && criteria.split(',').some(term =>
+        description.includes(term.trim())
+      )) {
+        matches = true
+      }
+    }
+
+    return matches
+  })
+}
+
+export default {
+  // Leads
+  getLeads,
+  getLeadById,
+  createLead,
+  updateLead,
+  moveLead,
+  deleteLead,
+
+  // Activities
+  getLeadActivities,
+  logActivity,
+  deleteActivity,
+
+  // Sample Deals
+  getSampleDeals,
+  getSampleDealById,
+  createSampleDeal,
+  updateSampleDeal,
+  deleteSampleDeal,
+  sendSampleDeals,
+
+  // Settings
+  getCRMSettings,
+  updateCRMSettings,
+
+  // Dashboard
+  getStaleLeads,
+  getFollowUpsDueToday,
+  getLeadsNeedingSamples,
+  getActiveConversationsGoneStale,
+  getWeeklyCallCount,
+  getPipelineStats,
+  getWeeklyStats,
+  getConversionFunnelStats,
+  getCRMDashboardData,
+  getCRMHeartbeat,
+
+  // Utilities
+  calculateStaleness,
+  filterSampleDealsByLead
+}
