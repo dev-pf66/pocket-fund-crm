@@ -5,7 +5,7 @@ import { useApp } from '../App'
 import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
 import QuickAddCard from '../components/QuickAddCard'
-import { Plus, Search, Filter } from 'lucide-react'
+import { Plus, Search, Filter, Upload } from 'lucide-react'
 
 const STAGES = [
   { key: 'cold_outreach', label: 'Cold Outreach', color: '#60a5fa' },
@@ -115,6 +115,13 @@ function LeadsBoard() {
           >
             <Filter size={18} />
             Filters
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => navigate('/import')}
+          >
+            <Upload size={18} />
+            Import CSV
           </button>
           <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
             <Plus size={18} />

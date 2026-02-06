@@ -8,6 +8,8 @@ import LeadsBoard from './pages/LeadsBoard'
 import LeadDetail from './pages/LeadDetail'
 import EmailTemplates from './pages/EmailTemplates'
 import SampleDeals from './pages/SampleDeals'
+import ImportLeads from './pages/ImportLeads'
+import Analytics from './pages/Analytics'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ChatTerminal from './components/ChatTerminal'
@@ -88,6 +90,8 @@ function AppContent() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="pipeline" element={<LeadsBoard />} />
             <Route path="leads/:id" element={<LeadDetail />} />
+            <Route path="import" element={<ImportLeads />} />
+            <Route path="analytics" element={<Analytics />} />
             <Route path="templates" element={<EmailTemplates />} />
             <Route path="samples" element={<SampleDeals />} />
           </Route>

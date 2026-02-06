@@ -728,3 +728,97 @@ export async function deleteEmailTemplate(id) {
 
   if (error) throw error
 }
+
+// ============================================================================
+// Analytics
+// ============================================================================
+
+export async function getAnalytics() {
+  // Get all leads
+  const { data: leads, error } = await supabase
+    .from('crm_leads')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+
+  // Conversion funnel
+  const stages = {
+    cold_outreach: leads.filter(l => l.stage === 'cold_outreach').length,
+    warm_lead: leads.filter(l => l.stage === 'warm_lead').length,
+    active_conversation: leads.filter(l => l.stage === 'active_conversation').length,
+    client: leads.filter(l => l.stage === 'client').length
+  }
+
+  const conversion = {
+    ...stages,
+    cold_to_warm_rate: stages.cold_outreach > 0 ? Math.round((stages.warm_lead / stages.cold_outreach) * 100) : 0,
+    warm_to_active_rate: stages.warm_lead > 0 ? Math.round((stages.active_conversation / stages.warm_lead) * 100) : 0,
+    active_to_client_rate: stages.active_conversation > 0 ? Math.round((stages.client / stages.active_conversation) * 100) : 0,
+    overall_rate: stages.cold_outreach > 0 ? Math.round((stages.client / stages.cold_outreach) * 100) : 0
+  }
+
+  // Pipeline velocity (avg days in each stage)
+  function getAvgDaysInStage(stage) {
+    const stageLeads = leads.filter(l => l.stage === stage && l.created_at)
+    if (stageLeads.length === 0) return 0
+
+    const avgMs = stageLeads.reduce((sum, lead) => {
+      const days = (new Date() - new Date(lead.created_at)) / (1000 * 60 * 60 * 24)
+      return sum + days
+    }, 0) / stageLeads.length
+
+    return Math.round(avgMs)
+  }
+
+  const velocity = {
+    cold_outreach: getAvgDaysInStage('cold_outreach'),
+    warm_lead: getAvgDaysInStage('warm_lead'),
+    active_conversation: getAvgDaysInStage('active_conversation'),
+    total: Math.round((getAvgDaysInStage('cold_outreach') + getAvgDaysInStage('warm_lead') + getAvgDaysInStage('active_conversation')))
+  }
+
+  // Lead sources
+  const sourceMap = {}
+  leads.forEach(lead => {
+    const source = lead.lead_source || 'Unknown'
+    if (!sourceMap[source]) {
+      sourceMap[source] = { total: 0, clients: 0 }
+    }
+    sourceMap[source].total++
+    if (lead.stage === 'client') {
+      sourceMap[source].clients++
+    }
+  })
+
+  const sources = Object.entries(sourceMap)
+    .map(([source, data]) => ({
+      source,
+      total: data.total,
+      clients: data.clients,
+      conversion_rate: data.total > 0 ? Math.round((data.clients / data.total) * 100) : 0
+    }))
+    .sort((a, b) => b.conversion_rate - a.conversion_rate)
+
+  // Weekly trends (last 4 weeks)
+  const weekly = []
+  for (let i = 0; i < 4; i++) {
+    const weekStart = new Date()
+    weekStart.setDate(weekStart.getDate() - (i + 1) * 7)
+    const weekEnd = new Date()
+    weekEnd.setDate(weekEnd.getDate() - i * 7)
+
+    const weekLeads = leads.filter(l => {
+      const created = new Date(l.created_at)
+      return created >= weekStart && created < weekEnd
+    })
+
+    weekly.unshift({
+      new_leads: weekLeads.length,
+      moved_to_active: weekLeads.filter(l => l.stage === 'active_conversation' || l.stage === 'client').length,
+      closed: weekLeads.filter(l => l.stage === 'client').length
+    })
+  }
+
+  return { conversion, velocity, sources, weekly }
+}
