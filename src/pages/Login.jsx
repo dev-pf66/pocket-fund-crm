@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { signInWithEmail } from '../lib/supabase'
 
 function Login() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,6 +16,8 @@ function Login() {
 
     try {
       await signInWithEmail(email, password)
+      // Redirect to dashboard after successful login
+      navigate('/dashboard')
     } catch (err) {
       console.error('Login error:', err)
       setError(err.message)
