@@ -6,6 +6,8 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import LeadsBoard from './pages/LeadsBoard'
 import LeadDetail from './pages/LeadDetail'
+import EmailTemplates from './pages/EmailTemplates'
+import SampleDeals from './pages/SampleDeals'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ChatTerminal from './components/ChatTerminal'
@@ -86,6 +88,8 @@ function AppContent() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="pipeline" element={<LeadsBoard />} />
             <Route path="leads/:id" element={<LeadDetail />} />
+            <Route path="templates" element={<EmailTemplates />} />
+            <Route path="samples" element={<SampleDeals />} />
           </Route>
         </Routes>
         <ChatTerminal />

@@ -680,3 +680,51 @@ export default {
   calculateStaleness,
   filterSampleDealsByLead
 }
+
+// ============================================================================
+// Email Templates
+// ============================================================================
+
+export async function getEmailTemplates() {
+  const { data, error } = await supabase
+    .from('crm_email_templates')
+    .select('*')
+    .eq('is_active', true)
+    .order('category', { ascending: true })
+    .order('name', { ascending: true })
+
+  if (error) throw error
+  return data || []
+}
+
+export async function createEmailTemplate(templateData) {
+  const { data, error } = await supabase
+    .from('crm_email_templates')
+    .insert([templateData])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function updateEmailTemplate(id, updates) {
+  const { data, error } = await supabase
+    .from('crm_email_templates')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function deleteEmailTemplate(id) {
+  const { error} = await supabase
+    .from('crm_email_templates')
+    .update({ is_active: false })
+    .eq('id', id)
+
+  if (error) throw error
+}
