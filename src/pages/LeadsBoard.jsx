@@ -5,7 +5,7 @@ import { useApp } from '../App'
 import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
 import QuickAddCard from '../components/QuickAddCard'
-import { Plus } from 'lucide-react'
+import { Plus, Search, Filter } from 'lucide-react'
 
 const STAGES = [
   { key: 'cold_outreach', label: 'Cold Outreach', color: '#60a5fa' },
@@ -21,6 +21,9 @@ function LeadsBoard() {
   const [leads, setLeads] = useState([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [draggedLead, setDraggedLead] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterType, setFilterType] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
     loadLeads()
@@ -67,7 +70,27 @@ function LeadsBoard() {
   }
 
   function getLeadsByStage(stage) {
-    return leads.filter(lead => lead.stage === stage)
+    return leads.filter(lead => {
+      // Stage filter
+      if (lead.stage !== stage) return false
+
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const matchesName = lead.name?.toLowerCase().includes(query)
+        const matchesFirm = lead.firm_name?.toLowerCase().includes(query)
+        const matchesEmail = lead.email?.toLowerCase().includes(query)
+        if (!matchesName && !matchesFirm && !matchesEmail) return false
+      }
+
+      // Type filter
+      if (filterType !== 'all') {
+        if (filterType === 'needs_samples' && !lead.needs_sample_deals) return false
+        if (filterType !== 'needs_samples' && lead.lead_type !== filterType) return false
+      }
+
+      return true
+    })
   }
 
   if (loading) {
@@ -85,10 +108,75 @@ function LeadsBoard() {
     <div>
       <div className="page-header">
         <h1>Sales Pipeline</h1>
-        <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
-          <Plus size={18} />
-          Add Lead
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter size={18} />
+            Filters
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
+            <Plus size={18} />
+            Add Lead
+          </button>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="pipeline-controls">
+        <div className="search-box">
+          <Search size={18} />
+          <input
+            type="text"
+            placeholder="Search leads by name, firm, or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              className="clear-search"
+              onClick={() => setSearchQuery('')}
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        {showFilters && (
+          <div className="filter-bar">
+            <button
+              className={`filter-chip ${filterType === 'all' ? 'active' : ''}`}
+              onClick={() => setFilterType('all')}
+            >
+              All
+            </button>
+            <button
+              className={`filter-chip ${filterType === 'PE Firm' ? 'active' : ''}`}
+              onClick={() => setFilterType('PE Firm')}
+            >
+              PE Firms
+            </button>
+            <button
+              className={`filter-chip ${filterType === 'Family Office' ? 'active' : ''}`}
+              onClick={() => setFilterType('Family Office')}
+            >
+              Family Offices
+            </button>
+            <button
+              className={`filter-chip ${filterType === 'Independent Sponsor' ? 'active' : ''}`}
+              onClick={() => setFilterType('Independent Sponsor')}
+            >
+              Independent Sponsors
+            </button>
+            <button
+              className={`filter-chip ${filterType === 'needs_samples' ? 'active' : ''}`}
+              onClick={() => setFilterType('needs_samples')}
+            >
+              📋 Needs Samples
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="crm-board">
@@ -123,7 +211,7 @@ function LeadsBoard() {
                     key={lead.id}
                     lead={lead}
                     onDragStart={handleDragStart}
-                    onClick={() => navigate(`/crm/leads/${lead.id}`)}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
                     onRefresh={loadLeads}
                   />
                 ))}

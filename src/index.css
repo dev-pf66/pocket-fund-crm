@@ -5500,3 +5500,254 @@ input, select, textarea {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Pipeline Controls */
+.pipeline-controls {
+  margin-bottom: 24px;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  gap: 10px;
+  transition: border-color 0.2s;
+}
+
+.search-box:focus-within {
+  border-color: var(--primary);
+}
+
+.search-box svg {
+  color: var(--gray-400);
+  flex-shrink: 0;
+}
+
+.search-box input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--gray-900);
+}
+
+.search-box input::placeholder {
+  color: var(--gray-400);
+}
+
+.clear-search {
+  background: var(--gray-200);
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray-600);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.clear-search:hover {
+  background: var(--gray-300);
+}
+
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  padding: 6px 14px;
+  border: 1px solid var(--gray-300);
+  border-radius: 20px;
+  background: white;
+  color: var(--gray-700);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.filter-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+}
+
+.btn-secondary:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+}
+
+/* Lead Detail Page */
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--gray-100);
+  color: var(--gray-700);
+  transition: background 0.2s;
+}
+
+.back-btn:hover {
+  background: var(--gray-200);
+  text-decoration: none;
+}
+
+.lead-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .lead-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-item label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  letter-spacing: 0.5px;
+}
+
+.info-item div {
+  color: var(--gray-900);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+.activity-form {
+  background: var(--gray-50);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.activity-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-item {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.activity-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--gray-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray-600);
+  flex-shrink: 0;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.activity-header strong {
+  color: var(--gray-900);
+}
+
+.activity-date {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.activity-notes {
+  color: var(--gray-700);
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 32px;
+  color: var(--gray-500);
+}

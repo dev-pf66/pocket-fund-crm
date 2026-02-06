@@ -5,6 +5,7 @@ import { getPeople, supabase } from './lib/supabase'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import LeadsBoard from './pages/LeadsBoard'
+import LeadDetail from './pages/LeadDetail'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ChatTerminal from './components/ChatTerminal'
@@ -84,6 +85,7 @@ function AppContent() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="pipeline" element={<LeadsBoard />} />
+            <Route path="leads/:id" element={<LeadDetail />} />
           </Route>
         </Routes>
         <ChatTerminal />
