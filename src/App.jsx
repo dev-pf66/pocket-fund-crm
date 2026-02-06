@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import LeadsBoard from './pages/LeadsBoard'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import ChatTerminal from './components/ChatTerminal'
 
 export const AppContext = createContext()
 
@@ -85,6 +86,7 @@ function AppContent() {
             <Route path="pipeline" element={<LeadsBoard />} />
           </Route>
         </Routes>
+        <ChatTerminal />
       </BrowserRouter>
     </AppContext.Provider>
   )

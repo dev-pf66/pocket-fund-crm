@@ -4,6 +4,7 @@ import { getLeads, moveLead } from '../lib/crm-api'
 import { useApp } from '../App'
 import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
+import QuickAddCard from '../components/QuickAddCard'
 import { Plus } from 'lucide-react'
 
 const STAGES = [
@@ -109,6 +110,8 @@ function LeadsBoard() {
               </div>
 
               <div className="crm-column-content">
+                <QuickAddCard stage={stage.key} onLeadCreated={loadLeads} />
+
                 {stageLeads.length === 0 && (
                   <div className="empty-column">
                     No leads in this stage

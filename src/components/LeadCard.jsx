@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
-import { getCRMSettings, calculateStaleness } from '../lib/crm-api'
+import { getCRMSettings, calculateStaleness, logActivity } from '../lib/crm-api'
+import { useApp } from '../App'
 import StalenessBadge from './StalenessBadge'
+import { Phone, Mail, MessageCircle } from 'lucide-react'
 
 function LeadCard({ lead, onDragStart, onClick, onRefresh }) {
+  const { currentPerson } = useApp()
   const [settings, setSettings] = useState(null)
+  const [logging, setLogging] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -15,6 +19,25 @@ function LeadCard({ lead, onDragStart, onClick, onRefresh }) {
       setSettings(data)
     } catch (error) {
       console.error('Failed to load settings:', error)
+    }
+  }
+
+  async function handleQuickLog(e, activityType) {
+    e.stopPropagation()
+    if (logging) return
+
+    setLogging(true)
+    try {
+      await logActivity(lead.id, {
+        activity_type: activityType,
+        notes: `Quick log from pipeline`
+      }, currentPerson?.id)
+
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      console.error('Failed to log activity:', error)
+    } finally {
+      setLogging(false)
     }
   }
 
@@ -91,6 +114,32 @@ function LeadCard({ lead, onDragStart, onClick, onRefresh }) {
         <span className="lead-last-activity">
           {activityTypeEmoji[lead.last_activity_type] || '•'} {formatTimeAgo(lead.last_activity_date)}
         </span>
+        <div className="lead-quick-actions">
+          <button
+            className="quick-action-btn"
+            onClick={(e) => handleQuickLog(e, 'call')}
+            disabled={logging}
+            title="Log call"
+          >
+            <Phone size={14} />
+          </button>
+          <button
+            className="quick-action-btn"
+            onClick={(e) => handleQuickLog(e, 'email')}
+            disabled={logging}
+            title="Log email"
+          >
+            <Mail size={14} />
+          </button>
+          <button
+            className="quick-action-btn"
+            onClick={(e) => handleQuickLog(e, 'linkedin_message')}
+            disabled={logging}
+            title="Log LinkedIn message"
+          >
+            <MessageCircle size={14} />
+          </button>
+        </div>
       </div>
     </div>
   )
