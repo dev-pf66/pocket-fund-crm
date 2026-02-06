@@ -26,6 +26,26 @@ export async function signInWithEmail(email, password) {
   return data
 }
 
+// Sign up with email
+export async function signUpWithEmail(email, password, name) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password
+  })
+  if (error) throw error
+
+  // Create person record if signup successful
+  if (data.user) {
+    const { error: personError } = await supabase
+      .from('people')
+      .insert([{ email, name }])
+
+    if (personError) console.error('Failed to create person record:', personError)
+  }
+
+  return data
+}
+
 // Sign out
 export async function signOut() {
   const { error } = await supabase.auth.signOut()

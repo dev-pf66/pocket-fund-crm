@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { signInWithEmail } from '../lib/supabase'
 
 function Login() {
@@ -60,6 +61,13 @@ function Login() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+          <span style={{ color: '#9ca3af' }}>Don't have an account? </span>
+          <Link to="/signup" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+            Create one
+          </Link>
+        </div>
       </div>
     </div>
   )

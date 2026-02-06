@@ -6,6 +6,7 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import LeadsBoard from './pages/LeadsBoard'
 import Login from './pages/Login'
+import Signup from './pages/Signup'
 
 export const AppContext = createContext()
 
@@ -54,11 +55,20 @@ function AppContent() {
     }
   }
 
+  if (authLoading) {
+    return <div className="loading-screen"><div className="loading-spinner"></div><p>Loading...</p></div>
+  }
+
   if (!isAuthenticated) {
-    if (authLoading) {
-      return <div className="loading-screen"><div className="loading-spinner"></div><p>Loading...</p></div>
-    }
-    return <Login />
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </BrowserRouter>
+    )
   }
 
   if (dataLoading) {
