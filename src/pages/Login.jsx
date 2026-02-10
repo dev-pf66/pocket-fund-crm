@@ -29,7 +29,7 @@ function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>Pocket Fund CRM</h1>
+        <h1>PF Sales CRM</h1>
         <p>Sales Lead Management</p>
 
         <form onSubmit={handleSubmit} className="login-form">

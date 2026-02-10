@@ -10,7 +10,7 @@ function Layout() {
   return (
     <div className="app-layout">
       <aside className="sidebar">
-        <h1>Pocket Fund CRM</h1>
+        <h1>PF Sales CRM</h1>
         <nav>
           <NavLink to="/dashboard"><LayoutDashboard size={18} />Dashboard</NavLink>
           <NavLink to="/pipeline"><Users size={18} />Sales Pipeline</NavLink>

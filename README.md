@@ -1,6 +1,6 @@
-# Pocket Fund Sales CRM
+# PF Sales CRM
 
-Sales lead management tool for Pocket Fund.
+Sales lead management tool for PF.
 
 ## Features
 
