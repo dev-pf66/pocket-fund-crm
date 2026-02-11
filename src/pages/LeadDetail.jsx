@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript } from '../lib/crm-api'
+import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn } from '../lib/crm-api'
 import { useApp } from '../App'
-import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles } from 'lucide-react'
 
 function LeadDetail() {
   const { id } = useParams()
@@ -18,6 +18,10 @@ function LeadDetail() {
   const [showTranscriptForm, setShowTranscriptForm] = useState(false)
   const [newActivity, setNewActivity] = useState({ activity_type: 'call', notes: '', transcript: '' })
   const [newTranscript, setNewTranscript] = useState({ title: '', transcript: '', call_date: new Date().toISOString().split('T')[0] })
+  const [allTags, setAllTags] = useState([])
+  const [leadTags, setLeadTags] = useState([])
+  const [enriching, setEnriching] = useState(false)
+  const [calculating, setCalculating] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -26,15 +30,19 @@ function LeadDetail() {
   async function loadData() {
     setLoading(true)
     try {
-      const [leadData, activitiesData, transcriptsData] = await Promise.all([
+      const [leadData, activitiesData, transcriptsData, tagsData, leadTagsData] = await Promise.all([
         getLeadById(id),
         getLeadActivities(id),
-        getLeadTranscripts(id)
+        getLeadTranscripts(id),
+        getTags(),
+        getLeadTags(id)
       ])
       setLead(leadData)
       setEditedLead(leadData)
       setActivities(activitiesData)
       setTranscripts(transcriptsData)
+      setAllTags(tagsData)
+      setLeadTags(leadTagsData)
     } catch (error) {
       console.error('Failed to load lead:', error)
     } finally {
@@ -102,6 +110,61 @@ function LeadDetail() {
     } catch (error) {
       console.error('Failed to delete transcript:', error)
       alert('Failed to delete transcript')
+    }
+  }
+
+  async function handleCalculateScore() {
+    setCalculating(true)
+    try {
+      const score = await calculateLeadScore(id)
+      await loadData() // Refresh to get updated score
+      alert(`Lead score calculated: ${score}/100`)
+    } catch (error) {
+      console.error('Failed to calculate score:', error)
+      alert('Failed to calculate score')
+    } finally {
+      setCalculating(false)
+    }
+  }
+
+  async function handleEnrichFromLinkedIn() {
+    if (!editedLead.linkedin_url) {
+      alert('Please add a LinkedIn URL first')
+      return
+    }
+
+    setEnriching(true)
+    try {
+      const result = await enrichLeadFromLinkedIn(id, editedLead.linkedin_url)
+      if (result.manual) {
+        alert(result.message)
+      }
+      await loadData()
+    } catch (error) {
+      console.error('Failed to enrich:', error)
+      alert('Failed to enrich from LinkedIn')
+    } finally {
+      setEnriching(false)
+    }
+  }
+
+  async function handleAddTag(tagId) {
+    try {
+      await addTagToLead(id, tagId)
+      await loadData()
+    } catch (error) {
+      console.error('Failed to add tag:', error)
+      alert('Failed to add tag')
+    }
+  }
+
+  async function handleRemoveTag(tagId) {
+    try {
+      await removeTagFromLead(id, tagId)
+      await loadData()
+    } catch (error) {
+      console.error('Failed to remove tag:', error)
+      alert('Failed to remove tag')
     }
   }
 
@@ -270,6 +333,190 @@ function LeadDetail() {
                   {' '}Needs Sample Deals
                 </label>
               </div>
+
+              {/* LinkedIn Enrichment Section */}
+              <div className="form-group full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={16} />
+                  LinkedIn Auto-Enrichment
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
+                  <input
+                    type="url"
+                    value={editedLead.linkedin_url || ''}
+                    onChange={(e) => setEditedLead({ ...editedLead, linkedin_url: e.target.value })}
+                    placeholder="Paste LinkedIn URL..."
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    onClick={handleEnrichFromLinkedIn}
+                    disabled={!editedLead.linkedin_url || enriching}
+                  >
+                    {enriching ? 'Enriching...' : 'Auto-Fill'}
+                  </button>
+                </div>
+                {editedLead.linkedin_headline && (
+                  <div style={{ marginTop: '8px', padding: '8px', background: 'var(--gray-50)', borderRadius: '4px', fontSize: '13px' }}>
+                    {editedLead.linkedin_headline}
+                  </div>
+                )}
+              </div>
+
+              {/* Firmographics Section */}
+              <div className="form-group full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
+                <h3 style={{ marginBottom: '12px', fontSize: '16px', color: 'var(--gray-700)' }}>Firmographics</h3>
+              </div>
+
+              <div className="form-group">
+                <label>AUM</label>
+                <input
+                  type="text"
+                  value={editedLead.aum || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, aum: e.target.value })}
+                  placeholder="e.g., $50M-$100M"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Portfolio Size</label>
+                <input
+                  type="number"
+                  value={editedLead.portfolio_size || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, portfolio_size: parseInt(e.target.value) || null })}
+                  placeholder="# of companies"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Fund Vintage</label>
+                <input
+                  type="text"
+                  value={editedLead.fund_vintage || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, fund_vintage: e.target.value })}
+                  placeholder="e.g., 2022"
+                />
+              </div>
+
+              <div className="form-group full-width">
+                <label>Investment Thesis</label>
+                <textarea
+                  value={editedLead.investment_thesis || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, investment_thesis: e.target.value })}
+                  rows={2}
+                  placeholder="What types of deals are they looking for?"
+                />
+              </div>
+
+              <div className="form-group full-width">
+                <label>Recent Deals</label>
+                <textarea
+                  value={editedLead.recent_deals || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, recent_deals: e.target.value })}
+                  rows={2}
+                  placeholder="Notable recent acquisitions or investments"
+                />
+              </div>
+
+              {/* Decision Timeline Section */}
+              <div className="form-group full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
+                <h3 style={{ marginBottom: '12px', fontSize: '16px', color: 'var(--gray-700)' }}>Decision Timeline</h3>
+              </div>
+
+              <div className="form-group">
+                <label>Expected Close Date</label>
+                <input
+                  type="date"
+                  value={editedLead.expected_close_date || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, expected_close_date: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Budget Discussed</label>
+                <input
+                  type="text"
+                  value={editedLead.budget_discussed || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, budget_discussed: e.target.value })}
+                  placeholder="e.g., $5K-10K/month"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Decision Process Stage</label>
+                <select
+                  value={editedLead.decision_process_stage || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, decision_process_stage: e.target.value })}
+                >
+                  <option value="">Select stage</option>
+                  <option value="Evaluation">Evaluation</option>
+                  <option value="Approval">Approval</option>
+                  <option value="Legal Review">Legal Review</option>
+                  <option value="Contracting">Contracting</option>
+                  <option value="Ready to Sign">Ready to Sign</option>
+                </select>
+              </div>
+
+              <div className="form-group full-width">
+                <label>Key Blockers</label>
+                <textarea
+                  value={editedLead.key_blockers || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, key_blockers: e.target.value })}
+                  rows={2}
+                  placeholder="What's preventing them from closing?"
+                />
+              </div>
+
+              {/* Relationship Strength Section */}
+              <div className="form-group full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
+                <h3 style={{ marginBottom: '12px', fontSize: '16px', color: 'var(--gray-700)' }}>Relationship Strength</h3>
+              </div>
+
+              <div className="form-group">
+                <label>Relationship Strength</label>
+                <select
+                  value={editedLead.relationship_strength || 'cold'}
+                  onChange={(e) => setEditedLead({ ...editedLead, relationship_strength: e.target.value })}
+                >
+                  <option value="cold">Cold</option>
+                  <option value="warm">Warm</option>
+                  <option value="strong">Strong</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Trust Level</label>
+                <select
+                  value={editedLead.trust_level || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, trust_level: e.target.value })}
+                >
+                  <option value="">Select level</option>
+                  <option value="building">Building</option>
+                  <option value="established">Established</option>
+                  <option value="trusted_advisor">Trusted Advisor</option>
+                </select>
+              </div>
+
+              <div className="form-group full-width">
+                <label>Mutual Connections</label>
+                <textarea
+                  value={editedLead.mutual_connections || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, mutual_connections: e.target.value })}
+                  rows={2}
+                  placeholder="Who do we both know?"
+                />
+              </div>
+
+              <div className="form-group full-width">
+                <label>Referral Details</label>
+                <textarea
+                  value={editedLead.referral_details || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, referral_details: e.target.value })}
+                  rows={2}
+                  placeholder="How were we introduced?"
+                />
+              </div>
             </div>
           ) : (
             <div className="info-grid">
@@ -332,8 +579,280 @@ function LeadDetail() {
                   <div className="lead-flag">📋 Needs Sample Deals</div>
                 </div>
               )}
+
+              {/* Lead Score */}
+              {lead.lead_score !== null && lead.lead_score !== undefined && (
+                <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <TrendingUp size={16} />
+                    Lead Score
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
+                    <div style={{
+                      fontSize: '32px',
+                      fontWeight: 'bold',
+                      color: lead.lead_score >= 75 ? 'var(--success)' : lead.lead_score >= 50 ? 'var(--warning)' : 'var(--gray-500)'
+                    }}>
+                      {lead.lead_score}
+                      <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/100</span>
+                    </div>
+                    <button className="btn btn-sm btn-secondary" onClick={handleCalculateScore} disabled={calculating}>
+                      {calculating ? 'Calculating...' : 'Recalculate'}
+                    </button>
+                  </div>
+                  {lead.score_last_calculated && (
+                    <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>
+                      Last calculated: {new Date(lead.score_last_calculated).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Firmographics */}
+              {(lead.aum || lead.investment_thesis || lead.portfolio_size || lead.fund_vintage || lead.recent_deals) && (
+                <>
+                  <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
+                    <h3 style={{ fontSize: '16px', color: 'var(--gray-700)', margin: 0 }}>Firmographics</h3>
+                  </div>
+
+                  {lead.aum && (
+                    <div className="info-item">
+                      <label>AUM</label>
+                      <div>{lead.aum}</div>
+                    </div>
+                  )}
+
+                  {lead.portfolio_size && (
+                    <div className="info-item">
+                      <label>Portfolio Size</label>
+                      <div>{lead.portfolio_size} companies</div>
+                    </div>
+                  )}
+
+                  {lead.fund_vintage && (
+                    <div className="info-item">
+                      <label>Fund Vintage</label>
+                      <div>{lead.fund_vintage}</div>
+                    </div>
+                  )}
+
+                  {lead.investment_thesis && (
+                    <div className="info-item full-width">
+                      <label>Investment Thesis</label>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{lead.investment_thesis}</div>
+                    </div>
+                  )}
+
+                  {lead.recent_deals && (
+                    <div className="info-item full-width">
+                      <label>Recent Deals</label>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{lead.recent_deals}</div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Decision Timeline */}
+              {(lead.expected_close_date || lead.budget_discussed || lead.decision_process_stage || lead.key_blockers) && (
+                <>
+                  <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
+                    <h3 style={{ fontSize: '16px', color: 'var(--gray-700)', margin: 0 }}>Decision Timeline</h3>
+                  </div>
+
+                  {lead.expected_close_date && (
+                    <div className="info-item">
+                      <label>Expected Close Date</label>
+                      <div>{new Date(lead.expected_close_date).toLocaleDateString()}</div>
+                    </div>
+                  )}
+
+                  {lead.budget_discussed && (
+                    <div className="info-item">
+                      <label>Budget Discussed</label>
+                      <div>{lead.budget_discussed}</div>
+                    </div>
+                  )}
+
+                  {lead.decision_process_stage && (
+                    <div className="info-item">
+                      <label>Decision Process Stage</label>
+                      <div><span className="stage-badge">{lead.decision_process_stage}</span></div>
+                    </div>
+                  )}
+
+                  {lead.key_blockers && (
+                    <div className="info-item full-width">
+                      <label>Key Blockers</label>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{lead.key_blockers}</div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Relationship Strength */}
+              {(lead.relationship_strength || lead.trust_level || lead.mutual_connections || lead.referral_details) && (
+                <>
+                  <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
+                    <h3 style={{ fontSize: '16px', color: 'var(--gray-700)', margin: 0 }}>Relationship Strength</h3>
+                  </div>
+
+                  {lead.relationship_strength && (
+                    <div className="info-item">
+                      <label>Relationship</label>
+                      <div><span className={`relationship-badge ${lead.relationship_strength}`}>{lead.relationship_strength}</span></div>
+                    </div>
+                  )}
+
+                  {lead.trust_level && (
+                    <div className="info-item">
+                      <label>Trust Level</label>
+                      <div>{lead.trust_level.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                    </div>
+                  )}
+
+                  {lead.mutual_connections && (
+                    <div className="info-item full-width">
+                      <label>Mutual Connections</label>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{lead.mutual_connections}</div>
+                    </div>
+                  )}
+
+                  {lead.referral_details && (
+                    <div className="info-item full-width">
+                      <label>Referral Details</label>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{lead.referral_details}</div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* LinkedIn Enrichment Info */}
+              {(lead.current_role || lead.linkedin_headline || lead.education || lead.past_experience) && (
+                <>
+                  <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Linkedin size={16} />
+                      LinkedIn Profile
+                    </label>
+                  </div>
+
+                  {lead.linkedin_headline && (
+                    <div className="info-item full-width">
+                      <div style={{ fontStyle: 'italic', color: 'var(--gray-600)' }}>{lead.linkedin_headline}</div>
+                    </div>
+                  )}
+
+                  {lead.current_role && (
+                    <div className="info-item">
+                      <label>Current Role</label>
+                      <div>{lead.current_role}</div>
+                    </div>
+                  )}
+
+                  {lead.education && (
+                    <div className="info-item">
+                      <label>Education</label>
+                      <div>{lead.education}</div>
+                    </div>
+                  )}
+
+                  {lead.past_experience && (
+                    <div className="info-item full-width">
+                      <label>Past Experience</label>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{lead.past_experience}</div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
+        </div>
+
+        {/* Tags Card */}
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Tag size={20} />
+              Tags
+            </h2>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+            {leadTags.length === 0 && (
+              <div style={{ color: 'var(--gray-400)', fontSize: '14px' }}>No tags yet</div>
+            )}
+            {leadTags.map(tag => (
+              <div
+                key={tag.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 12px',
+                  background: tag.color || '#3b82f6',
+                  color: 'white',
+                  borderRadius: '16px',
+                  fontSize: '13px',
+                  fontWeight: '500'
+                }}
+              >
+                {tag.name}
+                <button
+                  onClick={() => handleRemoveTag(tag.id)}
+                  style={{
+                    background: 'rgba(255,255,255,0.3)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '18px',
+                    height: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    padding: 0
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Add Tag</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {allTags.filter(tag => !leadTags.find(lt => lt.id === tag.id)).map(tag => (
+                <button
+                  key={tag.id}
+                  onClick={() => handleAddTag(tag.id)}
+                  style={{
+                    padding: '4px 12px',
+                    background: 'white',
+                    border: `2px solid ${tag.color || '#3b82f6'}`,
+                    color: tag.color || '#3b82f6',
+                    borderRadius: '16px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.background = tag.color || '#3b82f6'
+                    e.target.style.color = 'white'
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.background = 'white'
+                    e.target.style.color = tag.color || '#3b82f6'
+                  }}
+                >
+                  + {tag.name}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Activity Timeline */}

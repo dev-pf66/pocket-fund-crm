@@ -428,6 +428,46 @@
   }
 }
 
+/* ============================================================================
+   LEAD DETAIL - NEW FEATURES
+   ============================================================================ */
+
+/* Relationship Strength Badge */
+.relationship-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.relationship-badge.cold {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+.relationship-badge.warm {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.relationship-badge.strong {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* Stage Badge */
+.stage-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
 @media (max-width: 768px) {
   .crm-board {
     flex-direction: column;

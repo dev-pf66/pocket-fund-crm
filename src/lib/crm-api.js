@@ -869,3 +869,121 @@ export async function deleteTranscript(id) {
 
   if (error) throw error
 }
+
+// ============================================================================
+// TAGS
+// ============================================================================
+
+export async function getTags() {
+  const { data, error } = await supabase
+    .from('crm_tags')
+    .select('*')
+    .order('name', { ascending: true })
+
+  if (error) throw error
+  return data || []
+}
+
+export async function createTag(tagData) {
+  const { data, error } = await supabase
+    .from('crm_tags')
+    .insert([tagData])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function deleteTag(id) {
+  const { error } = await supabase
+    .from('crm_tags')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+export async function getLeadTags(leadId) {
+  const { data, error } = await supabase
+    .from('crm_lead_tags')
+    .select(`
+      *,
+      tag:crm_tags(*)
+    `)
+    .eq('lead_id', leadId)
+
+  if (error) throw error
+  return data?.map(lt => lt.tag) || []
+}
+
+export async function addTagToLead(leadId, tagId) {
+  const { data, error } = await supabase
+    .from('crm_lead_tags')
+    .insert([{ lead_id: leadId, tag_id: tagId }])
+    .select()
+
+  if (error) throw error
+  return data
+}
+
+export async function removeTagFromLead(leadId, tagId) {
+  const { error } = await supabase
+    .from('crm_lead_tags')
+    .delete()
+    .eq('lead_id', leadId)
+    .eq('tag_id', tagId)
+
+  if (error) throw error
+}
+
+// ============================================================================
+// LEAD SCORING
+// ============================================================================
+
+export async function calculateLeadScore(leadId) {
+  const { data, error } = await supabase.rpc('calculate_lead_score', {
+    p_lead_id: leadId
+  })
+
+  if (error) throw error
+  return data
+}
+
+export async function recalculateAllLeadScores() {
+  const leads = await getLeads()
+  const results = await Promise.all(
+    leads.map(lead => calculateLeadScore(lead.id))
+  )
+  return results
+}
+
+// ============================================================================
+// LINKEDIN ENRICHMENT
+// ============================================================================
+
+/**
+ * Enrich lead from LinkedIn URL
+ * This is a placeholder - in production, integrate with a LinkedIn scraping service
+ */
+export async function enrichLeadFromLinkedIn(leadId, linkedinUrl) {
+  // Mark as pending
+  await updateLead(leadId, {
+    linkedin_url: linkedinUrl,
+    enrichment_status: 'pending'
+  })
+
+  // In production, call a LinkedIn scraping API here
+  // For now, we'll just mark it as needing manual enrichment
+  await logActivity(leadId, {
+    activity_type: 'note',
+    activity_date: new Date().toISOString(),
+    notes: `LinkedIn profile URL added: ${linkedinUrl}. Manual enrichment needed.`
+  })
+
+  return {
+    success: true,
+    message: 'LinkedIn URL saved. Manual enrichment needed.',
+    manual: true
+  }
+}
