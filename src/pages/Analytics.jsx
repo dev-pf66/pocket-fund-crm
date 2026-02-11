@@ -14,12 +14,17 @@ function Analytics() {
   async function loadAnalytics() {
     setLoading(true)
     try {
-      const [analytics, outreach] = await Promise.all([
-        getAnalytics(),
-        getDailyOutreachStats(7)
-      ])
+      const analytics = await getAnalytics()
       setData(analytics)
-      setOutreachStats(outreach)
+
+      // Try to load outreach stats, but don't fail if table doesn't exist yet
+      try {
+        const outreach = await getDailyOutreachStats(7)
+        setOutreachStats(outreach)
+      } catch (outreachError) {
+        console.log('Outreach stats not available yet (table may not exist)')
+        setOutreachStats([])
+      }
     } catch (error) {
       console.error('Failed to load analytics:', error)
     } finally {

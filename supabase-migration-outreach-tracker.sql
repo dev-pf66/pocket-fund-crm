@@ -15,6 +15,15 @@ CREATE TABLE IF NOT EXISTS crm_outreach_log (
   status VARCHAR(50) DEFAULT 'sent', -- 'sent', 'replied', 'no_response', 'bounced'
   notes TEXT,
 
+  -- NEW FIELDS
+  message_content TEXT, -- The actual message sent
+  platform_details VARCHAR(200), -- Where: "LinkedIn DM", "Email to john@acme.com", "Phone +1234567890"
+  fit_score INTEGER CHECK (fit_score >= 1 AND fit_score <= 5), -- 1=poor fit, 5=perfect fit
+  industry VARCHAR(100),
+  deal_size VARCHAR(100), -- e.g. "$1M-$5M"
+  location VARCHAR(100),
+  lead_source VARCHAR(100), -- How did we find them
+
   -- Metadata
   logged_by INTEGER REFERENCES people(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
