@@ -94,7 +94,7 @@ function OutreachTracker() {
     }
 
     try {
-      await logOutreach(newOutreach, currentPerson?.id)
+      await logOutreach(newOutreach, currentPerson?.id, currentPerson?.name)
       setNewOutreach({
         lead_id: null,
         lead_name: '',
@@ -160,7 +160,7 @@ function OutreachTracker() {
         if (!outreach.outreach_type) outreach.outreach_type = 'cold_email'
         if (!outreach.status) outreach.status = 'sent'
 
-        await logOutreach(outreach, currentPerson?.id)
+        await logOutreach(outreach, currentPerson?.id, currentPerson?.name)
         imported++
       }
 

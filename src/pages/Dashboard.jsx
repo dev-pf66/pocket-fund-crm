@@ -1,21 +1,36 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { getCRMDashboardData } from '../lib/crm-api'
-import { TrendingUp, AlertCircle, Calendar, FileText, Phone } from 'lucide-react'
+import { getCRMDashboardData, getAssignedLeads } from '../lib/crm-api'
+import { useApp } from '../App'
+import { TrendingUp, AlertCircle, Calendar, FileText, Phone, Activity, User } from 'lucide-react'
+import ActivityFeed from '../components/ActivityFeed'
 
 function Dashboard() {
+  const { currentPerson } = useApp()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
+  const [myLeads, setMyLeads] = useState([])
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [currentPerson])
 
   async function loadData() {
     setLoading(true)
     try {
       const dashboardData = await getCRMDashboardData()
       setData(dashboardData)
+
+      // Load assigned leads if user is logged in
+      if (currentPerson?.id) {
+        try {
+          const assigned = await getAssignedLeads(currentPerson.id)
+          setMyLeads(assigned)
+        } catch (err) {
+          console.log('Could not load assigned leads:', err)
+          setMyLeads([])
+        }
+      }
     } catch (error) {
       console.error('Failed to load CRM dashboard:', error)
     } finally {
@@ -249,6 +264,83 @@ function Dashboard() {
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#16a34a' }}>
               {weeklyStats.closed_clients}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Team Activity & My Leads */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        {/* My Leads */}
+        <div className="card">
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <User size={20} /> My Assigned Leads
+          </h2>
+          {myLeads.length === 0 ? (
+            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--gray-500)' }}>
+              <User size={48} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+              <div>No leads assigned to you yet</div>
+            </div>
+          ) : (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{
+                fontSize: '32px',
+                fontWeight: 'bold',
+                color: 'var(--primary)',
+                marginBottom: '16px'
+              }}>
+                {myLeads.length}
+                <span style={{ fontSize: '18px', color: 'var(--gray-400)', marginLeft: '8px' }}>
+                  lead{myLeads.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {myLeads.map(lead => (
+                  <Link
+                    key={lead.id}
+                    to={`/leads/${lead.id}`}
+                    style={{
+                      display: 'block',
+                      padding: '12px',
+                      borderBottom: '1px solid var(--gray-100)',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>{lead.name}</div>
+                    {lead.firm_name && (
+                      <div style={{ fontSize: '14px', color: 'var(--gray-600)' }}>{lead.firm_name}</div>
+                    )}
+                    <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>
+                      {lead.stage.replace('_', ' ')} • Assigned {new Date(lead.assigned_date).toLocaleDateString()}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <Link
+                to="/pipeline"
+                style={{
+                  display: 'block',
+                  marginTop: '16px',
+                  textAlign: 'center',
+                  color: 'var(--primary)',
+                  textDecoration: 'none',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}
+              >
+                View All in Pipeline →
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Activity Feed */}
+        <div className="card">
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Activity size={20} /> Team Activity
+          </h2>
+          <div style={{ marginTop: '16px', maxHeight: '400px', overflowY: 'auto' }}>
+            <ActivityFeed limit={10} />
           </div>
         </div>
       </div>

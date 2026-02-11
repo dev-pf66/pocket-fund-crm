@@ -1033,7 +1033,7 @@ export async function getOutreachLog(filters = {}) {
 /**
  * Log an outreach activity
  */
-export async function logOutreach(outreachData, currentPersonId) {
+export async function logOutreach(outreachData, currentPersonId, currentPersonName) {
   const { data, error } = await supabase
     .from('crm_outreach_log')
     .insert([{
@@ -1045,6 +1045,32 @@ export async function logOutreach(outreachData, currentPersonId) {
     .single()
 
   if (error) throw error
+
+  // Log activity
+  if (currentPersonName && data) {
+    const typeLabel = outreachData.outreach_type?.replace('_', ' ') || 'outreach'
+    const description = `${currentPersonName} logged ${typeLabel} to ${outreachData.lead_name}${outreachData.firm_name ? ' at ' + outreachData.firm_name : ''}`
+
+    try {
+      await logActivityManual({
+        user_id: currentPersonId,
+        user_name: currentPersonName,
+        action_type: 'outreach_logged',
+        description,
+        entity_type: 'outreach',
+        entity_id: data.id,
+        entity_name: outreachData.lead_name,
+        metadata: {
+          outreach_type: outreachData.outreach_type,
+          firm: outreachData.firm_name,
+          fit_score: outreachData.fit_score
+        }
+      })
+    } catch (activityError) {
+      console.error('Failed to log activity:', activityError)
+    }
+  }
+
   return data
 }
 
@@ -1131,4 +1157,108 @@ export async function getTodaysOutreachSummary() {
   })
 
   return summary
+}
+
+// ============================================================================
+// LEAD ASSIGNMENT
+// ============================================================================
+
+/**
+ * Assign lead to a person
+ */
+export async function assignLead(leadId, assignedToPersonId, assignedByPersonId) {
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .update({
+      assigned_to: assignedToPersonId,
+      assigned_by: assignedByPersonId,
+      assigned_date: new Date().toISOString()
+    })
+    .eq('id', leadId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get leads assigned to a person
+ */
+export async function getAssignedLeads(personId) {
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .select(`
+      *,
+      assigned_to_person:assigned_to(id, name, email),
+      assigned_by_person:assigned_by(id, name, email)
+    `)
+    .eq('assigned_to', personId)
+    .order('assigned_date', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Get unassigned leads
+ */
+export async function getUnassignedLeads() {
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .select('*')
+    .is('assigned_to', null)
+    .neq('stage', 'passed')
+    .neq('stage', 'client')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+// ============================================================================
+// ACTIVITY FEED
+// ============================================================================
+
+/**
+ * Get recent activity feed
+ */
+export async function getRecentActivity(limit = 15) {
+  const { data, error } = await supabase.rpc('get_recent_activity', {
+    limit_count: limit
+  })
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Get activity for a specific user
+ */
+export async function getUserActivity(userId, limit = 15) {
+  const { data, error } = await supabase.rpc('get_user_activity', {
+    p_user_id: userId,
+    limit_count: limit
+  })
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Log activity manually (for actions not covered by triggers)
+ */
+export async function logActivityManual(activityData) {
+  const { error } = await supabase.rpc('log_activity', {
+    p_user_id: activityData.user_id,
+    p_user_name: activityData.user_name,
+    p_action_type: activityData.action_type,
+    p_description: activityData.description,
+    p_entity_type: activityData.entity_type || null,
+    p_entity_id: activityData.entity_id || null,
+    p_entity_name: activityData.entity_name || null,
+    p_metadata: activityData.metadata || null
+  })
+
+  if (error) throw error
 }

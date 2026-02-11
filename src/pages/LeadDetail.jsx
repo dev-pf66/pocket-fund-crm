@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn } from '../lib/crm-api'
+import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead } from '../lib/crm-api'
 import { useApp } from '../App'
-import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck } from 'lucide-react'
 
 function LeadDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
   const [transcripts, setTranscripts] = useState([])
@@ -168,6 +168,16 @@ function LeadDetail() {
     }
   }
 
+  async function handleAssignment(assignedToId) {
+    try {
+      await assignLead(id, parseInt(assignedToId), currentPerson?.id)
+      await loadData()
+    } catch (error) {
+      console.error('Failed to assign lead:', error)
+      alert('Failed to assign lead')
+    }
+  }
+
   if (loading) {
     return <div className="loading">Loading lead...</div>
   }
@@ -320,6 +330,24 @@ function LeadDetail() {
                   <option value="active_conversation">Active Conversation</option>
                   <option value="client">Client</option>
                   <option value="passed">Passed</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserCheck size={16} />
+                  Assigned To
+                </label>
+                <select
+                  value={editedLead.assigned_to || ''}
+                  onChange={(e) => handleAssignment(e.target.value)}
+                >
+                  <option value="">Unassigned</option>
+                  {people.map(person => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -559,6 +587,23 @@ function LeadDetail() {
                 <label>Stage</label>
                 <div>{lead.stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
               </div>
+
+              {lead.assigned_to && (
+                <div className="info-item">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <UserCheck size={16} />
+                    Assigned To
+                  </label>
+                  <div>
+                    {people.find(p => p.id === lead.assigned_to)?.name || 'Unknown'}
+                    {lead.assigned_date && (
+                      <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                        Assigned {new Date(lead.assigned_date).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {lead.deal_criteria && (
                 <div className="info-item full-width">

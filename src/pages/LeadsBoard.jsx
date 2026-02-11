@@ -23,6 +23,7 @@ function LeadsBoard() {
   const [draggedLead, setDraggedLead] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState('all')
+  const [assignmentFilter, setAssignmentFilter] = useState('all') // 'all', 'mine', 'unassigned'
   const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
@@ -82,6 +83,10 @@ function LeadsBoard() {
         const matchesEmail = lead.email?.toLowerCase().includes(query)
         if (!matchesName && !matchesFirm && !matchesEmail) return false
       }
+
+      // Assignment filter
+      if (assignmentFilter === 'mine' && lead.assigned_to !== currentPerson?.id) return false
+      if (assignmentFilter === 'unassigned' && lead.assigned_to != null) return false
 
       // Type filter
       if (filterType !== 'all') {
@@ -152,11 +157,32 @@ function LeadsBoard() {
 
         {showFilters && (
           <div className="filter-bar">
+            <div style={{ display: 'flex', gap: '8px', marginRight: '16px', paddingRight: '16px', borderRight: '2px solid var(--gray-200)' }}>
+              <button
+                className={`filter-chip ${assignmentFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setAssignmentFilter('all')}
+              >
+                All Leads
+              </button>
+              <button
+                className={`filter-chip ${assignmentFilter === 'mine' ? 'active' : ''}`}
+                onClick={() => setAssignmentFilter('mine')}
+              >
+                My Leads
+              </button>
+              <button
+                className={`filter-chip ${assignmentFilter === 'unassigned' ? 'active' : ''}`}
+                onClick={() => setAssignmentFilter('unassigned')}
+              >
+                Unassigned
+              </button>
+            </div>
+
             <button
               className={`filter-chip ${filterType === 'all' ? 'active' : ''}`}
               onClick={() => setFilterType('all')}
             >
-              All
+              All Types
             </button>
             <button
               className={`filter-chip ${filterType === 'PE Firm' ? 'active' : ''}`}
