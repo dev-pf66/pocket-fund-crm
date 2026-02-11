@@ -170,11 +170,12 @@ function LeadDetail() {
 
   async function handleAssignment(assignedToId) {
     try {
-      await assignLead(id, parseInt(assignedToId), currentPerson?.id)
+      const assignToPersonId = assignedToId ? parseInt(assignedToId) : null
+      await assignLead(id, assignToPersonId, currentPerson?.id)
       await loadData()
     } catch (error) {
       console.error('Failed to assign lead:', error)
-      alert('Failed to assign lead')
+      alert('Failed to assign lead: ' + error.message)
     }
   }
 

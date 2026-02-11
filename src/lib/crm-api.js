@@ -1167,13 +1167,15 @@ export async function getTodaysOutreachSummary() {
  * Assign lead to a person
  */
 export async function assignLead(leadId, assignedToPersonId, assignedByPersonId) {
+  const updateData = {
+    assigned_to: assignedToPersonId,
+    assigned_by: assignedToPersonId ? assignedByPersonId : null,
+    assigned_date: assignedToPersonId ? new Date().toISOString() : null
+  }
+
   const { data, error } = await supabase
     .from('crm_leads')
-    .update({
-      assigned_to: assignedToPersonId,
-      assigned_by: assignedByPersonId,
-      assigned_date: new Date().toISOString()
-    })
+    .update(updateData)
     .eq('id', leadId)
     .select()
     .single()
