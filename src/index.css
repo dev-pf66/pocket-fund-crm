@@ -6372,3 +6372,49 @@ input, select, textarea {
   font-size: 11px;
   color: var(--gray-600);
 }
+
+/* Transcripts Section */
+.transcripts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.transcript-item {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.transcript-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.transcript-header h4 {
+  margin: 0 0 4px;
+  color: var(--gray-900);
+  font-size: 16px;
+}
+
+.transcript-date {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.transcript-content {
+  background: white;
+  padding: 16px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--gray-700);
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--gray-200);
+}

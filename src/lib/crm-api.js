@@ -822,3 +822,50 @@ export async function getAnalytics() {
 
   return { conversion, velocity, sources, weekly }
 }
+
+// ============================================================================
+// Transcripts
+// ============================================================================
+
+export async function getLeadTranscripts(leadId) {
+  const { data, error } = await supabase
+    .from('crm_transcripts')
+    .select('*')
+    .eq('lead_id', leadId)
+    .order('call_date', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+export async function createTranscript(transcriptData) {
+  const { data, error } = await supabase
+    .from('crm_transcripts')
+    .insert([transcriptData])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function updateTranscript(id, updates) {
+  const { data, error } = await supabase
+    .from('crm_transcripts')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function deleteTranscript(id) {
+  const { error } = await supabase
+    .from('crm_transcripts')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}

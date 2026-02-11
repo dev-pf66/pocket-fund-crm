@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead } from '../lib/crm-api'
+import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript } from '../lib/crm-api'
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X } from 'lucide-react'
 
@@ -10,11 +10,14 @@ function LeadDetail() {
   const { currentPerson } = useApp()
   const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
+  const [transcripts, setTranscripts] = useState([])
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editedLead, setEditedLead] = useState(null)
   const [showActivityForm, setShowActivityForm] = useState(false)
+  const [showTranscriptForm, setShowTranscriptForm] = useState(false)
   const [newActivity, setNewActivity] = useState({ activity_type: 'call', notes: '', transcript: '' })
+  const [newTranscript, setNewTranscript] = useState({ title: '', transcript: '', call_date: new Date().toISOString().split('T')[0] })
 
   useEffect(() => {
     loadData()
@@ -23,13 +26,15 @@ function LeadDetail() {
   async function loadData() {
     setLoading(true)
     try {
-      const [leadData, activitiesData] = await Promise.all([
+      const [leadData, activitiesData, transcriptsData] = await Promise.all([
         getLeadById(id),
-        getLeadActivities(id)
+        getLeadActivities(id),
+        getLeadTranscripts(id)
       ])
       setLead(leadData)
       setEditedLead(leadData)
       setActivities(activitiesData)
+      setTranscripts(transcriptsData)
     } catch (error) {
       console.error('Failed to load lead:', error)
     } finally {
@@ -69,6 +74,34 @@ function LeadDetail() {
     } catch (error) {
       console.error('Failed to log activity:', error)
       alert('Failed to log activity')
+    }
+  }
+
+  async function handleAddTranscript() {
+    try {
+      await createTranscript({
+        lead_id: parseInt(id),
+        ...newTranscript,
+        created_by: currentPerson?.id
+      })
+      setNewTranscript({ title: '', transcript: '', call_date: new Date().toISOString().split('T')[0] })
+      setShowTranscriptForm(false)
+      await loadData()
+    } catch (error) {
+      console.error('Failed to add transcript:', error)
+      alert('Failed to add transcript')
+    }
+  }
+
+  async function handleDeleteTranscript(transcriptId) {
+    if (!confirm('Delete this transcript?')) return
+
+    try {
+      await deleteTranscript(transcriptId)
+      await loadData()
+    } catch (error) {
+      console.error('Failed to delete transcript:', error)
+      alert('Failed to delete transcript')
     }
   }
 
@@ -403,6 +436,95 @@ function LeadDetail() {
                       </div>
                     </details>
                   )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Call Transcripts */}
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2><Phone size={20} /> Call Transcripts</h2>
+            <button
+              className="btn btn-sm btn-primary"
+              onClick={() => setShowTranscriptForm(!showTranscriptForm)}
+            >
+              {showTranscriptForm ? 'Cancel' : '+ Add Transcript'}
+            </button>
+          </div>
+
+          {showTranscriptForm && (
+            <div className="activity-form" style={{ marginBottom: '24px' }}>
+              <div className="form-group">
+                <label>Title (Optional)</label>
+                <input
+                  type="text"
+                  value={newTranscript.title}
+                  onChange={(e) => setNewTranscript({ ...newTranscript, title: e.target.value })}
+                  placeholder="e.g., Discovery Call - Feb 10"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Call Date</label>
+                <input
+                  type="date"
+                  value={newTranscript.call_date}
+                  onChange={(e) => setNewTranscript({ ...newTranscript, call_date: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Transcript *</label>
+                <textarea
+                  value={newTranscript.transcript}
+                  onChange={(e) => setNewTranscript({ ...newTranscript, transcript: e.target.value })}
+                  placeholder="Paste full call transcript here..."
+                  rows={10}
+                  style={{ fontFamily: 'monospace', fontSize: '13px' }}
+                />
+              </div>
+
+              <button
+                className="btn btn-primary"
+                onClick={handleAddTranscript}
+                disabled={!newTranscript.transcript}
+              >
+                Save Transcript
+              </button>
+            </div>
+          )}
+
+          <div className="transcripts-list">
+            {transcripts.length === 0 && !showTranscriptForm && (
+              <div className="empty-state">No transcripts yet</div>
+            )}
+
+            {transcripts.map((transcript) => (
+              <div key={transcript.id} className="transcript-item">
+                <div className="transcript-header">
+                  <div>
+                    <h4>{transcript.title || `Call - ${new Date(transcript.call_date).toLocaleDateString()}`}</h4>
+                    <span className="transcript-date">
+                      {new Date(transcript.call_date).toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                  <button
+                    className="icon-btn"
+                    onClick={() => handleDeleteTranscript(transcript.id)}
+                    title="Delete transcript"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <div className="transcript-content">
+                  {transcript.transcript}
                 </div>
               </div>
             ))}
