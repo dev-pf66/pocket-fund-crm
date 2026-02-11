@@ -14,10 +14,7 @@ import { supabase } from './supabase'
 export async function getLeads(filters = {}) {
   let query = supabase
     .from('crm_leads')
-    .select(`
-      *,
-      created_by_person:created_by(id, name, email)
-    `)
+    .select('*')
     .order('updated_at', { ascending: false })
 
   if (filters.stage) query = query.eq('stage', filters.stage)
@@ -35,10 +32,7 @@ export async function getLeads(filters = {}) {
 export async function getLeadById(id) {
   const { data, error } = await supabase
     .from('crm_leads')
-    .select(`
-      *,
-      created_by_person:created_by(id, name, email)
-    `)
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -1206,11 +1200,7 @@ export async function assignLead(leadId, assignedToPersonId, assignedByPersonId)
 export async function getAssignedLeads(personId) {
   const { data, error } = await supabase
     .from('crm_leads')
-    .select(`
-      *,
-      assigned_to_person:assigned_to(id, name, email),
-      assigned_by_person:assigned_by(id, name, email)
-    `)
+    .select('*')
     .eq('assigned_to', personId)
     .order('assigned_date', { ascending: false })
 
