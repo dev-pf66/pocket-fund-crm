@@ -14,7 +14,7 @@ function LeadDetail() {
   const [isEditing, setIsEditing] = useState(false)
   const [editedLead, setEditedLead] = useState(null)
   const [showActivityForm, setShowActivityForm] = useState(false)
-  const [newActivity, setNewActivity] = useState({ activity_type: 'call', notes: '' })
+  const [newActivity, setNewActivity] = useState({ activity_type: 'call', notes: '', transcript: '' })
 
   useEffect(() => {
     loadData()
@@ -63,7 +63,7 @@ function LeadDetail() {
   async function handleAddActivity() {
     try {
       await logActivity(id, newActivity, currentPerson?.id)
-      setNewActivity({ activity_type: 'call', notes: '' })
+      setNewActivity({ activity_type: 'call', notes: '', transcript: '' })
       setShowActivityForm(false)
       await loadData()
     } catch (error) {
@@ -343,6 +343,19 @@ function LeadDetail() {
                 />
               </div>
 
+              {(newActivity.activity_type === 'call' || newActivity.activity_type === 'meeting') && (
+                <div className="form-group">
+                  <label>Call Transcript (Optional)</label>
+                  <textarea
+                    value={newActivity.transcript}
+                    onChange={(e) => setNewActivity({ ...newActivity, transcript: e.target.value })}
+                    placeholder="Paste full call transcript here..."
+                    rows={8}
+                    style={{ fontFamily: 'monospace', fontSize: '13px' }}
+                  />
+                </div>
+              )}
+
               <button className="btn btn-primary" onClick={handleAddActivity}>
                 Log Activity
               </button>
@@ -368,6 +381,27 @@ function LeadDetail() {
                   </div>
                   {activity.notes && (
                     <div className="activity-notes">{activity.notes}</div>
+                  )}
+                  {activity.transcript && (
+                    <details className="activity-transcript" style={{ marginTop: '12px' }}>
+                      <summary style={{ cursor: 'pointer', color: 'var(--primary)', fontWeight: '600', marginBottom: '8px' }}>
+                        📝 View Call Transcript
+                      </summary>
+                      <div style={{
+                        background: 'var(--gray-50)',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        whiteSpace: 'pre-wrap',
+                        fontFamily: 'monospace',
+                        fontSize: '13px',
+                        lineHeight: '1.6',
+                        color: 'var(--gray-700)',
+                        maxHeight: '400px',
+                        overflowY: 'auto'
+                      }}>
+                        {activity.transcript}
+                      </div>
+                    </details>
                   )}
                 </div>
               </div>
