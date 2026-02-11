@@ -77,14 +77,30 @@ export async function createLead(leadData, currentPersonId) {
  * Update lead
  */
 export async function updateLead(id, updates) {
+  // Clean up updates object - remove undefined/null values and internal fields
+  const cleanUpdates = {}
+  Object.keys(updates).forEach(key => {
+    // Skip internal fields that shouldn't be updated
+    if (['id', 'created_at', 'updated_at', 'created_by_person', 'assigned_to_person', 'assigned_by_person'].includes(key)) {
+      return
+    }
+    // Only include defined values
+    if (updates[key] !== undefined) {
+      cleanUpdates[key] = updates[key]
+    }
+  })
+
   const { data, error } = await supabase
     .from('crm_leads')
-    .update(updates)
+    .update(cleanUpdates)
     .eq('id', id)
     .select()
     .single()
 
-  if (error) throw error
+  if (error) {
+    console.error('Supabase update error:', error)
+    throw error
+  }
   return data
 }
 

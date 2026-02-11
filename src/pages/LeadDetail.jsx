@@ -52,12 +52,13 @@ function LeadDetail() {
 
   async function handleSave() {
     try {
-      await updateLead(id, editedLead)
-      setLead(editedLead)
+      const updatedLead = await updateLead(id, editedLead)
+      setLead(updatedLead)
       setIsEditing(false)
     } catch (error) {
       console.error('Failed to update lead:', error)
-      alert('Failed to update lead')
+      console.error('Error details:', error.message, error)
+      alert(`Failed to update lead: ${error.message}\n\nCheck console for details (F12)`)
     }
   }
 
