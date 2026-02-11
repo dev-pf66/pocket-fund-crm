@@ -25,7 +25,7 @@ ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS referral_details TEXT;
 ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS trust_level VARCHAR(50); -- 'building', 'established', 'trusted_advisor'
 
 -- 6. LinkedIn Auto-Enrichment (fields to populate)
-ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS current_role VARCHAR(200);
+ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS current_position VARCHAR(200); -- Changed from current_role (reserved keyword)
 ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS past_experience TEXT;
 ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS education TEXT;
 ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS linkedin_headline VARCHAR(300);

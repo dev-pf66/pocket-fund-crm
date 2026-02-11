@@ -772,7 +772,7 @@ function LeadDetail() {
               )}
 
               {/* LinkedIn Enrichment Info */}
-              {(lead.current_role || lead.linkedin_headline || lead.education || lead.past_experience) && (
+              {(lead.current_position || lead.linkedin_headline || lead.education || lead.past_experience) && (
                 <>
                   <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -787,10 +787,10 @@ function LeadDetail() {
                     </div>
                   )}
 
-                  {lead.current_role && (
+                  {lead.current_position && (
                     <div className="info-item">
-                      <label>Current Role</label>
-                      <div>{lead.current_role}</div>
+                      <label>Current Position</label>
+                      <div>{lead.current_position}</div>
                     </div>
                   )}
 
