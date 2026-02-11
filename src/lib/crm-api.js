@@ -987,3 +987,148 @@ export async function enrichLeadFromLinkedIn(leadId, linkedinUrl) {
     manual: true
   }
 }
+
+// ============================================================================
+// OUTREACH TRACKER
+// ============================================================================
+
+/**
+ * Get outreach log entries
+ */
+export async function getOutreachLog(filters = {}) {
+  let query = supabase
+    .from('crm_outreach_log')
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, stage),
+      logged_by_person:logged_by(id, name)
+    `)
+    .order('outreach_date', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (filters.outreach_date) {
+    query = query.eq('outreach_date', filters.outreach_date)
+  }
+
+  if (filters.outreach_type) {
+    query = query.eq('outreach_type', filters.outreach_type)
+  }
+
+  if (filters.status) {
+    query = query.eq('status', filters.status)
+  }
+
+  if (filters.days_back) {
+    const daysAgo = new Date()
+    daysAgo.setDate(daysAgo.getDate() - filters.days_back)
+    query = query.gte('outreach_date', daysAgo.toISOString().split('T')[0])
+  }
+
+  const { data, error } = await query
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Log an outreach activity
+ */
+export async function logOutreach(outreachData, currentPersonId) {
+  const { data, error } = await supabase
+    .from('crm_outreach_log')
+    .insert([{
+      ...outreachData,
+      logged_by: currentPersonId,
+      outreach_date: outreachData.outreach_date || new Date().toISOString().split('T')[0]
+    }])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update outreach entry
+ */
+export async function updateOutreach(id, updates) {
+  const { data, error } = await supabase
+    .from('crm_outreach_log')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Delete outreach entry
+ */
+export async function deleteOutreach(id) {
+  const { error } = await supabase
+    .from('crm_outreach_log')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+/**
+ * Get today's outreach count
+ */
+export async function getTodaysOutreachCount() {
+  const { data, error } = await supabase.rpc('get_todays_outreach_count')
+
+  if (error) throw error
+  return data || 0
+}
+
+/**
+ * Get daily outreach statistics
+ */
+export async function getDailyOutreachStats(daysBack = 30) {
+  const { data, error } = await supabase.rpc('get_daily_outreach_stats', {
+    days_back: daysBack
+  })
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Get outreach streak (consecutive days hitting 10+ goal)
+ */
+export async function getOutreachStreak() {
+  const { data, error } = await supabase.rpc('get_outreach_streak')
+
+  if (error) throw error
+  return data || 0
+}
+
+/**
+ * Get outreach summary for today
+ */
+export async function getTodaysOutreachSummary() {
+  const today = new Date().toISOString().split('T')[0]
+  const outreaches = await getOutreachLog({ outreach_date: today })
+
+  const summary = {
+    total: outreaches.length,
+    cold_email: 0,
+    linkedin_message: 0,
+    phone_call: 0,
+    other: 0,
+    replied: 0,
+    sent: 0,
+    no_response: 0
+  }
+
+  outreaches.forEach(o => {
+    summary[o.outreach_type] = (summary[o.outreach_type] || 0) + 1
+    summary[o.status] = (summary[o.status] || 0) + 1
+  })
+
+  return summary
+}

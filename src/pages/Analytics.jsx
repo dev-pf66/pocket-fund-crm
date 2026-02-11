@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { getAnalytics } from '../lib/crm-api'
-import { TrendingUp, Clock, Target, Award } from 'lucide-react'
+import { getAnalytics, getDailyOutreachStats } from '../lib/crm-api'
+import { TrendingUp, Clock, Target, Award, Send } from 'lucide-react'
 
 function Analytics() {
   const [data, setData] = useState(null)
+  const [outreachStats, setOutreachStats] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -13,8 +14,12 @@ function Analytics() {
   async function loadAnalytics() {
     setLoading(true)
     try {
-      const analytics = await getAnalytics()
+      const [analytics, outreach] = await Promise.all([
+        getAnalytics(),
+        getDailyOutreachStats(7)
+      ])
       setData(analytics)
+      setOutreachStats(outreach)
     } catch (error) {
       console.error('Failed to load analytics:', error)
     } finally {
@@ -192,6 +197,130 @@ function Analytics() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Daily Outreach Activity */}
+      <div className="card">
+        <h2><Send size={20} /> Daily Outreach Activity (Last 7 Days)</h2>
+        <p style={{ color: 'var(--gray-600)', marginBottom: '20px' }}>
+          Track daily outreach progress toward 10/day goal
+        </p>
+
+        {outreachStats.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
+            No outreach logged yet. Start tracking in the Outreach Tracker! 🚀
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--gray-200)', textAlign: 'left' }}>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Date</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Total</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Emails</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>LinkedIn</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Calls</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Replies</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Goal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {outreachStats.map((day, idx) => {
+                  const total = Number(day.total_outreaches)
+                  const goalMet = day.goal_met
+                  return (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                      <td style={{ padding: '12px 8px', fontSize: '14px', fontWeight: '500' }}>
+                        {new Date(day.outreach_date).toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </td>
+                      <td style={{ padding: '12px 8px', fontSize: '18px', fontWeight: 'bold', color: goalMet ? 'var(--success)' : 'var(--primary)' }}>
+                        {total}
+                      </td>
+                      <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--gray-600)' }}>
+                        {day.cold_emails}
+                      </td>
+                      <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--gray-600)' }}>
+                        {day.linkedin_messages}
+                      </td>
+                      <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--gray-600)' }}>
+                        {day.phone_calls}
+                      </td>
+                      <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--success)', fontWeight: '600' }}>
+                        {day.replied_count}
+                      </td>
+                      <td style={{ padding: '12px 8px' }}>
+                        {goalMet ? (
+                          <span style={{
+                            background: 'var(--success)',
+                            color: 'white',
+                            padding: '4px 12px',
+                            borderRadius: '12px',
+                            fontSize: '13px',
+                            fontWeight: '600'
+                          }}>
+                            ✓ Met
+                          </span>
+                        ) : (
+                          <span style={{
+                            background: 'var(--gray-200)',
+                            color: 'var(--gray-600)',
+                            padding: '4px 12px',
+                            borderRadius: '12px',
+                            fontSize: '13px',
+                            fontWeight: '600'
+                          }}>
+                            {total}/10
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            {/* Summary Stats */}
+            <div style={{
+              marginTop: '24px',
+              padding: '16px',
+              background: 'var(--gray-50)',
+              borderRadius: '8px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '16px'
+            }}>
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '4px' }}>Total Outreaches</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--primary)' }}>
+                  {outreachStats.reduce((sum, day) => sum + Number(day.total_outreaches), 0)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '4px' }}>Daily Average</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--primary)' }}>
+                  {Math.round(outreachStats.reduce((sum, day) => sum + Number(day.total_outreaches), 0) / outreachStats.length)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '4px' }}>Days Hit Goal</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--success)' }}>
+                  {outreachStats.filter(d => d.goal_met).length}/{outreachStats.length}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '4px' }}>Reply Rate</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--success)' }}>
+                  {Math.round((outreachStats.reduce((sum, day) => sum + Number(day.replied_count), 0) /
+                    outreachStats.reduce((sum, day) => sum + Number(day.total_outreaches), 0)) * 100) || 0}%
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
