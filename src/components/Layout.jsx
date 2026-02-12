@@ -32,9 +32,7 @@ function Layout() {
         </div>
       </aside>
       <main className="main-content">
-        <div className="page-content">
-          <Outlet />
-        </div>
+        <Outlet />
       </main>
     </div>
   )
