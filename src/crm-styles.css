@@ -482,3 +482,89 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================================
+   HELP CONTENT MARKDOWN STYLES
+   ============================================================================ */
+
+.help-content h1 {
+  margin: 28px 0 20px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.help-content h2 {
+  margin: 24px 0 16px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.help-content h3 {
+  margin: 20px 0 12px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.help-content p {
+  margin: 12px 0;
+  line-height: 1.8;
+}
+
+.help-content ul,
+.help-content ol {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.help-content li {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.help-content strong {
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.help-content code {
+  background: var(--gray-100);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--primary);
+}
+
+.help-content pre {
+  background: var(--gray-100);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+
+.help-content pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--gray-800);
+}
+
+.help-content blockquote {
+  border-left: 4px solid var(--primary);
+  padding-left: 16px;
+  margin: 16px 0;
+  color: var(--gray-600);
+  font-style: italic;
+}
+
+.help-content a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.help-content a:hover {
+  text-decoration: underline;
+}

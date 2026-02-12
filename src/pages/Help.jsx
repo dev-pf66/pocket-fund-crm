@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Search, BookOpen, ChevronRight, ChevronDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
+import rehypeSanitize from 'rehype-sanitize'
 
 const CATEGORIES = {
   getting_started: { label: 'Getting Started', icon: '🚀', color: '#3b82f6' },
@@ -235,10 +237,11 @@ function Help() {
                           lineHeight: '1.8',
                           color: 'var(--gray-700)'
                         }}
-                        dangerouslySetInnerHTML={{
-                          __html: formatMarkdown(article.content)
-                        }}
-                      />
+                      >
+                        <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+                          {article.content}
+                        </ReactMarkdown>
+                      </div>
                       {article.updated_at && (
                         <div style={{
                           marginTop: '20px',
@@ -262,27 +265,6 @@ function Help() {
   )
 }
 
-// Simple markdown formatter
-function formatMarkdown(text) {
-  if (!text) return ''
-
-  let html = text
-    // Headers
-    .replace(/^### (.*$)/gim, '<h3 style="margin: 20px 0 12px 0; font-size: 18px; font-weight: 600;">$1</h3>')
-    .replace(/^## (.*$)/gim, '<h2 style="margin: 24px 0 16px 0; font-size: 20px; font-weight: 600;">$1</h2>')
-    .replace(/^# (.*$)/gim, '<h1 style="margin: 28px 0 20px 0; font-size: 24px; font-weight: 700;">$1</h1>')
-    // Bold
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    // Lists
-    .replace(/^- (.*$)/gim, '<li style="margin-left: 20px;">$1</li>')
-    .replace(/^✅ (.*$)/gim, '<li style="margin-left: 20px; list-style: none;">✅ $1</li>')
-    // Code blocks
-    .replace(/```([\s\S]*?)```/g, '<pre style="background: var(--gray-100); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 16px 0;"><code>$1</code></pre>')
-    // Line breaks
-    .replace(/\n\n/g, '<br/><br/>')
-    .replace(/\n/g, '<br/>')
-
-  return html
-}
+// Note: Markdown rendering now handled by react-markdown with sanitization
 
 export default Help
