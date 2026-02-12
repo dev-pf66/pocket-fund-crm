@@ -11,6 +11,8 @@ import SampleDeals from './pages/SampleDeals'
 import ImportLeads from './pages/ImportLeads'
 import Analytics from './pages/Analytics'
 import OutreachTracker from './pages/OutreachTracker'
+import Help from './pages/Help'
+import HelpAdmin from './pages/HelpAdmin'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ChatTerminal from './components/ChatTerminal'
@@ -96,6 +98,8 @@ function AppContent() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="templates" element={<EmailTemplates />} />
             <Route path="samples" element={<SampleDeals />} />
+            <Route path="help" element={<Help />} />
+            <Route path="help/admin" element={<HelpAdmin />} />
           </Route>
         </Routes>
         <ChatTerminal />

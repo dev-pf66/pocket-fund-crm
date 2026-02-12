@@ -1,7 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../App'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
@@ -18,6 +18,7 @@ function Layout() {
           <NavLink to="/analytics"><BarChart3 size={18} />Analytics</NavLink>
           <NavLink to="/templates"><Mail size={18} />Email Templates</NavLink>
           <NavLink to="/samples"><FileText size={18} />Sample Deals</NavLink>
+          <NavLink to="/help"><HelpCircle size={18} />Help</NavLink>
         </nav>
         <div className="user-info">
           <div className="user-avatar">
