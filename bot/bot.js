@@ -87,28 +87,33 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
-// ─── Format tool results for Telegram ────────────────────────────────────────
+// ─── Escape HTML special chars so user data never breaks formatting ───────────
+function h(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ─── Format tool results for Telegram (HTML mode — safer than Markdown) ───────
 function formatToolResult(toolName, result) {
-  if (!result.success) return `❌ ${result.error}`;
+  if (!result.success) return `❌ ${h(result.error)}`;
 
   switch (toolName) {
     case 'add_lead': {
       const l = result.lead;
-      return `✅ *${l.contact_name}* (${l.company_name}) added → ${l.stage}${l.score ? ` | Score: ${l.score}/5` : ''}`;
+      return `✅ <b>${h(l.contact_name)}</b> (${h(l.company_name)}) added → ${h(l.stage)}${l.score ? ` | Score: ${l.score}/5` : ''}`;
     }
     case 'update_lead': {
       const l = result.lead;
-      return `✅ Updated *${l.contact_name}* (${l.company_name})\nStage: ${l.stage}${l.score ? ` | Score: ${l.score}/5` : ''}`;
+      return `✅ Updated <b>${h(l.contact_name)}</b> (${h(l.company_name)})\nStage: ${h(l.stage)}${l.score ? ` | Score: ${l.score}/5` : ''}`;
     }
     case 'log_outreach': {
       const l = result.lead;
-      return `✅ Logged ${result.outreach.platform} outreach for *${l.contact_name}* (${l.company_name})`;
+      return `✅ Logged ${h(result.outreach.platform)} outreach for <b>${h(l.contact_name)}</b> (${h(l.company_name)})`;
     }
     case 'get_leads': {
       if (result.leads.length === 0) return '🔍 No leads found.';
       const lines = result.leads.map(l => {
         const score = l.score ? ` ⭐${l.score}` : '';
-        return `• *${l.contact_name}* (${l.company_name}) → ${l.stage}${score}`;
+        return `• <b>${h(l.contact_name)}</b> (${h(l.company_name)}) → ${h(l.stage)}${score}`;
       });
       return `🔍 Found ${result.count} lead(s):\n${lines.join('\n')}`;
     }
@@ -117,12 +122,24 @@ function formatToolResult(toolName, result) {
   }
 }
 
+// ─── Haiku pricing (per million tokens) ───────────────────────────────────────
+const PRICE_INPUT_PER_M  = 0.80;  // $0.80 / 1M input tokens
+const PRICE_OUTPUT_PER_M = 4.00;  // $4.00 / 1M output tokens
+
+function calcCost(inputTokens, outputTokens) {
+  return (inputTokens / 1_000_000) * PRICE_INPUT_PER_M
+       + (outputTokens / 1_000_000) * PRICE_OUTPUT_PER_M;
+}
+
 // ─── Core AI handler ──────────────────────────────────────────────────────────
 async function handleMessage(ctx, rawText) {
   const chatId = ctx.chat.id;
   const userText = sanitizeInput(rawText);
 
   addToHistory(chatId, 'user', userText);
+
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
 
   try {
     let response = await anthropic.messages.create({
@@ -133,13 +150,16 @@ async function handleMessage(ctx, rawText) {
       messages: getHistory(chatId)
     });
 
+    totalInputTokens  += response.usage.input_tokens;
+    totalOutputTokens += response.usage.output_tokens;
+
     while (response.stop_reason === 'tool_use') {
       const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
       const textBlocks = response.content.filter(b => b.type === 'text');
 
       if (textBlocks.length > 0) {
         const text = textBlocks.map(b => b.text).join('\n').trim();
-        if (text) await ctx.reply(text, { parse_mode: 'Markdown' });
+        if (text) await ctx.reply(text, { parse_mode: 'HTML' });
       }
 
       addToHistory(chatId, 'assistant', response.content);
@@ -147,7 +167,7 @@ async function handleMessage(ctx, rawText) {
       const toolResults = [];
       for (const toolUse of toolUseBlocks) {
         const result = await executeTool(toolUse.name, toolUse.input);
-        await ctx.reply(formatToolResult(toolUse.name, result), { parse_mode: 'Markdown' });
+        await ctx.reply(formatToolResult(toolUse.name, result), { parse_mode: 'HTML' });
         toolResults.push({
           type: 'tool_result',
           tool_use_id: toolUse.id,
@@ -164,6 +184,9 @@ async function handleMessage(ctx, rawText) {
         tools: TOOLS,
         messages: getHistory(chatId)
       });
+
+      totalInputTokens  += response.usage.input_tokens;
+      totalOutputTokens += response.usage.output_tokens;
     }
 
     const finalText = response.content
@@ -173,9 +196,16 @@ async function handleMessage(ctx, rawText) {
       .trim();
 
     if (finalText) {
-      await ctx.reply(finalText, { parse_mode: 'Markdown' });
+      await ctx.reply(finalText, { parse_mode: 'HTML' });
       addToHistory(chatId, 'assistant', finalText);
     }
+
+    // Cost footer
+    const cost = calcCost(totalInputTokens, totalOutputTokens);
+    await ctx.reply(
+      `<i>🪙 ${totalInputTokens + totalOutputTokens} tokens · $${cost.toFixed(5)}</i>`,
+      { parse_mode: 'HTML' }
+    );
 
   } catch (err) {
     // Log the error type but NOT any content that might contain key material
@@ -187,12 +217,12 @@ async function handleMessage(ctx, rawText) {
 // ─── Commands ─────────────────────────────────────────────────────────────────
 bot.command('start', async (ctx) => {
   await ctx.reply(
-    `👋 *Pocket Fund CRM Bot*\n\nManage your pipeline from Telegram:\n\n` +
+    `👋 <b>Pocket Fund CRM Bot</b>\n\nManage your pipeline from Telegram:\n\n` +
     `• "Add new lead — John Smith from TechBiz, contacted via LinkedIn"\n` +
     `• "Move Sarah at Acme to qualified"\n` +
     `• "Log outreach to Mike — sent LinkedIn DM"\n` +
     `• "Show leads in contacted stage"`,
-    { parse_mode: 'Markdown' }
+    { parse_mode: 'HTML' }
   );
 });
 
@@ -203,20 +233,20 @@ bot.command('clear', async (ctx) => {
 
 bot.command('help', async (ctx) => {
   await ctx.reply(
-    `*Commands:*\n` +
+    `<b>Commands:</b>\n` +
     `/start — Welcome\n` +
     `/help — This message\n` +
     `/myid — Show your Telegram user ID\n` +
     `/clear — Reset conversation history\n\n` +
-    `*What I can do:*\n` +
+    `<b>What I can do:</b>\n` +
     `• Add leads\n• Update stage, score, notes\n• Log outreach\n• Search leads`,
-    { parse_mode: 'Markdown' }
+    { parse_mode: 'HTML' }
   );
 });
 
 // Useful for getting user ID to add to allowlist
 bot.command('myid', async (ctx) => {
-  await ctx.reply(`Your Telegram user ID: \`${ctx.from.id}\``, { parse_mode: 'Markdown' });
+  await ctx.reply(`Your Telegram user ID: \`${ctx.from.id}\``, { parse_mode: 'HTML' });
 });
 
 bot.on('message:text', async (ctx) => {
