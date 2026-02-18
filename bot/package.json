@@ -1,0 +1,16 @@
+{
+  "name": "pocket-fund-crm-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for Pocket Fund CRM",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "node --watch bot.js"
+  },
+  "dependencies": {
+    "grammy": "^1.40.0",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@supabase/supabase-js": "^2.47.10",
+    "dotenv": "^16.4.7"
+  }
+}
