@@ -132,6 +132,28 @@ const TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: 'log_transcript',
+    description: 'Save a call transcript to a lead in the CRM',
+    input_schema: {
+      type: 'object',
+      properties: {
+        lead_search_term: {
+          type: 'string',
+          description: 'Name or company to find the lead (partial match OK)'
+        },
+        transcript: {
+          type: 'string',
+          description: 'The full transcript text to save'
+        },
+        title: {
+          type: 'string',
+          description: 'Optional title e.g. "Discovery Call - Feb 19"'
+        }
+      },
+      required: ['lead_search_term', 'transcript']
+    }
   }
 ];
 
@@ -160,6 +182,8 @@ async function executeTool(toolName, toolInput) {
       return await logOutreach(toolInput);
     case 'get_leads':
       return await getLeads(toolInput);
+    case 'log_transcript':
+      return await logTranscript(toolInput);
     default:
       return { error: `Unknown tool: ${toolName}` };
   }
@@ -308,6 +332,48 @@ async function getLeads({ search_term, stage, limit = 10 } = {}) {
     success: true,
     leads: data || [],
     count: (data || []).length
+  };
+}
+
+async function logTranscript({ lead_search_term, transcript, title }) {
+  const leads = await findLead(lead_search_term);
+
+  if (leads.length === 0) {
+    return {
+      success: false,
+      error: `No lead found matching "${lead_search_term}". Please check the name or company.`
+    };
+  }
+
+  if (leads.length > 1) {
+    const options = leads.map(l => `• ${l.contact_name} (${l.company_name}) — ${l.stage}`).join('\n');
+    return {
+      success: false,
+      error: `Found ${leads.length} leads matching "${lead_search_term}". Which one?\n${options}`
+    };
+  }
+
+  const lead = leads[0];
+
+  const { data, error } = await getSupabase()
+    .from('crm_transcripts')
+    .insert([{
+      lead_id: lead.id,
+      transcript,
+      title: title || `Call — ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: true,
+    transcript: data,
+    lead,
+    charCount: transcript.length
   };
 }
 

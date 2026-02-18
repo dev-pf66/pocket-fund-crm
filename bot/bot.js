@@ -41,7 +41,7 @@ function isRateLimited(userId) {
 }
 
 // ─── Input sanitization ────────────────────────────────────────────────────────
-const MAX_INPUT_LENGTH = 1000;
+const MAX_INPUT_LENGTH = 50000; // transcripts can be long
 
 function sanitizeInput(text) {
   // Strip control characters (except newlines/tabs)
@@ -116,6 +116,10 @@ function formatToolResult(toolName, result) {
         return `• <b>${h(l.contact_name)}</b> (${h(l.company_name)}) → ${h(l.stage)}${score}`;
       });
       return `🔍 Found ${result.count} lead(s):\n${lines.join('\n')}`;
+    }
+    case 'log_transcript': {
+      const l = result.lead;
+      return `✅ Transcript saved for <b>${h(l.contact_name)}</b> (${h(l.company_name)})\n${result.charCount.toLocaleString()} characters saved`;
     }
     default:
       return `✅ Done`;
