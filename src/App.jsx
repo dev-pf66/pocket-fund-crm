@@ -11,6 +11,7 @@ import SampleDeals from './pages/SampleDeals'
 import ImportLeads from './pages/ImportLeads'
 import Analytics from './pages/Analytics'
 import OutreachTracker from './pages/OutreachTracker'
+import OutreachAdmin from './pages/OutreachAdmin'
 import Help from './pages/Help'
 import HelpAdmin from './pages/HelpAdmin'
 import Login from './pages/Login'
@@ -94,6 +95,7 @@ function AppContent() {
             <Route path="pipeline" element={<LeadsBoard />} />
             <Route path="leads/:id" element={<LeadDetail />} />
             <Route path="outreach" element={<OutreachTracker />} />
+            <Route path="outreach-admin" element={<OutreachAdmin />} />
             <Route path="import" element={<ImportLeads />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="templates" element={<EmailTemplates />} />

@@ -1270,3 +1270,75 @@ export async function logActivityManual(activityData) {
 
   if (error) throw error
 }
+
+// ============================================================================
+// AI TRANSCRIPT ANALYSIS
+// ============================================================================
+
+/**
+ * Send a transcript to the serverless function for AI analysis.
+ * Returns the analysis object or throws on failure.
+ */
+export async function analyzeTranscript(transcriptId, transcriptText) {
+  const apiKey = import.meta.env.VITE_CRM_API_KEY || 'your-secret-api-key-here'
+
+  const response = await fetch('/api/analyze-transcript', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey
+    },
+    body: JSON.stringify({
+      transcript_id: transcriptId,
+      transcript_text: transcriptText
+    })
+  })
+
+  const result = await response.json()
+
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || 'Analysis failed')
+  }
+
+  return result.analysis
+}
+
+// ============================================================================
+// OUTREACH ADMIN (all entries, no lead filter)
+// ============================================================================
+
+/**
+ * Get all outreach log entries across every lead, with optional filters.
+ * filters: { platform, days_back, has_response }
+ */
+export async function getAllOutreachLogs(filters = {}) {
+  let query = supabase
+    .from('crm_outreach_log')
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, stage),
+      logged_by_person:logged_by(id, name)
+    `)
+    .order('outreach_date', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (filters.platform) {
+    query = query.eq('outreach_type', filters.platform)
+  }
+
+  if (filters.has_response === true) {
+    query = query.not('response_received', 'is', null).neq('response_received', '')
+  } else if (filters.has_response === false) {
+    query = query.or('response_received.is.null,response_received.eq.')
+  }
+
+  if (filters.days_back) {
+    const since = new Date()
+    since.setDate(since.getDate() - filters.days_back)
+    query = query.gte('outreach_date', since.toISOString().split('T')[0])
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead } from '../lib/crm-api'
+import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript } from '../lib/crm-api'
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck } from 'lucide-react'
 
@@ -22,6 +22,7 @@ function LeadDetail() {
   const [leadTags, setLeadTags] = useState([])
   const [enriching, setEnriching] = useState(false)
   const [calculating, setCalculating] = useState(false)
+  const [analysingTranscriptId, setAnalysingTranscriptId] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -88,7 +89,7 @@ function LeadDetail() {
 
   async function handleAddTranscript() {
     try {
-      await createTranscript({
+      const saved = await createTranscript({
         lead_id: parseInt(id),
         ...newTranscript,
         created_by: currentPerson?.id
@@ -96,9 +97,26 @@ function LeadDetail() {
       setNewTranscript({ title: '', transcript: '', call_date: new Date().toISOString().split('T')[0] })
       setShowTranscriptForm(false)
       await loadData()
+
+      // Auto-trigger AI analysis in the background
+      if (saved?.id) {
+        triggerAnalysis(saved.id, newTranscript.transcript)
+      }
     } catch (error) {
       console.error('Failed to add transcript:', error)
       alert('Failed to add transcript')
+    }
+  }
+
+  async function triggerAnalysis(transcriptId, transcriptText) {
+    setAnalysingTranscriptId(transcriptId)
+    try {
+      await analyzeTranscript(transcriptId, transcriptText)
+      await loadData()
+    } catch (error) {
+      console.error('AI analysis failed:', error)
+    } finally {
+      setAnalysingTranscriptId(null)
     }
   }
 
@@ -1081,17 +1099,85 @@ function LeadDetail() {
                       })}
                     </span>
                   </div>
-                  <button
-                    className="icon-btn"
-                    onClick={() => handleDeleteTranscript(transcript.id)}
-                    title="Delete transcript"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {!transcript.ai_analysis && analysingTranscriptId !== transcript.id && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ fontSize: '12px' }}
+                        onClick={() => triggerAnalysis(transcript.id, transcript.transcript)}
+                        title="Analyse with AI"
+                      >
+                        <Sparkles size={14} /> Analyse
+                      </button>
+                    )}
+                    {analysingTranscriptId === transcript.id && (
+                      <span style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span className="loading-spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></span>
+                        Analysing…
+                      </span>
+                    )}
+                    {transcript.ai_analysis && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ fontSize: '12px' }}
+                        onClick={() => triggerAnalysis(transcript.id, transcript.transcript)}
+                        title="Re-analyse"
+                      >
+                        <Sparkles size={14} /> Re-analyse
+                      </button>
+                    )}
+                    <button
+                      className="icon-btn"
+                      onClick={() => handleDeleteTranscript(transcript.id)}
+                      title="Delete transcript"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
                 <div className="transcript-content">
                   {transcript.transcript}
                 </div>
+
+                {/* AI Analysis Panel */}
+                {transcript.ai_analysis && (
+                  <div className="ai-analysis-panel">
+                    <div className="ai-analysis-header">
+                      <Sparkles size={14} />
+                      <span>AI Analysis</span>
+                      {transcript.ai_analysis.analysed_at && (
+                        <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: 'auto' }}>
+                          {new Date(transcript.ai_analysis.analysed_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+
+                    <p style={{ margin: '0 0 12px', fontSize: '14px', lineHeight: '1.6', color: '#374151' }}>
+                      {transcript.ai_analysis.summary}
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px', alignItems: 'center' }}>
+                      {/* Sentiment badge */}
+                      <span className={`ai-sentiment ai-sentiment--${(transcript.ai_analysis.sentiment || 'Neutral').toLowerCase()}`}>
+                        {transcript.ai_analysis.sentiment}
+                      </span>
+
+                      {/* Fit score stars */}
+                      <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                        Fit:{' '}
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <span key={i} style={{ color: i < transcript.ai_analysis.fit_score ? '#f59e0b' : '#d1d5db' }}>★</span>
+                        ))}
+                        {' '}<span style={{ color: '#6b7280' }}>({transcript.ai_analysis.fit_reasoning})</span>
+                      </span>
+                    </div>
+
+                    {/* Next step callout */}
+                    <div className="ai-next-step">
+                      <strong>Next step:</strong> {transcript.ai_analysis.next_step}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
