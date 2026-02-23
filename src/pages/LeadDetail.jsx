@@ -16,7 +16,7 @@ function LeadDetail() {
   const [editedLead, setEditedLead] = useState(null)
   const [showActivityForm, setShowActivityForm] = useState(false)
   const [showTranscriptForm, setShowTranscriptForm] = useState(false)
-  const [newActivity, setNewActivity] = useState({ activity_type: 'call', notes: '', transcript: '' })
+  const [newActivity, setNewActivity] = useState({ activity_type: 'call', notes: '', transcript: '', activity_date: new Date().toISOString().split('T')[0] })
   const [newTranscript, setNewTranscript] = useState({ title: '', transcript: '', call_date: new Date().toISOString().split('T')[0] })
   const [allTags, setAllTags] = useState([])
   const [leadTags, setLeadTags] = useState([])
@@ -78,7 +78,7 @@ function LeadDetail() {
   async function handleAddActivity() {
     try {
       await logActivity(id, newActivity, currentPerson?.id)
-      setNewActivity({ activity_type: 'call', notes: '', transcript: '' })
+      setNewActivity({ activity_type: 'call', notes: '', transcript: '', activity_date: new Date().toISOString().split('T')[0] })
       setShowActivityForm(false)
       await loadData()
     } catch (error) {
