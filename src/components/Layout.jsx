@@ -1,25 +1,39 @@
+import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../App'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
   const { currentPerson } = useApp()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
     <div className="app-layout">
-      <aside className="sidebar">
+      {/* Mobile header with hamburger */}
+      <div className="mobile-header">
+        <h1>PF CRM</h1>
+        <button
+          className="mobile-menu-toggle"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label="Toggle menu"
+        >
+          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+
+      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <h1>PF Sales CRM</h1>
         <nav>
-          <NavLink to="/dashboard"><LayoutDashboard size={18} />Dashboard</NavLink>
-          <NavLink to="/pipeline"><Users size={18} />Sales Pipeline</NavLink>
-          <NavLink to="/outreach"><Target size={18} />Outreach Tracker</NavLink>
-          <NavLink to="/outreach-admin"><ClipboardList size={18} />Outreach Log</NavLink>
-          <NavLink to="/analytics"><BarChart3 size={18} />Analytics</NavLink>
-          <NavLink to="/templates"><Mail size={18} />Email Templates</NavLink>
-          <NavLink to="/samples"><FileText size={18} />Sample Deals</NavLink>
-          <NavLink to="/help"><HelpCircle size={18} />Help</NavLink>
+          <NavLink to="/dashboard" onClick={() => setMobileMenuOpen(false)}><LayoutDashboard size={18} />Dashboard</NavLink>
+          <NavLink to="/pipeline" onClick={() => setMobileMenuOpen(false)}><Users size={18} />Sales Pipeline</NavLink>
+          <NavLink to="/outreach" onClick={() => setMobileMenuOpen(false)}><Target size={18} />Outreach Tracker</NavLink>
+          <NavLink to="/outreach-admin" onClick={() => setMobileMenuOpen(false)}><ClipboardList size={18} />Outreach Log</NavLink>
+          <NavLink to="/analytics" onClick={() => setMobileMenuOpen(false)}><BarChart3 size={18} />Analytics</NavLink>
+          <NavLink to="/templates" onClick={() => setMobileMenuOpen(false)}><Mail size={18} />Email Templates</NavLink>
+          <NavLink to="/samples" onClick={() => setMobileMenuOpen(false)}><FileText size={18} />Sample Deals</NavLink>
+          <NavLink to="/help" onClick={() => setMobileMenuOpen(false)}><HelpCircle size={18} />Help</NavLink>
         </nav>
         <div className="user-info">
           <div className="user-avatar">
@@ -32,6 +46,15 @@ function Layout() {
           <button className="btn-sign-out" onClick={signOut} title="Sign out">↪</button>
         </div>
       </aside>
+
+      {/* Mobile overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="mobile-overlay"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       <main className="main-content">
         <Outlet />
       </main>
