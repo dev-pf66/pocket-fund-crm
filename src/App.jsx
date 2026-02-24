@@ -12,6 +12,8 @@ import ImportLeads from './pages/ImportLeads'
 import Analytics from './pages/Analytics'
 import OutreachTracker from './pages/OutreachTracker'
 import OutreachAdmin from './pages/OutreachAdmin'
+import MyWeeklyGoals from './pages/MyWeeklyGoals'
+import GoalTemplates from './pages/GoalTemplates'
 import Help from './pages/Help'
 import HelpAdmin from './pages/HelpAdmin'
 import Login from './pages/Login'
@@ -96,6 +98,8 @@ function AppContent() {
             <Route path="leads/:id" element={<LeadDetail />} />
             <Route path="outreach" element={<OutreachTracker />} />
             <Route path="outreach-admin" element={<OutreachAdmin />} />
+            <Route path="my-goals" element={<MyWeeklyGoals />} />
+            <Route path="goal-templates" element={<GoalTemplates />} />
             <Route path="import" element={<ImportLeads />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="templates" element={<EmailTemplates />} />
