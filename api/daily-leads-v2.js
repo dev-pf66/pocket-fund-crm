@@ -141,45 +141,26 @@ async function scrapeLinkedIn() {
   }
 }
 
-// Crunchbase scraper (NEW)
+// Crunchbase scraper (NEW) - TODO: Configure proper input format
 async function scrapeCrunchbase() {
   try {
-    // Search for investors and recently funded companies
+    console.log('Crunchbase scraping temporarily disabled - needs API configuration')
+    // TODO: Configure correct input format for curious_coder/crunchbase-scraper
+    // For now, return empty array to let LinkedIn scraper work
+    return []
+
+    /* Original code - keeping for reference:
     const input = {
       searchQueries: [
         'investor_type:"private_equity" OR investor_type:"family_office"',
         'funding_total:[1000000 TO 50000000]'
       ],
-      maxResults: 8,
-      includeFields: [
-        'name',
-        'description',
-        'website',
-        'num_funding_rounds',
-        'funding_total_usd',
-        'investor_type',
-        'founded_on',
-        'num_acquisitions'
-      ]
+      maxResults: 8
     }
-
     const run = await apifyClient.actor('curious_coder/crunchbase-scraper').call(input, { timeout: 120 })
     const { items } = await apifyClient.dataset(run.defaultDatasetId).listItems()
-
-    return (items || [])
-      .map(org => ({
-        name: extractContactName(org.name),
-        company: org.name,
-        website: org.website || null,
-        linkedin_url: null, // Crunchbase doesn't always have this
-        score: scoreCrunchbaseOrg(org),
-        source: 'crunchbase_auto',
-        notes: `${org.description || 'No description'}\n\nFunding: $${formatMoney(org.funding_total_usd)}\nType: ${org.investor_type || 'Unknown'}\nAcquisitions: ${org.num_acquisitions || 0}`,
-        tags: ['crunchbase', org.investor_type || 'company'].filter(Boolean)
-      }))
-      .filter(l => l.score >= 3)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6) // Max 6 from Crunchbase
+    return (items || []).map(org => ({...})).filter(l => l.score >= 3).slice(0, 6)
+    */
   } catch (error) {
     console.error('Crunchbase scrape failed:', error)
     return []
