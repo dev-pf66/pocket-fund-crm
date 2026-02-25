@@ -7,7 +7,7 @@
   ],
   "crons": [
     {
-      "path": "/api/daily-leads",
+      "path": "/api/daily-leads-v2",
       "schedule": "0 9 * * *"
     }
   ]

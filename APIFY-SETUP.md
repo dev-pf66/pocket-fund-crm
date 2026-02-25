@@ -1,6 +1,13 @@
-# Apify Lead Finder Setup
+# Multi-Source Lead Finder Setup (v2)
 
-Automatically scrapes LinkedIn daily for business buyers ($1-50M, acquisition intent) and imports them to your CRM.
+Automatically scrapes **LinkedIn + Crunchbase** daily for business buyers ($1-50M, acquisition intent) and imports them to your CRM.
+
+## Why Two Sources?
+
+**LinkedIn** → Find individuals (CEOs, investors, partners)
+**Crunchbase** → Find firms + funded companies (PE firms, family offices, recently funded = capital to acquire)
+
+**Better together** = Higher quality, more diversity
 
 ## Quick Setup (5 minutes)
 
@@ -130,3 +137,73 @@ Want to add more sources?
 - Crunchbase (funded startups)
 
 Just lmk! 🚀
+
+## What's New in V2?
+
+### LinkedIn (6 leads/day max)
+Same as before - finds individuals with acquisition intent
+
+### Crunchbase (6 leads/day max) - NEW! 🎉
+
+**Targets:**
+- **PE Firms** - Active investors in the $1-50M range
+- **Family Offices** - High net worth investors
+- **Recently Funded Companies** - $1-50M funding = capital to acquire
+- **Active Acquirers** - Companies with acquisition history
+
+**Quality Signals:**
+- Has made acquisitions before (+2 points)
+- Recently raised funding (+1-2 points)
+- Multiple funding rounds (+1 point)
+- PE/Family Office type (+3 points)
+
+**Data You Get:**
+- Company name
+- Website
+- Description
+- Funding amount
+- Number of acquisitions
+- Investor type
+
+### Daily Mix: 10 Total Leads
+- ~6 from LinkedIn (individuals)
+- ~4 from Crunchbase (firms/companies)
+- Both scored, sorted by quality
+- Best 10 imported to CRM
+
+## Updated Setup
+
+Same as before, just need the Apify token. Crunchbase scraping is included automatically!
+
+## Crunchbase Actor Info
+
+Uses: `curious_coder/crunchbase-scraper`
+- Free tier friendly
+- Searches: investor type, funding range
+- Returns: Company profiles with funding data
+
+## Expected Quality Improvement
+
+**Before (LinkedIn only):**
+- 10 leads/day
+- 60-70% quality
+- Mostly individuals
+
+**After (LinkedIn + Crunchbase):**
+- 10 leads/day
+- 70-80% quality ⬆️
+- Mix of individuals + firms
+- Better signal (funding data = intent)
+- More diversity (not just LinkedIn)
+
+## Monitoring
+
+Check which source performs better:
+```sql
+SELECT source, COUNT(*), AVG(score)
+FROM crm_leads
+WHERE source IN ('linkedin_auto', 'crunchbase_auto')
+GROUP BY source
+```
+
+Then adjust the ratio (edit `api/daily-leads-v2.js` lines with `.slice(0, 6)`)
