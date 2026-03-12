@@ -16,8 +16,8 @@ Set your API key in Vercel environment variables as `CRM_API_KEY`.
 Get all leads with optional filtering.
 
 **Query Parameters:**
-- `stage` - Filter by stage (cold_outreach, warm_lead, active_conversation, client)
-- `lead_type` - Filter by type (PE Firm, Family Office, Independent Sponsor)
+- `stage` - Filter by stage (`cold_outreach`, `warm_lead`, `active_conversation`, `client`, `passed`)
+- `lead_type` - Filter by type (`Independent Sponsor`, `PE Firm`, `Family Office`, `Other`)
 - `limit` - Max results (default: 100)
 
 **Example:**
@@ -44,6 +44,87 @@ curl -H "x-api-key: your-key" \
     }
   ]
 }
+```
+
+### GET /api/leads?id=
+
+Fetch a single lead by ID.
+
+**Example:**
+```bash
+curl -H "x-api-key: your-key" \
+  "https://pocket-fund-crm.vercel.app/api/leads?id=123"
+```
+
+**200 Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "name": "John Smith",
+    "firm_name": "Acme Capital",
+    "stage": "warm_lead",
+    ...
+  }
+}
+```
+
+**404 Response:**
+```json
+{ "success": false, "error": "Lead not found" }
+```
+
+### POST /api/leads
+
+Create a new lead.
+
+**Required:** `name` (string)
+
+**Optional fields:**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `email` | string | |
+| `phone` | string | |
+| `firm_name` | string | |
+| `linkedin_url` | string | |
+| `lead_type` | string | `Independent Sponsor`, `PE Firm`, `Family Office`, `Other` |
+| `lead_source` | string | `LinkedIn`, `Referral`, `Cold Email`, `Event`, `Website` |
+| `stage` | string | `cold_outreach`, `warm_lead`, `active_conversation`, `client`, `passed` |
+| `deal_criteria` | string | |
+| `notes` | string | |
+| `initial_conversation` | string | |
+| `needs_sample_deals` | boolean | |
+| `next_follow_up_date` | string | ISO date |
+| `reach_out_later_date` | string | ISO date |
+| `aum` | string | |
+| `investment_thesis` | string | |
+| `portfolio_size` | number | |
+| `fund_vintage` | string | |
+
+**Example:**
+```bash
+curl -X POST \
+  -H "x-api-key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Jane Smith", "firm_name": "Acme Capital", "lead_type": "PE Firm", "stage": "warm_lead"}' \
+  "https://pocket-fund-crm.vercel.app/api/leads"
+```
+
+**201 Response:**
+```json
+{ "success": true, "data": { "id": 456, "name": "Jane Smith", ... } }
+```
+
+**400 Response (missing name):**
+```json
+{ "success": false, "error": "name is required" }
+```
+
+**400 Response (invalid enum):**
+```json
+{ "success": false, "error": "Invalid stage. Must be one of: cold_outreach, warm_lead, active_conversation, client, passed" }
 ```
 
 ### GET /api/analytics
@@ -122,19 +203,29 @@ curl -H "x-api-key: your-key" \
 
 ## Error Responses
 
+**400 Bad Request:**
+```json
+{ "success": false, "error": "name is required" }
+```
+
 **401 Unauthorized:**
 ```json
-{
-  "error": "Unauthorized. Provide valid x-api-key header."
-}
+{ "error": "Unauthorized. Provide valid x-api-key header." }
+```
+
+**404 Not Found:**
+```json
+{ "success": false, "error": "Lead not found" }
+```
+
+**405 Method Not Allowed:**
+```json
+{ "error": "Method not allowed. Use GET or POST." }
 ```
 
 **500 Server Error:**
 ```json
-{
-  "success": false,
-  "error": "Error message here"
-}
+{ "success": false, "error": "Error message here" }
 ```
 
 ## Rate Limits
