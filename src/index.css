@@ -6671,3 +6671,37 @@ input, select, textarea {
     -webkit-touch-callout: none;
   }
 }
+
+/* ============================================================================
+   INVESTOR STATUS BADGES
+   ============================================================================ */
+
+.investor-status-prospect {
+  background: var(--gray-100);
+  color: var(--gray-700);
+}
+
+.investor-status-contacted {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.investor-status-in_conversation {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.investor-status-committed {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.investor-status-invested {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.investor-status-passed {
+  background: #fee2e2;
+  color: #991b1b;
+}

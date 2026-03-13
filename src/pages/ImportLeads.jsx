@@ -99,7 +99,7 @@ function ImportLeads() {
 
   function getMappedLeads() {
     return csvData.map(row => {
-      const lead = { stage: 'cold_outreach', created_by: currentPerson?.id }
+      const lead = { stage: 'new_lead', created_by: currentPerson?.id }
 
       Object.entries(mapping).forEach(([csvHeader, fieldName]) => {
         if (fieldName && row[csvHeader]) {

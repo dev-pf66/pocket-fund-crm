@@ -56,7 +56,22 @@ function Analytics() {
         </p>
 
         <div className="funnel-container">
-          <div className="funnel-stage" style={{ '--width': '100%', '--color': '#60a5fa' }}>
+          <div className="funnel-stage" style={{ '--width': '100%', '--color': '#a78bfa' }}>
+            <div className="funnel-bar">
+              <div className="funnel-label">
+                <span className="funnel-stage-name">New Leads</span>
+                <span className="funnel-count">{conversion.new_lead}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="funnel-arrow">
+            <div className="conversion-rate">
+              {conversion.new_to_cold_rate}% contacted
+            </div>
+          </div>
+
+          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.cold_outreach / conversion.new_lead) * 100 : 100}%`, '--color': '#60a5fa' }}>
             <div className="funnel-bar">
               <div className="funnel-label">
                 <span className="funnel-stage-name">Cold Outreach</span>
@@ -71,7 +86,7 @@ function Analytics() {
             </div>
           </div>
 
-          <div className="funnel-stage" style={{ '--width': `${(conversion.warm_lead / conversion.cold_outreach) * 100}%`, '--color': '#fbbf24' }}>
+          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.warm_lead / conversion.new_lead) * 100 : (conversion.cold_outreach > 0 ? (conversion.warm_lead / conversion.cold_outreach) * 100 : 0)}%`, '--color': '#fbbf24' }}>
             <div className="funnel-bar">
               <div className="funnel-label">
                 <span className="funnel-stage-name">Warm Leads</span>
@@ -86,7 +101,7 @@ function Analytics() {
             </div>
           </div>
 
-          <div className="funnel-stage" style={{ '--width': `${(conversion.active_conversation / conversion.cold_outreach) * 100}%`, '--color': '#f97316' }}>
+          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.active_conversation / conversion.new_lead) * 100 : (conversion.cold_outreach > 0 ? (conversion.active_conversation / conversion.cold_outreach) * 100 : 0)}%`, '--color': '#f97316' }}>
             <div className="funnel-bar">
               <div className="funnel-label">
                 <span className="funnel-stage-name">Active Conversations</span>
@@ -101,7 +116,7 @@ function Analytics() {
             </div>
           </div>
 
-          <div className="funnel-stage" style={{ '--width': `${(conversion.client / conversion.cold_outreach) * 100}%`, '--color': '#22c55e' }}>
+          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.client / conversion.new_lead) * 100 : (conversion.cold_outreach > 0 ? (conversion.client / conversion.cold_outreach) * 100 : 0)}%`, '--color': '#22c55e' }}>
             <div className="funnel-bar">
               <div className="funnel-label">
                 <span className="funnel-stage-name">Clients</span>
@@ -112,7 +127,7 @@ function Analytics() {
         </div>
 
         <div className="overall-conversion">
-          <strong>Overall Conversion:</strong> {conversion.overall_rate}% of cold outreach → clients
+          <strong>Overall Conversion:</strong> {conversion.overall_rate}% of leads → clients
         </div>
       </div>
 
@@ -125,6 +140,10 @@ function Analytics() {
           </p>
 
           <div className="velocity-stats">
+            <div className="velocity-item">
+              <div className="velocity-stage">New Lead</div>
+              <div className="velocity-days">{velocity.new_lead} days</div>
+            </div>
             <div className="velocity-item">
               <div className="velocity-stage">Cold Outreach</div>
               <div className="velocity-days">{velocity.cold_outreach} days</div>

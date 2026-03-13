@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../App'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, CheckSquare, ListChecks } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, CheckSquare, ListChecks, Briefcase } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
@@ -33,6 +33,7 @@ function Layout() {
           <NavLink to="/my-goals" onClick={() => setMobileMenuOpen(false)}><CheckSquare size={18} />My Weekly Goals</NavLink>
           <NavLink to="/goal-templates" onClick={() => setMobileMenuOpen(false)}><ListChecks size={18} />Goal Templates</NavLink>
           <NavLink to="/analytics" onClick={() => setMobileMenuOpen(false)}><BarChart3 size={18} />Analytics</NavLink>
+          <NavLink to="/investors" onClick={() => setMobileMenuOpen(false)}><Briefcase size={18} />Investor Contacts</NavLink>
           <NavLink to="/templates" onClick={() => setMobileMenuOpen(false)}><Mail size={18} />Email Templates</NavLink>
           <NavLink to="/samples" onClick={() => setMobileMenuOpen(false)}><FileText size={18} />Sample Deals</NavLink>
           <NavLink to="/help" onClick={() => setMobileMenuOpen(false)}><HelpCircle size={18} />Help</NavLink>

@@ -8,6 +8,7 @@ import QuickAddCard from '../components/QuickAddCard'
 import { Plus, Search, Filter, Upload } from 'lucide-react'
 
 const STAGES = [
+  { key: 'new_lead', label: 'New Leads', color: '#a78bfa' },
   { key: 'cold_outreach', label: 'Cold Outreach', color: '#60a5fa' },
   { key: 'warm_lead', label: 'Warm Leads', color: '#fbbf24' },
   { key: 'active_conversation', label: 'Active', color: '#f97316' },

@@ -359,6 +359,7 @@ export async function getStaleLeads() {
     )
 
     const thresholds = {
+      new_lead: 999, // New leads don't go stale — they haven't been contacted yet
       cold_outreach: settings.cold_outreach_threshold,
       warm_lead: settings.warm_lead_threshold,
       active_conversation: settings.active_conversation_threshold,
@@ -442,6 +443,7 @@ export async function getPipelineStats() {
   const leads = await getLeads()
 
   const stats = {
+    new_lead: 0,
     cold_outreach: 0,
     warm_lead: 0,
     active_conversation: 0,
@@ -456,6 +458,7 @@ export async function getPipelineStats() {
   })
 
   // Calculate percentages
+  stats.new_pct = (stats.new_lead / stats.total) * 100
   stats.cold_pct = (stats.cold_outreach / stats.total) * 100
   stats.warm_pct = (stats.warm_lead / stats.total) * 100
   stats.active_pct = (stats.active_conversation / stats.total) * 100
@@ -515,6 +518,7 @@ export async function getConversionFunnelStats() {
   }, {})
 
   return {
+    new_lead: stages.new_lead || 0,
     cold_outreach: stages.cold_outreach || 0,
     warm_lead: stages.warm_lead || 0,
     active_conversation: stages.active_conversation || 0,
@@ -595,6 +599,7 @@ export function calculateStaleness(lead, settings) {
   )
 
   const thresholds = {
+    new_lead: 999,
     cold_outreach: settings.cold_outreach_threshold,
     warm_lead: settings.warm_lead_threshold,
     active_conversation: settings.active_conversation_threshold,
@@ -648,6 +653,143 @@ export function filterSampleDealsByLead(sampleDeals, lead) {
   })
 }
 
+// ============================================================================
+// INVESTORS API
+// ============================================================================
+
+/**
+ * Get all investors with optional filters
+ */
+export async function getInvestors(filters = {}) {
+  let query = supabase
+    .from('crm_investors')
+    .select('*')
+    .order('updated_at', { ascending: false })
+
+  if (filters.status) query = query.eq('status', filters.status)
+  if (filters.investor_type) query = query.eq('investor_type', filters.investor_type)
+  if (filters.search) {
+    query = query.or(`name.ilike.%${filters.search}%,firm.ilike.%${filters.search}%,email.ilike.%${filters.search}%`)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Get investor by ID
+ */
+export async function getInvestorById(id) {
+  const { data, error } = await supabase
+    .from('crm_investors')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Create new investor
+ */
+export async function createInvestor(investorData, currentPersonId) {
+  const { data, error } = await supabase
+    .from('crm_investors')
+    .insert([{
+      ...investorData,
+      created_by: currentPersonId
+    }])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Update investor
+ */
+export async function updateInvestor(id, updates) {
+  const cleanUpdates = {}
+  Object.keys(updates).forEach(key => {
+    if (['id', 'created_at', 'updated_at', 'created_by'].includes(key)) return
+    if (updates[key] !== undefined) {
+      cleanUpdates[key] = updates[key]
+    }
+  })
+
+  const { data, error } = await supabase
+    .from('crm_investors')
+    .update(cleanUpdates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Delete investor
+ */
+export async function deleteInvestor(id) {
+  const { error } = await supabase
+    .from('crm_investors')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+/**
+ * Get interactions for an investor
+ */
+export async function getInvestorInteractions(investorId) {
+  const { data, error } = await supabase
+    .from('crm_investor_interactions')
+    .select(`
+      *,
+      logged_by_person:logged_by(id, name)
+    `)
+    .eq('investor_id', investorId)
+    .order('interaction_date', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Log interaction for an investor
+ */
+export async function logInvestorInteraction(investorId, interactionData, currentPersonId) {
+  const { data, error } = await supabase
+    .from('crm_investor_interactions')
+    .insert([{
+      investor_id: investorId,
+      ...interactionData,
+      logged_by: currentPersonId
+    }])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Delete investor interaction
+ */
+export async function deleteInvestorInteraction(id) {
+  const { error } = await supabase
+    .from('crm_investor_interactions')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
 export default {
   // Leads
   getLeads,
@@ -685,6 +827,16 @@ export default {
   getConversionFunnelStats,
   getCRMDashboardData,
   getCRMHeartbeat,
+
+  // Investors
+  getInvestors,
+  getInvestorById,
+  createInvestor,
+  updateInvestor,
+  deleteInvestor,
+  getInvestorInteractions,
+  logInvestorInteraction,
+  deleteInvestorInteraction,
 
   // Utilities
   calculateStaleness,
@@ -754,18 +906,21 @@ export async function getAnalytics() {
 
   // Conversion funnel
   const stages = {
+    new_lead: leads.filter(l => l.stage === 'new_lead').length,
     cold_outreach: leads.filter(l => l.stage === 'cold_outreach').length,
     warm_lead: leads.filter(l => l.stage === 'warm_lead').length,
     active_conversation: leads.filter(l => l.stage === 'active_conversation').length,
     client: leads.filter(l => l.stage === 'client').length
   }
 
+  const totalTop = stages.new_lead + stages.cold_outreach
   const conversion = {
     ...stages,
+    new_to_cold_rate: stages.new_lead > 0 ? Math.round((stages.cold_outreach / stages.new_lead) * 100) : 0,
     cold_to_warm_rate: stages.cold_outreach > 0 ? Math.round((stages.warm_lead / stages.cold_outreach) * 100) : 0,
     warm_to_active_rate: stages.warm_lead > 0 ? Math.round((stages.active_conversation / stages.warm_lead) * 100) : 0,
     active_to_client_rate: stages.active_conversation > 0 ? Math.round((stages.client / stages.active_conversation) * 100) : 0,
-    overall_rate: stages.cold_outreach > 0 ? Math.round((stages.client / stages.cold_outreach) * 100) : 0
+    overall_rate: totalTop > 0 ? Math.round((stages.client / totalTop) * 100) : 0
   }
 
   // Pipeline velocity (avg days in each stage)
@@ -782,10 +937,11 @@ export async function getAnalytics() {
   }
 
   const velocity = {
+    new_lead: getAvgDaysInStage('new_lead'),
     cold_outreach: getAvgDaysInStage('cold_outreach'),
     warm_lead: getAvgDaysInStage('warm_lead'),
     active_conversation: getAvgDaysInStage('active_conversation'),
-    total: Math.round((getAvgDaysInStage('cold_outreach') + getAvgDaysInStage('warm_lead') + getAvgDaysInStage('active_conversation')))
+    total: Math.round((getAvgDaysInStage('new_lead') + getAvgDaysInStage('cold_outreach') + getAvgDaysInStage('warm_lead') + getAvgDaysInStage('active_conversation')))
   }
 
   // Lead sources

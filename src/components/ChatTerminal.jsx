@@ -33,7 +33,7 @@ function ChatTerminal() {
       lead_type: '',
       deal_criteria: '',
       notes: '',
-      stage: 'cold_outreach'
+      stage: 'new_lead'
     }
 
     // Extract name (first thing after "add")

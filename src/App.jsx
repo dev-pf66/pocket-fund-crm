@@ -1,24 +1,28 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, createContext, useContext, lazy, Suspense } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { getPeople, supabase } from './lib/supabase'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
-import LeadsBoard from './pages/LeadsBoard'
-import LeadDetail from './pages/LeadDetail'
-import EmailTemplates from './pages/EmailTemplates'
-import SampleDeals from './pages/SampleDeals'
-import ImportLeads from './pages/ImportLeads'
-import Analytics from './pages/Analytics'
-import OutreachTracker from './pages/OutreachTracker'
-import OutreachAdmin from './pages/OutreachAdmin'
-import MyWeeklyGoals from './pages/MyWeeklyGoals'
-import GoalTemplates from './pages/GoalTemplates'
-import Help from './pages/Help'
-import HelpAdmin from './pages/HelpAdmin'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
-import ChatTerminal from './components/ChatTerminal'
+
+// Lazy-loaded page components
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const LeadsBoard = lazy(() => import('./pages/LeadsBoard'))
+const LeadDetail = lazy(() => import('./pages/LeadDetail'))
+const EmailTemplates = lazy(() => import('./pages/EmailTemplates'))
+const SampleDeals = lazy(() => import('./pages/SampleDeals'))
+const ImportLeads = lazy(() => import('./pages/ImportLeads'))
+const Analytics = lazy(() => import('./pages/Analytics'))
+const OutreachTracker = lazy(() => import('./pages/OutreachTracker'))
+const OutreachAdmin = lazy(() => import('./pages/OutreachAdmin'))
+const MyWeeklyGoals = lazy(() => import('./pages/MyWeeklyGoals'))
+const GoalTemplates = lazy(() => import('./pages/GoalTemplates'))
+const Help = lazy(() => import('./pages/Help'))
+const HelpAdmin = lazy(() => import('./pages/HelpAdmin'))
+const Investors = lazy(() => import('./pages/Investors'))
+const InvestorDetail = lazy(() => import('./pages/InvestorDetail'))
+const ChatTerminal = lazy(() => import('./components/ChatTerminal'))
 
 export const AppContext = createContext()
 
@@ -90,25 +94,29 @@ function AppContent() {
   return (
     <AppContext.Provider value={{ currentPerson, people, setPeople, refreshPeople: loadData }}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="pipeline" element={<LeadsBoard />} />
-            <Route path="leads/:id" element={<LeadDetail />} />
-            <Route path="outreach" element={<OutreachTracker />} />
-            <Route path="outreach-admin" element={<OutreachAdmin />} />
-            <Route path="my-goals" element={<MyWeeklyGoals />} />
-            <Route path="goal-templates" element={<GoalTemplates />} />
-            <Route path="import" element={<ImportLeads />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="templates" element={<EmailTemplates />} />
-            <Route path="samples" element={<SampleDeals />} />
-            <Route path="help" element={<Help />} />
-            <Route path="help/admin" element={<HelpAdmin />} />
-          </Route>
-        </Routes>
-        <ChatTerminal />
+        <Suspense fallback={<div className="loading-screen"><div className="loading-spinner"></div><p>Loading...</p></div>}>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="pipeline" element={<LeadsBoard />} />
+              <Route path="leads/:id" element={<LeadDetail />} />
+              <Route path="outreach" element={<OutreachTracker />} />
+              <Route path="outreach-admin" element={<OutreachAdmin />} />
+              <Route path="my-goals" element={<MyWeeklyGoals />} />
+              <Route path="goal-templates" element={<GoalTemplates />} />
+              <Route path="import" element={<ImportLeads />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="investors" element={<Investors />} />
+              <Route path="investors/:id" element={<InvestorDetail />} />
+              <Route path="templates" element={<EmailTemplates />} />
+              <Route path="samples" element={<SampleDeals />} />
+              <Route path="help" element={<Help />} />
+              <Route path="help/admin" element={<HelpAdmin />} />
+            </Route>
+          </Routes>
+          <ChatTerminal />
+        </Suspense>
       </BrowserRouter>
     </AppContext.Provider>
   )

@@ -75,6 +75,17 @@ function Dashboard() {
           marginTop: '1rem'
         }}>
           <div style={{
+            width: `${pipelineStats.new_pct}%`,
+            background: '#a78bfa',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontWeight: 'bold'
+          }}>
+            New: {pipelineStats.new_lead}
+          </div>
+          <div style={{
             width: `${pipelineStats.cold_pct}%`,
             background: '#60a5fa',
             display: 'flex',
