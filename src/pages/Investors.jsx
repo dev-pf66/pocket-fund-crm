@@ -208,69 +208,82 @@ function Investors() {
         </div>
       </div>
 
-      {/* Add/Edit Form */}
+      {/* Add/Edit Form Modal */}
       {showForm && (
-        <div className="card" style={{ marginBottom: '16px' }}>
-          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>{editingInvestor ? 'Edit Investor' : 'Add Investor'}</h3>
-            <button className="btn btn-secondary" onClick={handleCancel} style={{ padding: '4px 8px' }}>
-              <X size={16} />
-            </button>
+        <div className="modal-overlay" onClick={handleCancel}>
+          <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
+            <h2>{editingInvestor ? 'Edit Investor' : 'Add New Investor'}</h2>
+
+            <form onSubmit={handleSubmit}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Name *</label>
+                  <input type="text" required autoFocus value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Full Name" />
+                </div>
+                <div className="form-group">
+                  <label>Firm</label>
+                  <input type="text" value={formData.firm} onChange={(e) => setFormData({ ...formData, firm: e.target.value })} placeholder="Fund / Office Name" />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Email</label>
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@example.com" />
+                </div>
+                <div className="form-group">
+                  <label>Phone</label>
+                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+1 (555) 123-4567" />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>LinkedIn URL</label>
+                <input type="url" value={formData.linkedin_url} onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })} placeholder="https://linkedin.com/in/..." />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Investor Type</label>
+                  <select value={formData.investor_type} onChange={(e) => setFormData({ ...formData, investor_type: e.target.value })}>
+                    {INVESTOR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Status</label>
+                  <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+                    {INVESTOR_STATUSES.map(s => <option key={s} value={s}>{formatStatusLabel(s)}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Check Size Min ($)</label>
+                  <input type="number" value={formData.check_size_min} onChange={(e) => setFormData({ ...formData, check_size_min: e.target.value })} placeholder="e.g. 25000" />
+                </div>
+                <div className="form-group">
+                  <label>Check Size Max ($)</label>
+                  <input type="number" value={formData.check_size_max} onChange={(e) => setFormData({ ...formData, check_size_max: e.target.value })} placeholder="e.g. 100000" />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Investment Focus</label>
+                <input type="text" value={formData.investment_focus} onChange={(e) => setFormData({ ...formData, investment_focus: e.target.value })} placeholder="e.g. SMB SaaS, services, healthcare" />
+              </div>
+
+              <div className="form-group">
+                <label>Notes</label>
+                <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="Context, intro source, preferences..." rows={3} />
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+                <button type="submit" className="btn btn-primary">{editingInvestor ? 'Update Investor' : 'Add Investor'}</button>
+              </div>
+            </form>
           </div>
-          <form onSubmit={handleSubmit} style={{ padding: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label className="form-label">Name *</label>
-              <input className="form-input" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-            </div>
-            <div>
-              <label className="form-label">Firm</label>
-              <input className="form-input" value={formData.firm} onChange={(e) => setFormData({ ...formData, firm: e.target.value })} />
-            </div>
-            <div>
-              <label className="form-label">Email</label>
-              <input className="form-input" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-            </div>
-            <div>
-              <label className="form-label">Phone</label>
-              <input className="form-input" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
-            </div>
-            <div>
-              <label className="form-label">LinkedIn URL</label>
-              <input className="form-input" value={formData.linkedin_url} onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })} />
-            </div>
-            <div>
-              <label className="form-label">Investor Type</label>
-              <select className="form-select" value={formData.investor_type} onChange={(e) => setFormData({ ...formData, investor_type: e.target.value })}>
-                {INVESTOR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="form-label">Check Size Min ($)</label>
-              <input className="form-input" type="number" value={formData.check_size_min} onChange={(e) => setFormData({ ...formData, check_size_min: e.target.value })} placeholder="e.g. 25000" />
-            </div>
-            <div>
-              <label className="form-label">Check Size Max ($)</label>
-              <input className="form-input" type="number" value={formData.check_size_max} onChange={(e) => setFormData({ ...formData, check_size_max: e.target.value })} placeholder="e.g. 100000" />
-            </div>
-            <div>
-              <label className="form-label">Status</label>
-              <select className="form-select" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                {INVESTOR_STATUSES.map(s => <option key={s} value={s}>{formatStatusLabel(s)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="form-label">Investment Focus</label>
-              <input className="form-input" value={formData.investment_focus} onChange={(e) => setFormData({ ...formData, investment_focus: e.target.value })} placeholder="e.g. SMB SaaS, services, healthcare" />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label">Notes</label>
-              <textarea className="form-textarea" rows={3} value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
-            </div>
-            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
-              <button type="submit" className="btn btn-primary">{editingInvestor ? 'Update' : 'Add'} Investor</button>
-            </div>
-          </form>
         </div>
       )}
 
