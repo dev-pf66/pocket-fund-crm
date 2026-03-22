@@ -5,6 +5,33 @@
 import { supabase } from './supabase'
 
 // ============================================================================
+// IN-MEMORY CACHE
+// ============================================================================
+
+const _cache = new Map()
+
+function cacheGet(key, ttlMs) {
+  const entry = _cache.get(key)
+  if (!entry) return undefined
+  if (Date.now() - entry.ts > ttlMs) {
+    _cache.delete(key)
+    return undefined
+  }
+  return entry.data
+}
+
+function cacheSet(key, data) {
+  _cache.set(key, { data, ts: Date.now() })
+}
+
+export function cacheClear(prefix) {
+  if (!prefix) { _cache.clear(); return }
+  for (const key of _cache.keys()) {
+    if (key.startsWith(prefix)) _cache.delete(key)
+  }
+}
+
+// ============================================================================
 // LEADS API
 // ============================================================================
 
@@ -12,6 +39,10 @@ import { supabase } from './supabase'
  * Get all leads with optional filters
  */
 export async function getLeads(filters = {}) {
+  const cacheKey = 'leads:' + JSON.stringify(filters)
+  const cached = cacheGet(cacheKey, 15000) // 15s TTL
+  if (cached) return cached
+
   let query = supabase
     .from('crm_leads')
     .select('*')
@@ -23,7 +54,9 @@ export async function getLeads(filters = {}) {
 
   const { data, error } = await query
   if (error) throw error
-  return data || []
+  const result = data || []
+  cacheSet(cacheKey, result)
+  return result
 }
 
 /**
@@ -64,6 +97,8 @@ export async function createLead(leadData, currentPersonId) {
     notes: 'Lead created in CRM'
   }, currentPersonId)
 
+  cacheClear('leads')
+  cacheClear('dashboard')
   return data
 }
 
@@ -95,6 +130,8 @@ export async function updateLead(id, updates) {
     console.error('Supabase update error:', error)
     throw error
   }
+  cacheClear('leads')
+  cacheClear('dashboard')
   return data
 }
 
@@ -115,9 +152,11 @@ export async function moveLead(id, newStage, currentPersonId) {
   await logActivity(id, {
     activity_type: 'note',
     activity_date: new Date().toISOString(),
-    notes: `Moved to ${newStage.replace('_', ' ')}`
+    notes: `Moved to ${newStage.replace(/_/g, ' ')}`
   }, currentPersonId)
 
+  cacheClear('leads')
+  cacheClear('dashboard')
   return data
 }
 
@@ -131,6 +170,8 @@ export async function deleteLead(id) {
     .eq('id', id)
 
   if (error) throw error
+  cacheClear('leads')
+  cacheClear('dashboard')
 }
 
 // ============================================================================
@@ -310,9 +351,18 @@ export async function sendSampleDeals(leadId, sampleDealIds, currentPersonId) {
 // ============================================================================
 
 /**
- * Get CRM settings
+ * Get CRM settings (cached for 60s to avoid redundant fetches)
  */
+let _settingsCache = null
+let _settingsCacheTime = 0
+const SETTINGS_CACHE_TTL = 60000
+
 export async function getCRMSettings() {
+  const now = Date.now()
+  if (_settingsCache && (now - _settingsCacheTime) < SETTINGS_CACHE_TTL) {
+    return _settingsCache
+  }
+
   const { data, error } = await supabase
     .from('crm_settings')
     .select('*')
@@ -320,6 +370,8 @@ export async function getCRMSettings() {
     .single()
 
   if (error) throw error
+  _settingsCache = data
+  _settingsCacheTime = now
   return data
 }
 
@@ -335,6 +387,8 @@ export async function updateCRMSettings(updates) {
     .single()
 
   if (error) throw error
+  _settingsCache = data
+  _settingsCacheTime = Date.now()
   return data
 }
 
@@ -530,6 +584,9 @@ export async function getConversionFunnelStats() {
  * Get complete CRM dashboard data
  */
 export async function getCRMDashboardData() {
+  const cached = cacheGet('dashboard', 15000)
+  if (cached) return cached
+
   const [
     leads,
     staleLeads,
@@ -550,7 +607,7 @@ export async function getCRMDashboardData() {
     getCRMSettings()
   ])
 
-  return {
+  const result = {
     leads,
     staleLeads,
     followUps,
@@ -560,6 +617,8 @@ export async function getCRMDashboardData() {
     pipelineStats,
     settings
   }
+  cacheSet('dashboard', result)
+  return result
 }
 
 /**
@@ -661,6 +720,10 @@ export function filterSampleDealsByLead(sampleDeals, lead) {
  * Get all investors with optional filters
  */
 export async function getInvestors(filters = {}) {
+  const cacheKey = 'investors:' + JSON.stringify(filters)
+  const cached = cacheGet(cacheKey, 15000)
+  if (cached) return cached
+
   let query = supabase
     .from('crm_investors')
     .select('*')
@@ -674,7 +737,9 @@ export async function getInvestors(filters = {}) {
 
   const { data, error } = await query
   if (error) throw error
-  return data || []
+  const result = data || []
+  cacheSet(cacheKey, result)
+  return result
 }
 
 /**
@@ -705,6 +770,7 @@ export async function createInvestor(investorData, currentPersonId) {
     .single()
 
   if (error) throw error
+  cacheClear('investors')
   return data
 }
 
@@ -728,6 +794,7 @@ export async function updateInvestor(id, updates) {
     .single()
 
   if (error) throw error
+  cacheClear('investors')
   return data
 }
 
@@ -741,6 +808,7 @@ export async function deleteInvestor(id) {
     .eq('id', id)
 
   if (error) throw error
+  cacheClear('investors')
 }
 
 /**
@@ -1129,28 +1197,47 @@ export async function recalculateAllLeadScores() {
 // ============================================================================
 
 /**
- * Enrich lead from LinkedIn URL
- * This is a placeholder - in production, integrate with a LinkedIn scraping service
+ * Enrich lead from LinkedIn URL using AI-powered enrichment.
+ * Calls the /api/enrich-linkedin serverless function which uses Claude
+ * to generate structured enrichment data based on the lead's info.
  */
 export async function enrichLeadFromLinkedIn(leadId, linkedinUrl) {
-  // Mark as pending
+  // Immediately mark as enriching in local state
   await updateLead(leadId, {
     linkedin_url: linkedinUrl,
-    enrichment_status: 'pending'
+    enrichment_status: 'enriching'
   })
 
-  // In production, call a LinkedIn scraping API here
-  // For now, we'll just mark it as needing manual enrichment
-  await logActivity(leadId, {
-    activity_type: 'note',
-    activity_date: new Date().toISOString(),
-    notes: `LinkedIn profile URL added: ${linkedinUrl}. Manual enrichment needed.`
-  })
+  const apiKey = import.meta.env.VITE_CRM_API_KEY || 'your-secret-api-key-here'
 
-  return {
-    success: true,
-    message: 'LinkedIn URL saved. Manual enrichment needed.',
-    manual: true
+  try {
+    const response = await fetch('/api/enrich-linkedin', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey
+      },
+      body: JSON.stringify({
+        leadId,
+        linkedinUrl
+      })
+    })
+
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      // Mark as failed
+      await updateLead(leadId, { enrichment_status: 'failed' })
+      throw new Error(result.error || 'Enrichment failed')
+    }
+
+    return result.enrichment
+  } catch (error) {
+    // Ensure status is set to failed on any error
+    try {
+      await updateLead(leadId, { enrichment_status: 'failed' })
+    } catch { /* ignore secondary error */ }
+    throw error
   }
 }
 
@@ -1214,7 +1301,7 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
 
   // Log activity
   if (currentPersonName && data) {
-    const typeLabel = outreachData.outreach_type?.replace('_', ' ') || 'outreach'
+    const typeLabel = outreachData.outreach_type?.replace(/_/g, ' ') || 'outreach'
     const description = `${currentPersonName} logged ${typeLabel} to ${outreachData.lead_name}${outreachData.firm_name ? ' at ' + outreachData.firm_name : ''}`
 
     try {

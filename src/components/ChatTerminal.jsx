@@ -148,7 +148,7 @@ Examples:
 
         setMessages(prev => [...prev, {
           type: 'success',
-          text: `✓ Created lead: ${newLead.name}${newLead.firm_name ? ` (${newLead.firm_name})` : ''} in ${newLead.stage.replace('_', ' ')}`
+          text: `✓ Created lead: ${newLead.name}${newLead.firm_name ? ` (${newLead.firm_name})` : ''} in ${newLead.stage.replace(/_/g, ' ')}`
         }])
       } else {
         setMessages(prev => [...prev, {

@@ -6,10 +6,14 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 
-// Lazy-loaded page components
-const Dashboard = lazy(() => import('./pages/Dashboard'))
-const LeadsBoard = lazy(() => import('./pages/LeadsBoard'))
-const LeadDetail = lazy(() => import('./pages/LeadDetail'))
+// Eagerly loaded — these are the main pages users navigate between
+import Dashboard from './pages/Dashboard'
+import LeadsBoard from './pages/LeadsBoard'
+import LeadDetail from './pages/LeadDetail'
+import Investors from './pages/Investors'
+import InvestorDetail from './pages/InvestorDetail'
+
+// Lazy-loaded — less frequently visited pages
 const EmailTemplates = lazy(() => import('./pages/EmailTemplates'))
 const SampleDeals = lazy(() => import('./pages/SampleDeals'))
 const ImportLeads = lazy(() => import('./pages/ImportLeads'))
@@ -20,8 +24,6 @@ const MyWeeklyGoals = lazy(() => import('./pages/MyWeeklyGoals'))
 const GoalTemplates = lazy(() => import('./pages/GoalTemplates'))
 const Help = lazy(() => import('./pages/Help'))
 const HelpAdmin = lazy(() => import('./pages/HelpAdmin'))
-const Investors = lazy(() => import('./pages/Investors'))
-const InvestorDetail = lazy(() => import('./pages/InvestorDetail'))
 const ChatTerminal = lazy(() => import('./components/ChatTerminal'))
 
 export const AppContext = createContext()

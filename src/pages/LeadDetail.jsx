@@ -51,6 +51,32 @@ function LeadDetail() {
     }
   }
 
+  async function refreshLead() {
+    const leadData = await getLeadById(id)
+    setLead(leadData)
+    setEditedLead(leadData)
+  }
+
+  async function refreshActivities() {
+    const [leadData, activitiesData] = await Promise.all([
+      getLeadById(id),
+      getLeadActivities(id)
+    ])
+    setLead(leadData)
+    setEditedLead(leadData)
+    setActivities(activitiesData)
+  }
+
+  async function refreshTranscripts() {
+    const transcriptsData = await getLeadTranscripts(id)
+    setTranscripts(transcriptsData)
+  }
+
+  async function refreshTags() {
+    const leadTagsData = await getLeadTags(id)
+    setLeadTags(leadTagsData)
+  }
+
   async function handleSave() {
     try {
       const updatedLead = await updateLead(id, editedLead)
@@ -80,7 +106,7 @@ function LeadDetail() {
       await logActivity(id, newActivity, currentPerson?.id)
       setNewActivity({ activity_type: 'call', notes: '', transcript: '', activity_date: new Date().toISOString().split('T')[0] })
       setShowActivityForm(false)
-      await loadData()
+      await refreshActivities()
     } catch (error) {
       console.error('Failed to log activity:', error)
       alert('Failed to log activity')
@@ -96,7 +122,7 @@ function LeadDetail() {
       })
       setNewTranscript({ title: '', transcript: '', call_date: new Date().toISOString().split('T')[0] })
       setShowTranscriptForm(false)
-      await loadData()
+      await refreshTranscripts()
 
       // Auto-trigger AI analysis in the background
       if (saved?.id) {
@@ -112,7 +138,7 @@ function LeadDetail() {
     setAnalysingTranscriptId(transcriptId)
     try {
       await analyzeTranscript(transcriptId, transcriptText)
-      await loadData()
+      await refreshTranscripts()
     } catch (error) {
       console.error('AI analysis failed:', error)
     } finally {
@@ -125,7 +151,7 @@ function LeadDetail() {
 
     try {
       await deleteTranscript(transcriptId)
-      await loadData()
+      await refreshTranscripts()
     } catch (error) {
       console.error('Failed to delete transcript:', error)
       alert('Failed to delete transcript')
@@ -136,7 +162,7 @@ function LeadDetail() {
     setCalculating(true)
     try {
       const score = await calculateLeadScore(id)
-      await loadData() // Refresh to get updated score
+      await refreshLead()
       alert(`Lead score calculated: ${score}/100`)
     } catch (error) {
       console.error('Failed to calculate score:', error)
@@ -154,14 +180,11 @@ function LeadDetail() {
 
     setEnriching(true)
     try {
-      const result = await enrichLeadFromLinkedIn(id, editedLead.linkedin_url)
-      if (result.manual) {
-        alert(result.message)
-      }
-      await loadData()
+      await enrichLeadFromLinkedIn(id, editedLead.linkedin_url)
+      await refreshLead()
     } catch (error) {
       console.error('Failed to enrich:', error)
-      alert('Failed to enrich from LinkedIn')
+      alert('Failed to enrich from LinkedIn: ' + error.message)
     } finally {
       setEnriching(false)
     }
@@ -170,7 +193,7 @@ function LeadDetail() {
   async function handleAddTag(tagId) {
     try {
       await addTagToLead(id, tagId)
-      await loadData()
+      await refreshTags()
     } catch (error) {
       console.error('Failed to add tag:', error)
       alert('Failed to add tag')
@@ -180,7 +203,7 @@ function LeadDetail() {
   async function handleRemoveTag(tagId) {
     try {
       await removeTagFromLead(id, tagId)
-      await loadData()
+      await refreshTags()
     } catch (error) {
       console.error('Failed to remove tag:', error)
       alert('Failed to remove tag')
@@ -191,7 +214,7 @@ function LeadDetail() {
     try {
       const assignToPersonId = assignedToId ? parseInt(assignedToId) : null
       await assignLead(id, assignToPersonId, currentPerson?.id)
-      await loadData()
+      await refreshLead()
     } catch (error) {
       console.error('Failed to assign lead:', error)
       alert('Failed to assign lead: ' + error.message)
@@ -387,6 +410,11 @@ function LeadDetail() {
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Sparkles size={16} />
                   LinkedIn Auto-Enrichment
+                  {editedLead.enrichment_status && (
+                    <span className={`enrichment-badge enrichment-badge-${editedLead.enrichment_status}`}>
+                      {editedLead.enrichment_status}
+                    </span>
+                  )}
                 </label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
                   <input
@@ -402,12 +430,56 @@ function LeadDetail() {
                     onClick={handleEnrichFromLinkedIn}
                     disabled={!editedLead.linkedin_url || enriching}
                   >
-                    {enriching ? 'Enriching...' : 'Auto-Fill'}
+                    {enriching && <span className="enrichment-spinner" />}
+                    {enriching ? 'Enriching...' : editedLead.enrichment_status === 'enriched' ? 'Re-enrich' : 'Auto-Fill'}
                   </button>
                 </div>
-                {editedLead.linkedin_headline && (
-                  <div style={{ marginTop: '8px', padding: '8px', background: 'var(--gray-50)', borderRadius: '4px', fontSize: '13px' }}>
-                    {editedLead.linkedin_headline}
+
+                {/* Enrichment results */}
+                {editedLead.enrichment_status === 'enriched' && (
+                  <div className="enrichment-results">
+                    {editedLead.linkedin_headline && (
+                      <div className="enrichment-field">
+                        <span className="enrichment-field-label">Headline</span>
+                        <span className="enrichment-field-value">{editedLead.linkedin_headline}</span>
+                      </div>
+                    )}
+                    {editedLead.current_position && (
+                      <div className="enrichment-field">
+                        <span className="enrichment-field-label">Current Role</span>
+                        <span className="enrichment-field-value">{editedLead.current_position}</span>
+                      </div>
+                    )}
+                    {editedLead.education && (
+                      <div className="enrichment-field">
+                        <span className="enrichment-field-label">Education</span>
+                        <span className="enrichment-field-value">{editedLead.education}</span>
+                      </div>
+                    )}
+                    {editedLead.past_experience && (
+                      <div className="enrichment-field">
+                        <span className="enrichment-field-label">Past Experience</span>
+                        <span className="enrichment-field-value enrichment-field-pre">{editedLead.past_experience}</span>
+                      </div>
+                    )}
+                    {editedLead.enriched_at && (
+                      <div className="enrichment-timestamp">
+                        Enriched {new Date(editedLead.enriched_at).toLocaleDateString()} via AI
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {editedLead.enrichment_status === 'failed' && (
+                  <div className="enrichment-failed">
+                    Enrichment failed. Check the LinkedIn URL and try again.
+                  </div>
+                )}
+
+                {enriching && (
+                  <div className="enrichment-loading">
+                    <span className="enrichment-spinner" />
+                    Analyzing LinkedIn profile with AI...
                   </div>
                 )}
               </div>
@@ -605,7 +677,7 @@ function LeadDetail() {
 
               <div className="info-item">
                 <label>Stage</label>
-                <div>{lead.stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                <div>{lead.stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
               </div>
 
               {lead.assigned_to && (
@@ -771,7 +843,7 @@ function LeadDetail() {
                   {lead.trust_level && (
                     <div className="info-item">
                       <label>Trust Level</label>
-                      <div>{lead.trust_level.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                      <div>{lead.trust_level.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
                     </div>
                   )}
 
@@ -991,7 +1063,7 @@ function LeadDetail() {
                 </div>
                 <div className="activity-content">
                   <div className="activity-header">
-                    <strong>{activity.activity_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong>
+                    <strong>{activity.activity_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong>
                     <span className="activity-date">
                       {new Date(activity.activity_date).toLocaleString()}
                     </span>

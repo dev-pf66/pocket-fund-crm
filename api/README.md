@@ -36,6 +36,10 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `GET` | [`/api/activities`](#get-apiactivities) | API key | List lead activities |
 | `GET` | [`/api/analytics`](#get-apianalytics) | API key | Pipeline analytics & conversion rates |
 | `POST` | [`/api/analyze-transcript`](#post-apianalyze-transcript) | API key | AI analysis of a sales call transcript |
+| `POST` | [`/api/enrich-linkedin`](#post-apienrich-linkedin) | API key | AI-powered LinkedIn profile enrichment |
+| `GET` | [`/api/investors`](#get-apiinvestors) | API key | List investors (filterable + searchable) |
+| `GET` | [`/api/investors?id=`](#get-apiinvestorsid123) | API key | Get single investor by ID |
+| `POST` | [`/api/investors`](#post-apiinvestors) | API key | Create a new investor |
 | `GET` | `/api/daily-leads` | Cron secret | Auto-import leads from LinkedIn (v1) |
 | `GET` | `/api/daily-leads-v2` | Cron secret | Auto-import from LinkedIn + Crunchbase (v2) |
 
@@ -173,7 +177,7 @@ Content-Type: application/json
 | `linkedin_url` | string | No | |
 | `lead_type` | string | No | See [Lead Type enum](#lead-type) |
 | `lead_source` | string | No | See [Lead Source enum](#lead-source) |
-| `stage` | string | No | See [Stage enum](#stage). Defaults to `cold_outreach` |
+| `stage` | string | No | See [Stage enum](#stage). Defaults to `new_lead` |
 | `deal_criteria` | string | No | e.g. `"B2B SaaS, $1-5M revenue"` |
 | `notes` | string | No | |
 | `initial_conversation` | string | No | |
@@ -234,7 +238,7 @@ curl -X POST \
 
 **400 Response** (invalid enum):
 ```json
-{ "success": false, "error": "Invalid stage. Must be one of: cold_outreach, warm_lead, active_conversation, client, passed" }
+{ "success": false, "error": "Invalid stage. Must be one of: new_lead, cold_outreach, warm_lead, active_conversation, client, passed" }
 ```
 
 ---
@@ -414,6 +418,249 @@ curl -X POST \
 
 ---
 
+## LinkedIn Enrichment
+
+### POST /api/enrich-linkedin
+
+Enrich a lead's profile using AI-powered LinkedIn analysis. Uses Claude Haiku to generate structured professional data (headline, position, experience, education) based on the lead's existing info and LinkedIn URL. Updates the lead record and logs an activity note.
+
+**Headers:**
+```
+x-api-key: YOUR_KEY
+Content-Type: application/json
+```
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `leadId` | integer | **Yes** | ID of the lead to enrich |
+| `linkedinUrl` | string | **Yes** | Full LinkedIn profile URL (must be a valid `linkedin.com` domain) |
+
+**Example:**
+```bash
+curl -X POST \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "leadId": 32,
+    "linkedinUrl": "https://www.linkedin.com/in/janesmith"
+  }' \
+  "https://pocket-fund-crm.vercel.app/api/enrich-linkedin"
+```
+
+**200 Response:**
+```json
+{
+  "success": true,
+  "enrichment": {
+    "linkedin_url": "https://www.linkedin.com/in/janesmith",
+    "linkedin_headline": "Managing Partner at Acme Capital | Private Equity | B2B SaaS Acquisitions",
+    "current_position": "Managing Partner at Acme Capital",
+    "past_experience": "• VP of Strategy at Summit Partners (2018-2022)\n• Associate at Goldman Sachs (2015-2018)",
+    "education": "MBA, Wharton School of Business; BS Finance, NYU",
+    "enrichment_status": "enriched",
+    "enriched_at": "2026-03-16T14:30:00.000Z",
+    "enrichment_notes": "Experienced PE professional with B2B SaaS focus. Approach with relevant deal flow in the $2-10M range."
+  }
+}
+```
+
+**Enrichment fields saved to the lead:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `linkedin_url` | string | The LinkedIn URL provided |
+| `linkedin_headline` | string | Generated headline (max 300 chars) |
+| `current_position` | string | Current role and title (max 200 chars) |
+| `past_experience` | string | Bullet-pointed past roles |
+| `education` | string | Educational background |
+| `enrichment_status` | string | Set to `enriched` on success, `failed` on error |
+| `enriched_at` | timestamp | When enrichment completed |
+
+**Side effects:**
+- Sets `enrichment_status` to `enriching` during processing
+- Logs a `note` activity on the lead with enrichment summary
+- On failure, sets `enrichment_status` to `failed`
+
+**400 Response:**
+```json
+{ "error": "leadId and linkedinUrl are required" }
+```
+
+**400 Response** (invalid URL):
+```json
+{ "error": "Invalid LinkedIn URL" }
+```
+
+**404 Response:**
+```json
+{ "error": "Lead not found" }
+```
+
+---
+
+## Investors
+
+### GET /api/investors
+
+List investors with optional filters and search. Returns newest-updated first.
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `status` | string | — | Filter by investor status |
+| `investor_type` | string | — | Filter by investor type |
+| `search` | string | — | Search across name, firm, and email (case-insensitive) |
+| `limit` | integer | `100` | Max results to return |
+
+**Example:**
+```bash
+curl -H "x-api-key: YOUR_KEY" \
+  "https://pocket-fund-crm.vercel.app/api/investors?status=committed&investor_type=Family%20Office&limit=10"
+```
+
+**200 Response:**
+```json
+{
+  "success": true,
+  "count": 1,
+  "data": [
+    {
+      "id": 5,
+      "name": "Sarah Chen",
+      "firm": "Chen Family Office",
+      "email": "sarah@chenfamilyoffice.com",
+      "phone": "+1 (415) 555-0199",
+      "linkedin_url": "https://linkedin.com/in/sarahchen",
+      "investor_type": "Family Office",
+      "status": "committed",
+      "check_size_min": 50000,
+      "check_size_max": 250000,
+      "investment_focus": "SMB SaaS, healthcare services",
+      "notes": "Prefers co-investments with other family offices",
+      "created_by": 1,
+      "created_at": "2026-03-10T08:30:00.000Z",
+      "updated_at": "2026-03-15T14:20:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### GET /api/investors?id=123
+
+Fetch a single investor by their database ID.
+
+**Example:**
+```bash
+curl -H "x-api-key: YOUR_KEY" \
+  "https://pocket-fund-crm.vercel.app/api/investors?id=5"
+```
+
+**200 Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 5,
+    "name": "Sarah Chen",
+    "firm": "Chen Family Office",
+    "status": "committed",
+    "investor_type": "Family Office",
+    ...
+  }
+}
+```
+
+**404 Response:**
+```json
+{ "success": false, "error": "Investor not found" }
+```
+
+---
+
+### POST /api/investors
+
+Create a new investor. Returns the full created investor object.
+
+**Headers:**
+```
+x-api-key: YOUR_KEY
+Content-Type: application/json
+```
+
+**Request Body:**
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `name` | string | **Yes** | Investor name (cannot be empty) |
+| `firm` | string | No | Fund or office name |
+| `email` | string | No | |
+| `phone` | string | No | |
+| `linkedin_url` | string | No | LinkedIn profile URL |
+| `investor_type` | string | No | See [Investor Type enum](#investor-type). Defaults to `Individual LP` |
+| `status` | string | No | See [Investor Status enum](#investor-status). Defaults to `prospect` |
+| `check_size_min` | number | No | Minimum check size in dollars |
+| `check_size_max` | number | No | Maximum check size in dollars |
+| `investment_focus` | string | No | e.g. `"SMB SaaS, services, healthcare"` |
+| `notes` | string | No | Context, intro source, preferences |
+
+**Example:**
+```bash
+curl -X POST \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Sarah Chen",
+    "firm": "Chen Family Office",
+    "email": "sarah@chenfamilyoffice.com",
+    "investor_type": "Family Office",
+    "status": "prospect",
+    "check_size_min": 50000,
+    "check_size_max": 250000,
+    "investment_focus": "SMB SaaS, healthcare services",
+    "notes": "Intro via Mike at Apex Partners"
+  }' \
+  "https://pocket-fund-crm.vercel.app/api/investors"
+```
+
+**201 Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 6,
+    "name": "Sarah Chen",
+    "firm": "Chen Family Office",
+    "email": "sarah@chenfamilyoffice.com",
+    "investor_type": "Family Office",
+    "status": "prospect",
+    "check_size_min": 50000,
+    "check_size_max": 250000,
+    "investment_focus": "SMB SaaS, healthcare services",
+    "notes": "Intro via Mike at Apex Partners",
+    "created_at": "2026-03-16T10:00:00.000Z",
+    "updated_at": "2026-03-16T10:00:00.000Z",
+    ...
+  }
+}
+```
+
+**400 Response** (missing name):
+```json
+{ "success": false, "error": "name is required" }
+```
+
+**400 Response** (invalid enum):
+```json
+{ "success": false, "error": "Invalid investor_type. Must be one of: Individual LP, Family Office, Fund of Funds, Institutional, HNW Individual, Strategic, Other" }
+```
+
+---
+
 ## Cron Jobs (Internal)
 
 These are triggered automatically by Vercel Cron. They use `Authorization: Bearer CRON_SECRET`, not the API key.
@@ -453,7 +700,8 @@ Pipeline stages a lead progresses through:
 
 | Value | Description |
 |-------|-------------|
-| `cold_outreach` | Initial contact, no response yet (default) |
+| `new_lead` | Freshly added, not yet contacted |
+| `cold_outreach` | Initial contact, no response yet |
 | `warm_lead` | Responded or showed interest |
 | `active_conversation` | Ongoing discussions |
 | `client` | Converted to paying client |
@@ -477,6 +725,29 @@ Pipeline stages a lead progresses through:
 | `Cold Email` |
 | `Event` |
 | `Website` |
+
+### Investor Type
+
+| Value |
+|-------|
+| `Individual LP` |
+| `Family Office` |
+| `Fund of Funds` |
+| `Institutional` |
+| `HNW Individual` |
+| `Strategic` |
+| `Other` |
+
+### Investor Status
+
+| Value | Description |
+|-------|-------------|
+| `prospect` | Identified, not yet contacted (default) |
+| `contacted` | Initial outreach made |
+| `in_conversation` | Active discussions |
+| `committed` | Verbal or written commitment |
+| `invested` | Capital received |
+| `passed` | Declined or disqualified |
 
 ### Activity Type
 
@@ -555,11 +826,11 @@ Required in Vercel project settings:
 
 | Variable | Used By | Description |
 |----------|---------|-------------|
-| `CRM_API_KEY` | leads, activities, analytics, analyze-transcript | API key for external access |
+| `CRM_API_KEY` | leads, activities, analytics, analyze-transcript, enrich-linkedin, investors | API key for external access |
 | `VITE_SUPABASE_URL` | All endpoints | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | leads, activities, analytics, daily-leads, daily-leads-v2 | Supabase service role key (server-side) |
+| `SUPABASE_SERVICE_ROLE_KEY` | leads, activities, analytics, investors, daily-leads, daily-leads-v2 | Supabase service role key (server-side) |
 | `VITE_SUPABASE_ANON_KEY` | analyze-transcript, frontend | Supabase anon key |
-| `ANTHROPIC_API_KEY` | analyze-transcript | Claude API key for AI analysis |
+| `ANTHROPIC_API_KEY` | analyze-transcript, enrich-linkedin | Claude API key for AI analysis |
 | `APIFY_API_TOKEN` | daily-leads, daily-leads-v2 | Apify token for LinkedIn scraping |
 | `CRON_SECRET` | daily-leads, daily-leads-v2 | Vercel Cron auth secret |
 

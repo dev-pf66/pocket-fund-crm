@@ -5,17 +5,14 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Valid enum values
-const VALID_STAGES = ['new_lead', 'cold_outreach', 'warm_lead', 'active_conversation', 'client', 'passed']
-const VALID_LEAD_TYPES = ['Independent Sponsor', 'PE Firm', 'Family Office', 'Other']
-const VALID_LEAD_SOURCES = ['LinkedIn', 'Referral', 'Cold Email', 'Event', 'Website']
+const VALID_INVESTOR_TYPES = ['Individual LP', 'Family Office', 'Fund of Funds', 'Institutional', 'HNW Individual', 'Strategic', 'Other']
+const VALID_STATUSES = ['prospect', 'contacted', 'in_conversation', 'committed', 'invested', 'passed']
 
-// Fields allowed when creating a lead
+// Fields allowed when creating/updating an investor
 const ALLOWED_FIELDS = [
-  'name', 'email', 'phone', 'firm_name', 'linkedin_url',
-  'lead_type', 'deal_criteria', 'lead_source', 'stage', 'notes',
-  'initial_conversation', 'needs_sample_deals', 'next_follow_up_date',
-  'reach_out_later_date', 'aum', 'investment_thesis', 'portfolio_size',
-  'fund_vintage'
+  'name', 'firm', 'email', 'phone', 'linkedin_url',
+  'investor_type', 'status', 'check_size_min', 'check_size_max',
+  'investment_focus', 'notes'
 ]
 
 function authenticate(req) {
@@ -48,19 +45,19 @@ export default async function handler(req, res) {
 
 async function handleGet(req, res) {
   try {
-    const { id, stage, lead_type, limit = 100 } = req.query
+    const { id, status, investor_type, search, limit = 100 } = req.query
 
-    // Single lead by ID
+    // Single investor by ID
     if (id) {
       const { data, error } = await supabase
-        .from('crm_leads')
+        .from('crm_investors')
         .select('*')
         .eq('id', id)
         .single()
 
       if (error) {
         if (error.code === 'PGRST116') {
-          return res.status(404).json({ success: false, error: 'Lead not found' })
+          return res.status(404).json({ success: false, error: 'Investor not found' })
         }
         throw error
       }
@@ -68,19 +65,26 @@ async function handleGet(req, res) {
       return res.status(200).json({ success: true, data })
     }
 
-    // List leads with filters
+    // List investors with filters
     let query = supabase
-      .from('crm_leads')
+      .from('crm_investors')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .limit(parseInt(limit))
 
-    if (stage) {
-      query = query.eq('stage', stage)
+    if (status) {
+      query = query.eq('status', status)
     }
 
-    if (lead_type) {
-      query = query.eq('lead_type', lead_type)
+    if (investor_type) {
+      query = query.eq('investor_type', investor_type)
+    }
+
+    if (search) {
+      const sanitized = search.replace(/[%_,.()"'\\]/g, '')
+      if (sanitized) {
+        query = query.or(`name.ilike.%${sanitized}%,firm.ilike.%${sanitized}%,email.ilike.%${sanitized}%`)
+      }
     }
 
     const { data, error } = await query
@@ -107,25 +111,35 @@ async function handlePost(req, res) {
     }
 
     // Validate enums
-    if (body.stage && !VALID_STAGES.includes(body.stage)) {
+    if (body.investor_type && !VALID_INVESTOR_TYPES.includes(body.investor_type)) {
       return res.status(400).json({
         success: false,
-        error: `Invalid stage. Must be one of: ${VALID_STAGES.join(', ')}`
+        error: `Invalid investor_type. Must be one of: ${VALID_INVESTOR_TYPES.join(', ')}`
       })
     }
 
-    if (body.lead_type && !VALID_LEAD_TYPES.includes(body.lead_type)) {
+    if (body.status && !VALID_STATUSES.includes(body.status)) {
       return res.status(400).json({
         success: false,
-        error: `Invalid lead_type. Must be one of: ${VALID_LEAD_TYPES.join(', ')}`
+        error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`
       })
     }
 
-    if (body.lead_source && !VALID_LEAD_SOURCES.includes(body.lead_source)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid lead_source. Must be one of: ${VALID_LEAD_SOURCES.join(', ')}`
-      })
+    // Validate check sizes are positive numbers if provided
+    if (body.check_size_min !== undefined && body.check_size_min !== null) {
+      const min = Number(body.check_size_min)
+      if (isNaN(min) || min < 0) {
+        return res.status(400).json({ success: false, error: 'check_size_min must be a positive number' })
+      }
+      body.check_size_min = min
+    }
+
+    if (body.check_size_max !== undefined && body.check_size_max !== null) {
+      const max = Number(body.check_size_max)
+      if (isNaN(max) || max < 0) {
+        return res.status(400).json({ success: false, error: 'check_size_max must be a positive number' })
+      }
+      body.check_size_max = max
     }
 
     // Whitelist fields
@@ -137,7 +151,7 @@ async function handlePost(req, res) {
     }
 
     const { data, error } = await supabase
-      .from('crm_leads')
+      .from('crm_investors')
       .insert(insert)
       .select()
       .single()

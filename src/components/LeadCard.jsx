@@ -1,28 +1,14 @@
-import { useState, useEffect } from 'react'
-import { getCRMSettings, calculateStaleness, logActivity } from '../lib/crm-api'
+import { useState, useCallback, memo } from 'react'
+import { logActivity } from '../lib/crm-api'
 import { useApp } from '../App'
 import StalenessBadge from './StalenessBadge'
 import { Phone, Mail, MessageCircle } from 'lucide-react'
 
-function LeadCard({ lead, onDragStart, onClick, onRefresh }) {
+const LeadCard = memo(function LeadCard({ lead, settings, onDragStart, onClick, onRefresh }) {
   const { currentPerson } = useApp()
-  const [settings, setSettings] = useState(null)
   const [logging, setLogging] = useState(false)
 
-  useEffect(() => {
-    loadSettings()
-  }, [])
-
-  async function loadSettings() {
-    try {
-      const data = await getCRMSettings()
-      setSettings(data)
-    } catch (error) {
-      console.error('Failed to load settings:', error)
-    }
-  }
-
-  async function handleQuickLog(e, activityType) {
+  const handleQuickLog = useCallback(async function handleQuickLog(e, activityType) {
     e.stopPropagation()
     if (logging) return
 
@@ -39,7 +25,7 @@ function LeadCard({ lead, onDragStart, onClick, onRefresh }) {
     } finally {
       setLogging(false)
     }
-  }
+  }, [lead.id, currentPerson?.id, onRefresh, logging])
 
   function formatTimeAgo(date) {
     if (!date) return 'Never'
@@ -143,6 +129,6 @@ function LeadCard({ lead, onDragStart, onClick, onRefresh }) {
       </div>
     </div>
   )
-}
+})
 
 export default LeadCard

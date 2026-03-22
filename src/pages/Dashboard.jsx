@@ -13,24 +13,22 @@ function Dashboard() {
 
   useEffect(() => {
     loadData()
-  }, [currentPerson])
+  }, [currentPerson?.id])
 
   async function loadData() {
     setLoading(true)
     try {
-      const dashboardData = await getCRMDashboardData()
-      setData(dashboardData)
-
-      // Load assigned leads if user is logged in
+      const promises = [getCRMDashboardData()]
       if (currentPerson?.id) {
-        try {
-          const assigned = await getAssignedLeads(currentPerson.id)
-          setMyLeads(assigned)
-        } catch (err) {
+        promises.push(getAssignedLeads(currentPerson.id).catch(err => {
           console.log('Could not load assigned leads:', err)
-          setMyLeads([])
-        }
+          return []
+        }))
       }
+
+      const [dashboardData, assigned] = await Promise.all(promises)
+      setData(dashboardData)
+      setMyLeads(assigned || [])
     } catch (error) {
       console.error('Failed to load CRM dashboard:', error)
     } finally {
@@ -59,7 +57,7 @@ function Dashboard() {
     <div>
       <div className="page-header">
         <h1>Sales CRM Dashboard</h1>
-        <Link to="/crm/leads" className="btn btn-primary">
+        <Link to="/pipeline" className="btn btn-primary">
           View Pipeline
         </Link>
       </div>
@@ -150,7 +148,7 @@ function Dashboard() {
               </h3>
               {activeStale.map(lead => (
                 <div key={lead.id} style={{ padding: '0.5rem 0' }}>
-                  <Link to={`/crm/leads/${lead.id}`} style={{ fontWeight: 'bold', color: '#dc2626' }}>
+                  <Link to={`/leads/${lead.id}`} style={{ fontWeight: 'bold', color: '#dc2626' }}>
                     {lead.name}
                   </Link>
                   {lead.firm_name && <span> • {lead.firm_name}</span>}
@@ -169,12 +167,12 @@ function Dashboard() {
               </h3>
               {staleLeads.slice(0, 5).map(lead => (
                 <div key={lead.id} style={{ padding: '0.25rem 0' }}>
-                  <Link to={`/crm/leads/${lead.id}`}>
+                  <Link to={`/leads/${lead.id}`}>
                     {lead.name}
                   </Link>
                   {lead.firm_name && <span> • {lead.firm_name}</span>}
                   <span style={{ color: '#9ca3af', marginLeft: '0.5rem' }}>
-                    ({lead.stage.replace('_', ' ')}, {Math.ceil((Date.now() - new Date(lead.last_activity_date)) / (1000 * 60 * 60 * 24))} days)
+                    ({lead.stage.replace(/_/g, ' ')}, {Math.ceil((Date.now() - new Date(lead.last_activity_date)) / (1000 * 60 * 60 * 24))} days)
                   </span>
                 </div>
               ))}
@@ -193,7 +191,7 @@ function Dashboard() {
               </h3>
               {followUps.map(lead => (
                 <div key={lead.id} style={{ padding: '0.25rem 0' }}>
-                  <Link to={`/crm/leads/${lead.id}`}>
+                  <Link to={`/leads/${lead.id}`}>
                     {lead.name}
                   </Link>
                   {lead.firm_name && <span> • {lead.firm_name}</span>}
@@ -209,7 +207,7 @@ function Dashboard() {
               </h3>
               {needsSamples.map(lead => (
                 <div key={lead.id} style={{ padding: '0.25rem 0' }}>
-                  <Link to={`/crm/leads/${lead.id}`}>
+                  <Link to={`/leads/${lead.id}`}>
                     {lead.name}
                   </Link>
                   {lead.firm_name && <span> • {lead.firm_name}</span>}
@@ -322,7 +320,7 @@ function Dashboard() {
                       <div style={{ fontSize: '14px', color: 'var(--gray-600)' }}>{lead.firm_name}</div>
                     )}
                     <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>
-                      {lead.stage.replace('_', ' ')} • Assigned {new Date(lead.assigned_date).toLocaleDateString()}
+                      {lead.stage.replace(/_/g, ' ')} • Assigned {new Date(lead.assigned_date).toLocaleDateString()}
                     </div>
                   </Link>
                 ))}

@@ -652,7 +652,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {outreachTypeIcons[outreach.outreach_type]}
                         <span style={{ textTransform: 'capitalize' }}>
-                          {outreach.outreach_type.replace('_', ' ')}
+                          {outreach.outreach_type.replace(/_/g, ' ')}
                         </span>
                       </div>
                     </td>
@@ -808,7 +808,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {outreachTypeIcons[selectedOutreach.outreach_type]}
                   <span style={{ textTransform: 'capitalize' }}>
-                    {selectedOutreach.outreach_type.replace('_', ' ')}
+                    {selectedOutreach.outreach_type.replace(/_/g, ' ')}
                   </span>
                 </div>
               </div>
@@ -818,7 +818,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {statusIcons[selectedOutreach.status]}
                   <span style={{ textTransform: 'capitalize' }}>
-                    {selectedOutreach.status.replace('_', ' ')}
+                    {selectedOutreach.status.replace(/_/g, ' ')}
                   </span>
                 </div>
               </div>
