@@ -1,9 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { getCRMDashboardData, getAssignedLeads } from '../lib/crm-api'
 import { useApp } from '../App'
-import { TrendingUp, AlertCircle, Calendar, FileText, Phone, Activity, User } from 'lucide-react'
+import { TrendingUp, AlertCircle, Calendar, FileText, Phone, Activity, User, Clock, FlaskConical } from 'lucide-react'
 import ActivityFeed from '../components/ActivityFeed'
+
+const PIPELINE_SEGMENTS = [
+  { key: 'new_lead',             label: 'New',     color: '#a78bfa', countKey: 'new_lead',            pctKey: 'new_pct' },
+  { key: 'cold_outreach',        label: 'Cold',    color: '#60a5fa', countKey: 'cold_outreach',       pctKey: 'cold_pct' },
+  { key: 'warm_lead',            label: 'Warm',    color: '#fbbf24', countKey: 'warm_lead',           pctKey: 'warm_pct' },
+  { key: 'active_conversation',  label: 'Active',  color: '#f97316', countKey: 'active_conversation', pctKey: 'active_pct' },
+  { key: 'client',               label: 'Clients', color: '#22c55e', countKey: 'client',              pctKey: 'client_pct' },
+]
+
+function daysSince(dateStr) {
+  if (!dateStr) return null
+  return Math.ceil((Date.now() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
+}
 
 function Dashboard() {
   const { currentPerson } = useApp()
@@ -20,12 +33,8 @@ function Dashboard() {
     try {
       const promises = [getCRMDashboardData()]
       if (currentPerson?.id) {
-        promises.push(getAssignedLeads(currentPerson.id).catch(err => {
-          console.log('Could not load assigned leads:', err)
-          return []
-        }))
+        promises.push(getAssignedLeads(currentPerson.id).catch(() => []))
       }
-
       const [dashboardData, assigned] = await Promise.all(promises)
       setData(dashboardData)
       setMyLeads(assigned || [])
@@ -39,320 +48,222 @@ function Dashboard() {
   if (loading) {
     return (
       <div>
-        <div className="page-header">
-          <h1>Sales CRM Dashboard</h1>
-        </div>
+        <div className="page-header"><h1>Sales CRM Dashboard</h1></div>
         <div className="loading">Loading dashboard...</div>
       </div>
     )
   }
 
-  if (!data) {
-    return <div>Error loading dashboard</div>
-  }
+  if (!data) return <div>Error loading dashboard</div>
 
   const { pipelineStats, staleLeads, followUps, needsSamples, activeStale, weeklyStats, settings } = data
+  const hasAlerts = activeStale.length || staleLeads.length || followUps.length || needsSamples.length
 
   return (
-    <div>
+    <div className="dashboard">
       <div className="page-header">
         <h1>Sales CRM Dashboard</h1>
-        <Link to="/pipeline" className="btn btn-primary">
-          View Pipeline
-        </Link>
+        <Link to="/pipeline" className="btn btn-primary">View Pipeline</Link>
       </div>
 
-      {/* Pipeline Health */}
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
+      {/* Pipeline Overview */}
+      <div className="card dashboard-card">
         <h2><TrendingUp size={20} /> Pipeline Overview</h2>
-        <div className="pipeline-bar" style={{
-          display: 'flex',
-          height: '60px',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          marginTop: '1rem'
-        }}>
-          <div style={{
-            width: `${pipelineStats.new_pct}%`,
-            background: '#a78bfa',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold'
-          }}>
-            New: {pipelineStats.new_lead}
-          </div>
-          <div style={{
-            width: `${pipelineStats.cold_pct}%`,
-            background: '#60a5fa',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold'
-          }}>
-            Cold: {pipelineStats.cold_outreach}
-          </div>
-          <div style={{
-            width: `${pipelineStats.warm_pct}%`,
-            background: '#fbbf24',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold'
-          }}>
-            Warm: {pipelineStats.warm_lead}
-          </div>
-          <div style={{
-            width: `${pipelineStats.active_pct}%`,
-            background: '#f97316',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold'
-          }}>
-            Active: {pipelineStats.active_conversation}
-          </div>
-          <div style={{
-            width: `${pipelineStats.client_pct}%`,
-            background: '#22c55e',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold'
-          }}>
-            Clients: {pipelineStats.client}
-          </div>
-        </div>
+        <PipelineBar stats={pipelineStats} />
       </div>
 
-      {/* Red Alerts */}
-      {(activeStale.length > 0 || staleLeads.length > 0 || followUps.length > 0 || needsSamples.length > 0) && (
-        <div className="card" style={{ marginBottom: '1.5rem', borderColor: '#ef4444' }}>
-          <h2><AlertCircle size={20} color="#ef4444" /> 🔴 Action Required Today</h2>
+      {/* Alerts */}
+      {hasAlerts ? (
+        <div className="card dashboard-card dashboard-alerts">
+          <h2><AlertCircle size={20} color="#ef4444" /> Action Required Today</h2>
 
           {activeStale.length > 0 && (
-            <div style={{
-              background: '#fef2f2',
-              padding: '1rem',
-              borderRadius: '8px',
-              marginTop: '1rem',
-              borderLeft: '4px solid #ef4444'
-            }}>
-              <h3 style={{ color: '#dc2626', marginBottom: '0.5rem' }}>
-                ⚠️ URGENT: {activeStale.length} Active Conversations Gone Cold!
-              </h3>
-              {activeStale.map(lead => (
-                <div key={lead.id} style={{ padding: '0.5rem 0' }}>
-                  <Link to={`/leads/${lead.id}`} style={{ fontWeight: 'bold', color: '#dc2626' }}>
-                    {lead.name}
-                  </Link>
-                  {lead.firm_name && <span> • {lead.firm_name}</span>}
-                  <span style={{ color: '#ef4444', marginLeft: '0.5rem' }}>
-                    ({Math.ceil((Date.now() - new Date(lead.last_activity_date)) / (1000 * 60 * 60 * 24))} days)
-                  </span>
-                </div>
-              ))}
-            </div>
+            <AlertSection
+              tone="urgent"
+              title={`URGENT — ${activeStale.length} Active Conversation${activeStale.length === 1 ? '' : 's'} Gone Cold`}
+              leads={activeStale}
+              showDays
+            />
           )}
 
           {staleLeads.length > 0 && (
-            <div style={{ padding: '1rem 0', borderTop: '1px solid #fee2e2' }}>
-              <h3 style={{ color: '#dc2626', marginBottom: '0.5rem' }}>
-                🔴 {staleLeads.length} Stale Leads
-              </h3>
-              {staleLeads.slice(0, 5).map(lead => (
-                <div key={lead.id} style={{ padding: '0.25rem 0' }}>
-                  <Link to={`/leads/${lead.id}`}>
-                    {lead.name}
-                  </Link>
-                  {lead.firm_name && <span> • {lead.firm_name}</span>}
-                  <span style={{ color: '#9ca3af', marginLeft: '0.5rem' }}>
-                    ({lead.stage.replace(/_/g, ' ')}, {Math.ceil((Date.now() - new Date(lead.last_activity_date)) / (1000 * 60 * 60 * 24))} days)
-                  </span>
-                </div>
-              ))}
-              {staleLeads.length > 5 && (
-                <div style={{ marginTop: '0.5rem', color: '#9ca3af' }}>
-                  ... and {staleLeads.length - 5} more
-                </div>
-              )}
-            </div>
+            <AlertSection
+              tone="warn"
+              title={`${staleLeads.length} Stale Lead${staleLeads.length === 1 ? '' : 's'}`}
+              leads={staleLeads}
+              limit={5}
+              showDays
+              showStage
+            />
           )}
 
           {followUps.length > 0 && (
-            <div style={{ padding: '1rem 0', borderTop: '1px solid #fee2e2' }}>
-              <h3 style={{ color: '#f97316', marginBottom: '0.5rem' }}>
-                📅 {followUps.length} Follow-ups Due Today
-              </h3>
-              {followUps.map(lead => (
-                <div key={lead.id} style={{ padding: '0.25rem 0' }}>
-                  <Link to={`/leads/${lead.id}`}>
-                    {lead.name}
-                  </Link>
-                  {lead.firm_name && <span> • {lead.firm_name}</span>}
-                </div>
-              ))}
-            </div>
+            <AlertSection
+              tone="info"
+              icon={<Calendar size={16} />}
+              title={`${followUps.length} Follow-up${followUps.length === 1 ? '' : 's'} Due Today`}
+              leads={followUps}
+            />
           )}
 
           {needsSamples.length > 0 && (
-            <div style={{ padding: '1rem 0', borderTop: '1px solid #fee2e2' }}>
-              <h3 style={{ color: '#f97316', marginBottom: '0.5rem' }}>
-                📋 {needsSamples.length} Leads Need Sample Deals
-              </h3>
-              {needsSamples.map(lead => (
-                <div key={lead.id} style={{ padding: '0.25rem 0' }}>
-                  <Link to={`/leads/${lead.id}`}>
-                    {lead.name}
-                  </Link>
-                  {lead.firm_name && <span> • {lead.firm_name}</span>}
-                </div>
-              ))}
-            </div>
+            <AlertSection
+              tone="info"
+              icon={<FlaskConical size={16} />}
+              title={`${needsSamples.length} Lead${needsSamples.length === 1 ? '' : 's'} Need Sample Deals`}
+              leads={needsSamples}
+            />
           )}
         </div>
-      )}
-
-      {(activeStale.length === 0 && staleLeads.length === 0 && followUps.length === 0 && needsSamples.length === 0) && (
-        <div className="card" style={{ marginBottom: '1.5rem', background: '#f0fdf4', borderColor: '#22c55e' }}>
-          <h2 style={{ color: '#16a34a' }}>✅ HEARTBEAT_OK - Pipeline is Healthy!</h2>
-          <p style={{ color: '#16a34a' }}>No action required. All leads are up to date.</p>
+      ) : (
+        <div className="card dashboard-card dashboard-ok">
+          <h2>✅ Pipeline is Healthy</h2>
+          <p>No action required. All leads are up to date.</p>
         </div>
       )}
 
       {/* Weekly Performance */}
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
+      <div className="card dashboard-card">
         <h2><Calendar size={20} /> This Week</h2>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: '1rem',
-          marginTop: '1rem'
-        }}>
-          <div className="stat-card">
-            <div style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.25rem' }}>
-              <Phone size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
-              Discovery Calls
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: weeklyStats.discovery_calls >= settings.weekly_discovery_call_target ? '#22c55e' : '#ef4444' }}>
-              {weeklyStats.discovery_calls}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-              Target: {settings.weekly_discovery_call_target}
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.25rem' }}>
-              <FileText size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
-              Proposals Sent
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-              {weeklyStats.proposals_sent}
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.25rem' }}>
-              ➕ New Leads
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-              {weeklyStats.new_leads}
-            </div>
-          </div>
-
-          <div className="stat-card" style={{ background: '#f0fdf4', borderColor: '#22c55e' }}>
-            <div style={{ fontSize: '0.875rem', color: '#16a34a', marginBottom: '0.25rem' }}>
-              🎉 Clients Closed
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#16a34a' }}>
-              {weeklyStats.closed_clients}
-            </div>
-          </div>
+        <div className="stat-grid">
+          <StatCard
+            icon={<Phone size={16} />}
+            label="Discovery Calls"
+            value={weeklyStats.discovery_calls}
+            target={settings.weekly_discovery_call_target}
+            goodWhen={weeklyStats.discovery_calls >= settings.weekly_discovery_call_target}
+          />
+          <StatCard icon={<FileText size={16} />} label="Proposals Sent" value={weeklyStats.proposals_sent} />
+          <StatCard icon={<TrendingUp size={16} />} label="New Leads" value={weeklyStats.new_leads} />
+          <StatCard label="Clients Closed" value={weeklyStats.closed_clients} tone="success" />
         </div>
       </div>
 
-      {/* Team Activity & My Leads */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-        {/* My Leads */}
-        <div className="card">
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <User size={20} /> My Assigned Leads
-          </h2>
+      {/* My Leads + Team Activity */}
+      <div className="dashboard-split">
+        <div className="card dashboard-card">
+          <h2><User size={20} /> My Assigned Leads</h2>
           {myLeads.length === 0 ? (
-            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--gray-500)' }}>
-              <User size={48} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+            <div className="empty-state">
+              <User size={48} />
               <div>No leads assigned to you yet</div>
             </div>
           ) : (
-            <div style={{ marginTop: '16px' }}>
-              <div style={{
-                fontSize: '32px',
-                fontWeight: 'bold',
-                color: 'var(--primary)',
-                marginBottom: '16px'
-              }}>
+            <>
+              <div className="my-leads-count">
                 {myLeads.length}
-                <span style={{ fontSize: '18px', color: 'var(--gray-400)', marginLeft: '8px' }}>
-                  lead{myLeads.length !== 1 ? 's' : ''}
-                </span>
+                <span className="my-leads-unit">lead{myLeads.length !== 1 ? 's' : ''}</span>
               </div>
-              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              <div className="my-leads-scroll">
                 {myLeads.map(lead => (
-                  <Link
-                    key={lead.id}
-                    to={`/leads/${lead.id}`}
-                    style={{
-                      display: 'block',
-                      padding: '12px',
-                      borderBottom: '1px solid var(--gray-100)',
-                      textDecoration: 'none',
-                      color: 'inherit'
-                    }}
-                  >
-                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>{lead.name}</div>
-                    {lead.firm_name && (
-                      <div style={{ fontSize: '14px', color: 'var(--gray-600)' }}>{lead.firm_name}</div>
-                    )}
-                    <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>
+                  <Link key={lead.id} to={`/leads/${lead.id}`} className="my-lead-row">
+                    <div className="my-lead-name">{lead.name}</div>
+                    {lead.firm_name && <div className="my-lead-firm">{lead.firm_name}</div>}
+                    <div className="my-lead-meta">
                       {lead.stage.replace(/_/g, ' ')} • Assigned {new Date(lead.assigned_date).toLocaleDateString()}
                     </div>
                   </Link>
                 ))}
               </div>
-              <Link
-                to="/pipeline"
-                style={{
-                  display: 'block',
-                  marginTop: '16px',
-                  textAlign: 'center',
-                  color: 'var(--primary)',
-                  textDecoration: 'none',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}
-              >
-                View All in Pipeline →
-              </Link>
-            </div>
+              <Link to="/pipeline" className="dashboard-link">View All in Pipeline →</Link>
+            </>
           )}
         </div>
 
-        {/* Activity Feed */}
-        <div className="card">
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Activity size={20} /> Team Activity
-          </h2>
-          <div style={{ marginTop: '16px', maxHeight: '400px', overflowY: 'auto' }}>
+        <div className="card dashboard-card">
+          <h2><Activity size={20} /> Team Activity</h2>
+          <div className="activity-scroll">
             <ActivityFeed limit={10} />
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function PipelineBar({ stats }) {
+  const total = useMemo(
+    () => PIPELINE_SEGMENTS.reduce((sum, s) => sum + (stats[s.countKey] || 0), 0),
+    [stats]
+  )
+  if (total === 0) {
+    return <div className="pipeline-empty">No leads in pipeline yet</div>
+  }
+  return (
+    <>
+      <div className="pipeline-bar">
+        {PIPELINE_SEGMENTS.map(seg => {
+          const pct = stats[seg.pctKey] || 0
+          const count = stats[seg.countKey] || 0
+          if (pct === 0) return null
+          return (
+            <div
+              key={seg.key}
+              className="pipeline-segment"
+              style={{ width: `${pct}%`, background: seg.color }}
+              title={`${seg.label}: ${count} (${Math.round(pct)}%)`}
+            >
+              {pct >= 12 && <span className="pipeline-segment-label">{seg.label}: {count}</span>}
+              {pct < 12 && pct >= 5 && <span className="pipeline-segment-label">{count}</span>}
+            </div>
+          )
+        })}
+      </div>
+      <div className="pipeline-legend">
+        {PIPELINE_SEGMENTS.map(seg => (
+          <div key={seg.key} className="pipeline-legend-item">
+            <span className="pipeline-legend-dot" style={{ background: seg.color }} />
+            <span className="pipeline-legend-label">{seg.label}</span>
+            <span className="pipeline-legend-count">{stats[seg.countKey] || 0}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function AlertSection({ tone, title, icon, leads, limit, showDays, showStage }) {
+  const shown = limit ? leads.slice(0, limit) : leads
+  const overflow = limit && leads.length > limit ? leads.length - limit : 0
+  return (
+    <div className={`alert-section alert-section-${tone}`}>
+      <h3 className="alert-section-title">
+        {icon && <span className="alert-section-icon">{icon}</span>}
+        {title}
+      </h3>
+      <ul className="alert-lead-list">
+        {shown.map(lead => (
+          <li key={lead.id} className="alert-lead-row">
+            <Link to={`/leads/${lead.id}`} className="alert-lead-name">{lead.name}</Link>
+            {lead.firm_name && <span className="alert-lead-firm">{lead.firm_name}</span>}
+            {showStage && lead.stage && (
+              <span className="alert-lead-stage">{lead.stage.replace(/_/g, ' ')}</span>
+            )}
+            {showDays && lead.last_activity_date && (
+              <span className="alert-lead-days">
+                <Clock size={12} />
+                {daysSince(lead.last_activity_date)}d
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {overflow > 0 && <div className="alert-overflow">… and {overflow} more</div>}
+    </div>
+  )
+}
+
+function StatCard({ icon, label, value, target, goodWhen, tone }) {
+  return (
+    <div className={`stat-card ${tone ? `stat-card-${tone}` : ''}`}>
+      <div className="stat-label">
+        {icon && <span className="stat-icon">{icon}</span>}
+        {label}
+      </div>
+      <div className={`stat-value ${target != null ? (goodWhen ? 'stat-value-good' : 'stat-value-bad') : ''}`}>
+        {value}
+      </div>
+      {target != null && <div className="stat-target">Target: {target}</div>}
     </div>
   )
 }
