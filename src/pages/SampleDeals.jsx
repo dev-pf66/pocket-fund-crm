@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { getSampleDeals, createSampleDeal, updateSampleDeal, deleteSampleDeal } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Plus, Edit2, Trash2, ExternalLink } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 function SampleDeals() {
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const [deals, setDeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingDeal, setEditingDeal] = useState(null)
@@ -48,7 +50,7 @@ function SampleDeals() {
       await loadDeals()
     } catch (error) {
       console.error('Failed to save sample deal:', error)
-      alert('Failed to save sample deal')
+      toast.error('Failed to save sample deal')
     }
   }
 
@@ -60,7 +62,7 @@ function SampleDeals() {
       await loadDeals()
     } catch (error) {
       console.error('Failed to delete sample deal:', error)
-      alert('Failed to delete sample deal')
+      toast.error('Failed to delete sample deal')
     }
   }
 

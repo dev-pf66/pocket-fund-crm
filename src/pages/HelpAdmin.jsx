@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 import { ArrowLeft, Plus, Edit2, Trash2, Save, X } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 const CATEGORIES = [
   { value: 'getting_started', label: '🚀 Getting Started' },
@@ -15,6 +16,7 @@ const CATEGORIES = [
 function HelpAdmin() {
   const navigate = useNavigate()
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingArticle, setEditingArticle] = useState(null)
@@ -88,7 +90,7 @@ function HelpAdmin() {
 
   async function handleSave() {
     if (!formData.title || !formData.content) {
-      alert('Please fill in title and content')
+      toast.warn('Please fill in title and content')
       return
     }
 
@@ -121,7 +123,7 @@ function HelpAdmin() {
       handleCancel()
     } catch (error) {
       console.error('Failed to save article:', error)
-      alert('Failed to save article: ' + error.message)
+      toast.error('Failed to save article: ' + error.message)
     }
   }
 
@@ -138,7 +140,7 @@ function HelpAdmin() {
       await loadArticles()
     } catch (error) {
       console.error('Failed to delete article:', error)
-      alert('Failed to delete article')
+      toast.error('Failed to delete article')
     }
   }
 

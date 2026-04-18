@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getInvestorById, getInvestorInteractions, logInvestorInteraction, updateInvestor, deleteInvestor, deleteInvestorInteraction } from '../lib/crm-api'
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, Trash2, Edit2, Save, X, MessageSquare, Users, Handshake, StickyNote, Plus } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 const INVESTOR_TYPES = [
   'Individual LP',
@@ -62,6 +63,7 @@ function InvestorDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const [investor, setInvestor] = useState(null)
   const [interactions, setInteractions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -106,7 +108,7 @@ function InvestorDetail() {
       setIsEditing(false)
     } catch (error) {
       console.error('Failed to update investor:', error)
-      alert(`Failed to update investor: ${error.message}`)
+      toast.error(`Failed to update investor: ${error.message}`)
     }
   }
 
@@ -117,7 +119,7 @@ function InvestorDetail() {
       navigate('/investors')
     } catch (error) {
       console.error('Failed to delete investor:', error)
-      alert('Failed to delete investor')
+      toast.error('Failed to delete investor')
     }
   }
 
@@ -133,7 +135,7 @@ function InvestorDetail() {
       await loadData()
     } catch (error) {
       console.error('Failed to log interaction:', error)
-      alert('Failed to log interaction')
+      toast.error('Failed to log interaction')
     }
   }
 

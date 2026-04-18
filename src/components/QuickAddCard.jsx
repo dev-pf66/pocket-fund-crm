@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { createLead } from '../lib/crm-api'
 import { useApp } from '../App'
+import { useToast } from './Toast'
 
 function QuickAddCard({ stage, onLeadCreated }) {
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const [isAdding, setIsAdding] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -40,7 +42,7 @@ function QuickAddCard({ stage, onLeadCreated }) {
       if (onLeadCreated) onLeadCreated()
     } catch (err) {
       console.error('Failed to create lead:', err)
-      alert('Failed to create lead: ' + err.message)
+      toast.error('Failed to create lead: ' + err.message)
     } finally {
       setLoading(false)
     }

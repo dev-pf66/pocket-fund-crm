@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../App'
 import { getGoalTemplates, createGoalTemplate, updateGoalTemplate, deleteGoalTemplate, getPeople } from '../lib/crm-api'
 import { Target, Plus, Trash2, GripVertical, Save, X } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 function GoalTemplates() {
   const { currentPerson, people } = useApp()
+  const { toast } = useToast()
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedPerson, setSelectedPerson] = useState('')
@@ -44,7 +46,7 @@ function GoalTemplates() {
       await loadTemplates()
     } catch (err) {
       console.error('Failed to add template:', err)
-      alert('Failed to add goal template')
+      toast.error('Failed to add goal template')
     }
   }
 
@@ -55,7 +57,7 @@ function GoalTemplates() {
       setEditingId(null)
     } catch (err) {
       console.error('Failed to update template:', err)
-      alert('Failed to update template')
+      toast.error('Failed to update template')
     }
   }
 
@@ -67,7 +69,7 @@ function GoalTemplates() {
       await loadTemplates()
     } catch (err) {
       console.error('Failed to delete template:', err)
-      alert('Failed to delete template')
+      toast.error('Failed to delete template')
     }
   }
 

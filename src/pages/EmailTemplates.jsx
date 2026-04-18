@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { getEmailTemplates, createEmailTemplate, updateEmailTemplate, deleteEmailTemplate } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Copy, Plus, Edit2, Trash2, Check } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 function EmailTemplates() {
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingTemplate, setEditingTemplate] = useState(null)
@@ -46,7 +48,7 @@ function EmailTemplates() {
       await loadTemplates()
     } catch (error) {
       console.error('Failed to save template:', error)
-      alert('Failed to save template')
+      toast.error('Failed to save template')
     }
   }
 
@@ -58,7 +60,7 @@ function EmailTemplates() {
       await loadTemplates()
     } catch (error) {
       console.error('Failed to delete template:', error)
-      alert('Failed to delete template')
+      toast.error('Failed to delete template')
     }
   }
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getInvestors, createInvestor, updateInvestor, deleteInvestor } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Plus, Search, Edit2, Trash2, X } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 const INVESTOR_TYPES = [
   'Individual LP',
@@ -58,6 +59,7 @@ function formatStatusLabel(status) {
 
 function Investors() {
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const navigate = useNavigate()
   const [investors, setInvestors] = useState([])
   const [loading, setLoading] = useState(true)
@@ -126,7 +128,7 @@ function Investors() {
       await loadInvestors()
     } catch (error) {
       console.error('Failed to delete investor:', error)
-      alert('Failed to delete investor')
+      toast.error('Failed to delete investor')
     }
   }
 
@@ -151,7 +153,7 @@ function Investors() {
       await loadInvestors()
     } catch (error) {
       console.error('Failed to save investor:', error)
-      alert('Failed to save investor')
+      toast.error('Failed to save investor')
     }
   }
 

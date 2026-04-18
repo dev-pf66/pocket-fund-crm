@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { createLead } from '../lib/crm-api'
 import { useApp } from '../App'
+import { useToast } from '../components/Toast'
 
 function LeadForm({ onClose, onSave, lead = null }) {
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: lead?.name || '',
@@ -27,7 +29,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
     e.preventDefault()
 
     if (!formData.name.trim()) {
-      alert('Name is required')
+      toast.warn('Name is required')
       return
     }
 
@@ -37,7 +39,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
       onSave()
     } catch (error) {
       console.error('Failed to create lead:', error)
-      alert('Failed to create lead')
+      toast.error('Failed to create lead')
     } finally {
       setLoading(false)
     }

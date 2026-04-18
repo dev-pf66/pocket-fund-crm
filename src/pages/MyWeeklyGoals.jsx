@@ -10,9 +10,11 @@ import {
   getWeeklyGoalStats
 } from '../lib/crm-api'
 import { Target, Plus, Trash2, Check, ChevronLeft, ChevronRight, Edit2, Save, X } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 function MyWeeklyGoals() {
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const [goals, setGoals] = useState([])
   const [stats, setStats] = useState({ total: 0, completed: 0, remaining: 0, percentage: 0 })
   const [loading, setLoading] = useState(true)
@@ -58,7 +60,7 @@ function MyWeeklyGoals() {
       await loadGoals()
     } catch (err) {
       console.error('Failed to toggle goal:', err)
-      alert('Failed to update goal')
+      toast.error('Failed to update goal')
     }
   }
 
@@ -77,7 +79,7 @@ function MyWeeklyGoals() {
       await loadGoals()
     } catch (err) {
       console.error('Failed to add goal:', err)
-      alert('Failed to add goal')
+      toast.error('Failed to add goal')
     }
   }
 
@@ -88,7 +90,7 @@ function MyWeeklyGoals() {
       await loadGoals()
     } catch (err) {
       console.error('Failed to update goal:', err)
-      alert('Failed to update goal')
+      toast.error('Failed to update goal')
     }
   }
 
@@ -100,7 +102,7 @@ function MyWeeklyGoals() {
       await loadGoals()
     } catch (err) {
       console.error('Failed to delete goal:', err)
-      alert('Failed to delete goal')
+      toast.error('Failed to delete goal')
     }
   }
 

@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getTodaysOutreachCount, getDailyOutreachStats, getOutreachStreak, getLeads } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Eye } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 function OutreachTracker() {
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const [outreaches, setOutreaches] = useState([])
   const [todayCount, setTodayCount] = useState(0)
   const [streak, setStreak] = useState(0)
@@ -89,7 +91,7 @@ function OutreachTracker() {
 
   async function handleAddOutreach() {
     if (!newOutreach.lead_name && !newOutreach.lead_id) {
-      alert('Please enter a lead name or select from dropdown')
+      toast.warn('Please enter a lead name or select from dropdown')
       return
     }
 
@@ -114,14 +116,14 @@ function OutreachTracker() {
       await loadData()
     } catch (error) {
       console.error('Failed to log outreach:', error)
-      alert('Failed to log outreach')
+      toast.error('Failed to log outreach')
     }
   }
 
   async function handleCsvUpload(e) {
     e.preventDefault()
     if (!csvFile) {
-      alert('Please select a CSV file')
+      toast.warn('Please select a CSV file')
       return
     }
 
@@ -164,13 +166,13 @@ function OutreachTracker() {
         imported++
       }
 
-      alert(`Successfully imported ${imported} outreaches!`)
+      toast.success(`Successfully imported ${imported} outreaches!`)
       setCsvFile(null)
       setShowCsvUpload(false)
       await loadData()
     } catch (error) {
       console.error('CSV upload failed:', error)
-      alert('Failed to upload CSV: ' + error.message)
+      toast.error('Failed to upload CSV: ' + error.message)
     } finally {
       setCsvUploading(false)
     }
@@ -182,7 +184,7 @@ function OutreachTracker() {
       await loadData()
     } catch (error) {
       console.error('Failed to update status:', error)
-      alert('Failed to update status')
+      toast.error('Failed to update status')
     }
   }
 
@@ -194,7 +196,7 @@ function OutreachTracker() {
       await loadData()
     } catch (error) {
       console.error('Failed to delete outreach:', error)
-      alert('Failed to delete outreach')
+      toast.error('Failed to delete outreach')
     }
   }
 

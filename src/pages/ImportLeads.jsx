@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { createLead } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Upload, X, Check, AlertCircle } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 function ImportLeads() {
   const navigate = useNavigate()
   const { currentPerson } = useApp()
+  const { toast } = useToast()
   const [file, setFile] = useState(null)
   const [csvData, setCsvData] = useState([])
   const [headers, setHeaders] = useState([])
@@ -32,7 +34,7 @@ function ImportLeads() {
     if (!selectedFile) return
 
     if (!selectedFile.name.endsWith('.csv')) {
-      alert('Please upload a CSV file')
+      toast.warn('Please upload a CSV file')
       return
     }
 
@@ -47,7 +49,7 @@ function ImportLeads() {
       const lines = text.split('\n').filter(line => line.trim())
 
       if (lines.length === 0) {
-        alert('CSV file is empty')
+        toast.warn('CSV file is empty')
         return
       }
 
@@ -115,7 +117,7 @@ function ImportLeads() {
     const leads = getMappedLeads()
 
     if (leads.length === 0) {
-      alert('No valid leads to import. Make sure you map the Name column.')
+      toast.warn('No valid leads to import. Make sure you map the Name column.')
       return
     }
 

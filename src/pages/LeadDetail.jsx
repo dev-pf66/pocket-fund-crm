@@ -3,11 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript } from '../lib/crm-api'
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 function LeadDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { currentPerson, people } = useApp()
+  const { toast } = useToast()
   const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
   const [transcripts, setTranscripts] = useState([])
@@ -84,8 +86,7 @@ function LeadDetail() {
       setIsEditing(false)
     } catch (error) {
       console.error('Failed to update lead:', error)
-      console.error('Error details:', error.message, error)
-      alert(`Failed to update lead: ${error.message}\n\nCheck console for details (F12)`)
+      toast.error(`Failed to update lead: ${error.message}`)
     }
   }
 
@@ -97,7 +98,7 @@ function LeadDetail() {
       navigate('/pipeline')
     } catch (error) {
       console.error('Failed to delete lead:', error)
-      alert('Failed to delete lead')
+      toast.error('Failed to delete lead')
     }
   }
 
@@ -109,7 +110,7 @@ function LeadDetail() {
       await refreshActivities()
     } catch (error) {
       console.error('Failed to log activity:', error)
-      alert('Failed to log activity')
+      toast.error('Failed to log activity')
     }
   }
 
@@ -130,7 +131,7 @@ function LeadDetail() {
       }
     } catch (error) {
       console.error('Failed to add transcript:', error)
-      alert('Failed to add transcript')
+      toast.error('Failed to add transcript')
     }
   }
 
@@ -154,7 +155,7 @@ function LeadDetail() {
       await refreshTranscripts()
     } catch (error) {
       console.error('Failed to delete transcript:', error)
-      alert('Failed to delete transcript')
+      toast.error('Failed to delete transcript')
     }
   }
 
@@ -163,10 +164,10 @@ function LeadDetail() {
     try {
       const score = await calculateLeadScore(id)
       await refreshLead()
-      alert(`Lead score calculated: ${score}/100`)
+      toast.success(`Lead score calculated: ${score}/100`)
     } catch (error) {
       console.error('Failed to calculate score:', error)
-      alert('Failed to calculate score')
+      toast.error('Failed to calculate score')
     } finally {
       setCalculating(false)
     }
@@ -174,7 +175,7 @@ function LeadDetail() {
 
   async function handleEnrichFromLinkedIn() {
     if (!editedLead.linkedin_url) {
-      alert('Please add a LinkedIn URL first')
+      toast.warn('Please add a LinkedIn URL first')
       return
     }
 
@@ -184,7 +185,7 @@ function LeadDetail() {
       await refreshLead()
     } catch (error) {
       console.error('Failed to enrich:', error)
-      alert('Failed to enrich from LinkedIn: ' + error.message)
+      toast.error('Failed to enrich from LinkedIn: ' + error.message)
     } finally {
       setEnriching(false)
     }
@@ -196,7 +197,7 @@ function LeadDetail() {
       await refreshTags()
     } catch (error) {
       console.error('Failed to add tag:', error)
-      alert('Failed to add tag')
+      toast.error('Failed to add tag')
     }
   }
 
@@ -206,7 +207,7 @@ function LeadDetail() {
       await refreshTags()
     } catch (error) {
       console.error('Failed to remove tag:', error)
-      alert('Failed to remove tag')
+      toast.error('Failed to remove tag')
     }
   }
 
@@ -217,7 +218,7 @@ function LeadDetail() {
       await refreshLead()
     } catch (error) {
       console.error('Failed to assign lead:', error)
-      alert('Failed to assign lead: ' + error.message)
+      toast.error('Failed to assign lead: ' + error.message)
     }
   }
 
