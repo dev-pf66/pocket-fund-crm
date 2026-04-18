@@ -123,6 +123,7 @@ function AppContent() {
               <Route path="help" element={<Help />} />
               <Route path="help/admin" element={<HelpAdmin />} />
             </Route>
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
           <ChatTerminal />
         </Suspense>
