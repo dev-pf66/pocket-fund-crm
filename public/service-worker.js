@@ -1,27 +1,19 @@
-// Simple service worker for PWA
-const CACHE_NAME = 'pf-crm-v1'
+// Kill-switch service worker: unregisters itself and clears all caches.
+// Any browser that still has an old SW will fetch this file, run cleanup,
+// and serve future requests directly from the network.
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        '/',
-        '/index.html'
-      ])
-    })
-  )
+self.addEventListener('install', () => {
+  self.skipWaiting()
 })
 
-self.addEventListener('fetch', (event) => {
-  // Let Supabase and API requests go through without caching
-  if (event.request.url.includes('supabase.co') ||
-      event.request.url.includes('/api/')) {
-    return
-  }
-
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request)
-    })
-  )
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys()
+    await Promise.all(keys.map((k) => caches.delete(k)))
+    const clients = await self.clients.matchAll({ type: 'window' })
+    for (const client of clients) {
+      client.navigate(client.url)
+    }
+    await self.registration.unregister()
+  })())
 })

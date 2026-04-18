@@ -3,8 +3,11 @@ import { useState, useEffect, createContext, useContext, lazy, Suspense } from '
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { getPeople, supabase } from './lib/supabase'
 import Layout from './components/Layout'
+import ErrorBoundary from './components/ErrorBoundary'
+import { ToastProvider } from './components/Toast'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import ResetPassword from './pages/ResetPassword'
 
 // Eagerly loaded — these are the main pages users navigate between
 import Dashboard from './pages/Dashboard'
@@ -83,6 +86,7 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
@@ -95,9 +99,12 @@ function AppContent() {
 
   return (
     <AppContext.Provider value={{ currentPerson, people, setPeople, refreshPeople: loadData }}>
+      <ToastProvider>
+      <ErrorBoundary>
       <BrowserRouter>
         <Suspense fallback={<div className="loading-screen"><div className="loading-spinner"></div><p>Loading...</p></div>}>
           <Routes>
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
@@ -120,6 +127,8 @@ function AppContent() {
           <ChatTerminal />
         </Suspense>
       </BrowserRouter>
+      </ErrorBoundary>
+      </ToastProvider>
     </AppContext.Provider>
   )
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { signInWithEmail } from '../lib/supabase'
+import { signInWithEmail, supabase } from '../lib/supabase'
 
 function Login() {
   const navigate = useNavigate()
@@ -8,6 +8,8 @@ function Login() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [resetSent, setResetSent] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -16,13 +18,35 @@ function Login() {
 
     try {
       await signInWithEmail(email, password)
-      // Redirect to dashboard after successful login
       navigate('/dashboard')
     } catch (err) {
       console.error('Login error:', err)
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleForgotPassword() {
+    setError(null)
+    setResetSent(false)
+
+    if (!email) {
+      setError('Enter your email above, then click "Forgot password?"')
+      return
+    }
+
+    setResetting(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) throw error
+      setResetSent(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -56,12 +80,33 @@ function Login() {
             />
           </div>
 
-          {error && (
-            <div className="error-message">{error}</div>
+          {error && <div className="error-message">{error}</div>}
+          {resetSent && (
+            <div className="error-message" style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0' }}>
+              Password reset link sent. Check your inbox.
+            </div>
           )}
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={resetting}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#3b82f6',
+              fontSize: '0.875rem',
+              marginTop: '0.75rem',
+              cursor: 'pointer',
+              textAlign: 'center',
+              width: '100%',
+            }}
+          >
+            {resetting ? 'Sending...' : 'Forgot password?'}
           </button>
         </form>
 
