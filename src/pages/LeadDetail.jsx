@@ -104,13 +104,27 @@ function LeadDetail() {
 
   async function handleAddActivity() {
     try {
-      await logActivity(id, newActivity, currentPerson?.id)
+      const { transcript, ...activityPayload } = newActivity
+      await logActivity(id, activityPayload, currentPerson?.id)
+
+      if (transcript?.trim()) {
+        const saved = await createTranscript({
+          lead_id: parseInt(id),
+          title: `${newActivity.activity_type} — ${newActivity.activity_date}`,
+          transcript,
+          call_date: newActivity.activity_date,
+          created_by: currentPerson?.id,
+        })
+        if (saved?.id) triggerAnalysis(saved.id, transcript)
+      }
+
       setNewActivity({ activity_type: 'call', notes: '', transcript: '', activity_date: new Date().toISOString().split('T')[0] })
       setShowActivityForm(false)
       await refreshActivities()
+      if (transcript?.trim()) await refreshTranscripts()
     } catch (error) {
       console.error('Failed to log activity:', error)
-      toast.error('Failed to log activity')
+      toast.error(`Failed to log activity: ${error.message}`)
     }
   }
 
