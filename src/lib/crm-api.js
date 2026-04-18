@@ -199,12 +199,14 @@ export async function getLeadActivities(leadId) {
  * Log activity for a lead
  */
 export async function logActivity(leadId, activityData, currentPersonId) {
-  // Insert activity
+  const activityDate = activityData.activity_date || new Date().toISOString()
+
   const { data: activity, error: activityError } = await supabase
     .from('crm_lead_activities')
     .insert([{
       lead_id: leadId,
       ...activityData,
+      activity_date: activityDate,
       logged_by: currentPersonId
     }])
     .select()
@@ -212,15 +214,16 @@ export async function logActivity(leadId, activityData, currentPersonId) {
 
   if (activityError) throw activityError
 
-  // Update lead's last activity
   await supabase
     .from('crm_leads')
     .update({
-      last_activity_date: activityData.activity_date,
+      last_activity_date: activityDate,
       last_activity_type: activityData.activity_type
     })
     .eq('id', leadId)
 
+  cacheClear('leads')
+  cacheClear('dashboard')
   return activity
 }
 

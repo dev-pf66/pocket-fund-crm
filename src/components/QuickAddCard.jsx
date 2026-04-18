@@ -25,18 +25,15 @@ function QuickAddCard({ stage, onLeadCreated }) {
     e.preventDefault()
     if (!input.trim() || loading) return
 
+    if (!currentPerson?.id) {
+      toast.error('Please wait — loading user info')
+      return
+    }
+
     setLoading(true)
     try {
       const { name, firm_name } = parseQuickInput(input)
-
-      const leadData = {
-        name,
-        firm_name,
-        stage,
-        created_by: currentPerson?.id
-      }
-
-      await createLead(leadData)
+      await createLead({ name, firm_name, stage }, currentPerson.id)
       setInput('')
       setIsAdding(false)
       if (onLeadCreated) onLeadCreated()

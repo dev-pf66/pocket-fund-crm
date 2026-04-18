@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createLead } from '../lib/crm-api'
+import { createLead, updateLead } from '../lib/crm-api'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 
@@ -32,14 +32,22 @@ function LeadForm({ onClose, onSave, lead = null }) {
       toast.warn('Name is required')
       return
     }
+    if (!currentPerson?.id) {
+      toast.error('Please wait — loading user info')
+      return
+    }
 
     setLoading(true)
     try {
-      await createLead(formData, currentPerson.id)
+      if (lead?.id) {
+        await updateLead(lead.id, formData)
+      } else {
+        await createLead(formData, currentPerson.id)
+      }
       onSave()
     } catch (error) {
-      console.error('Failed to create lead:', error)
-      toast.error('Failed to create lead')
+      console.error('Failed to save lead:', error)
+      toast.error(`Failed to ${lead?.id ? 'update' : 'create'} lead: ${error.message}`)
     } finally {
       setLoading(false)
     }
