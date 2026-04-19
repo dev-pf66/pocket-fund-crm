@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getInvestors, createInvestor, updateInvestor, deleteInvestor } from '../lib/crm-api'
+import { getInvestors, createInvestor, updateInvestor, deleteInvestor, cachePeek } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Plus, Search, Edit2, Trash2, X } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -61,8 +61,9 @@ function Investors() {
   const { currentPerson } = useApp()
   const { toast } = useToast()
   const navigate = useNavigate()
-  const [investors, setInvestors] = useState([])
-  const [loading, setLoading] = useState(true)
+  // Seed from cache so sidebar nav back to Investors renders instantly.
+  const [investors, setInvestors] = useState(() => cachePeek('investors:{}') || [])
+  const [loading, setLoading] = useState(() => !cachePeek('investors:{}'))
   const [showForm, setShowForm] = useState(false)
   const [editingInvestor, setEditingInvestor] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -75,7 +76,6 @@ function Investors() {
   }, [])
 
   async function loadInvestors() {
-    setLoading(true)
     try {
       const data = await getInvestors()
       setInvestors(data)
@@ -165,7 +165,7 @@ function Investors() {
 
   const filtered = getFilteredInvestors()
 
-  if (loading) {
+  if (loading && investors.length === 0) {
     return (
       <div>
         <div className="page-header"><h1>Investor Contacts</h1></div>

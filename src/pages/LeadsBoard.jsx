@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, moveLead, getCRMSettings } from '../lib/crm-api'
+import { getLeads, moveLead, getCRMSettings, cachePeek } from '../lib/crm-api'
 import { useApp } from '../App'
 import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
@@ -77,8 +77,9 @@ function countActiveAdvancedFilters(filters) {
 function LeadsBoard() {
   const { currentPerson } = useApp()
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  const [leads, setLeads] = useState([])
+  // Seed from cache so sidebar nav back to Pipeline renders instantly.
+  const [leads, setLeads] = useState(() => cachePeek('leads:{}') || [])
+  const [loading, setLoading] = useState(() => !cachePeek('leads:{}'))
   const [settings, setSettings] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [draggedLead, setDraggedLead] = useState(null)
@@ -107,7 +108,6 @@ function LeadsBoard() {
   }, [])
 
   const loadLeads = useCallback(async function loadLeads() {
-    setLoading(true)
     try {
       const data = await getLeads()
       setLeads(data)
@@ -306,7 +306,7 @@ function LeadsBoard() {
     return result
   }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin])
 
-  if (loading) {
+  if (loading && leads.length === 0) {
     return (
       <div>
         <div className="page-header">

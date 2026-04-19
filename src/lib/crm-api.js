@@ -31,6 +31,14 @@ export function cacheClear(prefix) {
   }
 }
 
+// Synchronous cache peek — lets components render immediately with cached data
+// on mount (stale-while-revalidate), avoiding the spinner flash on sidebar nav.
+// Uses a longer TTL than the fetchers because stale data is fine to show while
+// the background refetch runs.
+export function cachePeek(key, ttlMs = 5 * 60 * 1000) {
+  return cacheGet(key, ttlMs)
+}
+
 // ============================================================================
 // LEADS API
 // ============================================================================

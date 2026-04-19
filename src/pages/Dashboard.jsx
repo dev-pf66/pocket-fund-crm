@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { getCRMDashboardData, getAssignedLeads } from '../lib/crm-api'
+import { getCRMDashboardData, getAssignedLeads, cachePeek } from '../lib/crm-api'
 import { useApp } from '../App'
 import { TrendingUp, AlertCircle, Calendar, FileText, Phone, Activity, User, Clock, FlaskConical } from 'lucide-react'
 import ActivityFeed from '../components/ActivityFeed'
@@ -20,16 +20,17 @@ function daysSince(dateStr) {
 
 function Dashboard() {
   const { currentPerson } = useApp()
-  const [loading, setLoading] = useState(true)
-  const [data, setData] = useState(null)
+  // Seed from cache so sidebar nav back to Dashboard renders instantly
+  // (stale-while-revalidate — we still refetch below).
+  const [data, setData] = useState(() => cachePeek('dashboard') || null)
   const [myLeads, setMyLeads] = useState([])
+  const [loading, setLoading] = useState(() => !cachePeek('dashboard'))
 
   useEffect(() => {
     loadData()
   }, [currentPerson?.id])
 
   async function loadData() {
-    setLoading(true)
     try {
       const promises = [getCRMDashboardData()]
       if (currentPerson?.id) {
@@ -45,7 +46,7 @@ function Dashboard() {
     }
   }
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div>
         <div className="page-header"><h1>Sales CRM Dashboard</h1></div>
