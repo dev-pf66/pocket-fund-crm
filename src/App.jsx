@@ -43,22 +43,22 @@ function AppContent() {
 
   useEffect(() => {
     if (isAuthenticated && user?.email) {
-      loadData()
+      loadData(user.email)
     }
-  }, [isAuthenticated, user])
+  }, [isAuthenticated, user?.email])
 
-  async function loadData() {
+  async function loadData(email) {
     setDataLoading(true)
     try {
       const allPeople = await getPeople()
       setPeople(allPeople)
 
-      let person = allPeople.find(p => p.email === user.email)
+      let person = allPeople.find(p => p.email === email)
 
       if (!person) {
         const { data: newPerson, error } = await supabase
           .from('people')
-          .insert([{ name: user.email.split('@')[0], email: user.email }])
+          .insert([{ name: email.split('@')[0], email }])
           .select()
           .single()
 
@@ -93,12 +93,14 @@ function AppContent() {
     )
   }
 
-  if (dataLoading) {
+  // Only show the full-screen loader on the very first load (no person yet).
+  // Background refreshes after token refresh must not unmount the app.
+  if (dataLoading && !currentPerson) {
     return <div className="loading-screen"><div className="loading-spinner"></div><p>Loading...</p></div>
   }
 
   return (
-    <AppContext.Provider value={{ currentPerson, people, setPeople, refreshPeople: loadData }}>
+    <AppContext.Provider value={{ currentPerson, people, setPeople, refreshPeople: () => loadData(user?.email) }}>
       <ToastProvider>
       <ErrorBoundary>
       <BrowserRouter>
