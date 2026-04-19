@@ -384,6 +384,7 @@ function LeadDetail() {
                   onChange={(e) => setEditedLead({ ...editedLead, stage: e.target.value })}
                 >
                   <option value="cold_outreach">Cold Outreach</option>
+                  <option value="responded">Responded</option>
                   <option value="warm_lead">Warm Lead</option>
                   <option value="active_conversation">Active Conversation</option>
                   <option value="client">Client</option>

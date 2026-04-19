@@ -161,6 +161,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
             <select name="stage" value={formData.stage} onChange={handleChange}>
               <option value="new_lead">New Lead</option>
               <option value="cold_outreach">Cold Outreach</option>
+              <option value="responded">Responded</option>
               <option value="warm_lead">Warm Lead</option>
               <option value="active_conversation">Active Conversation</option>
               <option value="client">Client</option>

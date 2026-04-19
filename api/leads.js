@@ -5,7 +5,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Valid enum values
-const VALID_STAGES = ['new_lead', 'cold_outreach', 'warm_lead', 'active_conversation', 'client', 'passed']
+const VALID_STAGES = ['new_lead', 'cold_outreach', 'responded', 'warm_lead', 'active_conversation', 'client', 'passed']
 const VALID_LEAD_TYPES = ['Independent Sponsor', 'PE Firm', 'Family Office', 'Other']
 const VALID_LEAD_SOURCES = ['LinkedIn', 'Referral', 'Cold Email', 'Event', 'Website']
 
@@ -20,7 +20,7 @@ const ALLOWED_FIELDS = [
 
 function authenticate(req) {
   const apiKey = req.headers['x-api-key'] || req.query.api_key
-  const validKey = process.env.CRM_API_KEY || 'your-secret-api-key-here'
+  const validKey = process.env.CRM_API_KEY
   return apiKey === validKey
 }
 

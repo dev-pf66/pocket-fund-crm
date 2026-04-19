@@ -6,11 +6,12 @@ import { TrendingUp, AlertCircle, Calendar, FileText, Phone, Activity, User, Clo
 import ActivityFeed from '../components/ActivityFeed'
 
 const PIPELINE_SEGMENTS = [
-  { key: 'new_lead',             label: 'New',     color: '#a78bfa', countKey: 'new_lead',            pctKey: 'new_pct' },
-  { key: 'cold_outreach',        label: 'Cold',    color: '#60a5fa', countKey: 'cold_outreach',       pctKey: 'cold_pct' },
-  { key: 'warm_lead',            label: 'Warm',    color: '#fbbf24', countKey: 'warm_lead',           pctKey: 'warm_pct' },
-  { key: 'active_conversation',  label: 'Active',  color: '#f97316', countKey: 'active_conversation', pctKey: 'active_pct' },
-  { key: 'client',               label: 'Clients', color: '#22c55e', countKey: 'client',              pctKey: 'client_pct' },
+  { key: 'new_lead',             label: 'New',       color: '#a78bfa', countKey: 'new_lead',            pctKey: 'new_pct' },
+  { key: 'cold_outreach',        label: 'Cold',      color: '#60a5fa', countKey: 'cold_outreach',       pctKey: 'cold_pct' },
+  { key: 'responded',            label: 'Responded', color: '#06b6d4', countKey: 'responded',           pctKey: 'responded_pct' },
+  { key: 'warm_lead',            label: 'Warm',      color: '#fbbf24', countKey: 'warm_lead',           pctKey: 'warm_pct' },
+  { key: 'active_conversation',  label: 'Active',    color: '#f97316', countKey: 'active_conversation', pctKey: 'active_pct' },
+  { key: 'client',               label: 'Clients',   color: '#22c55e', countKey: 'client',              pctKey: 'client_pct' },
 ]
 
 function daysSince(dateStr) {

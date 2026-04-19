@@ -82,7 +82,22 @@ function Analytics() {
 
           <div className="funnel-arrow">
             <div className="conversion-rate">
-              {conversion.cold_to_warm_rate}% convert
+              {conversion.cold_to_responded_rate}% reply
+            </div>
+          </div>
+
+          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.responded / conversion.new_lead) * 100 : (conversion.cold_outreach > 0 ? (conversion.responded / conversion.cold_outreach) * 100 : 0)}%`, '--color': '#06b6d4' }}>
+            <div className="funnel-bar">
+              <div className="funnel-label">
+                <span className="funnel-stage-name">Responded</span>
+                <span className="funnel-count">{conversion.responded}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="funnel-arrow">
+            <div className="conversion-rate">
+              {conversion.responded_to_warm_rate}% warm
             </div>
           </div>
 
@@ -147,6 +162,10 @@ function Analytics() {
             <div className="velocity-item">
               <div className="velocity-stage">Cold Outreach</div>
               <div className="velocity-days">{velocity.cold_outreach} days</div>
+            </div>
+            <div className="velocity-item">
+              <div className="velocity-stage">Responded</div>
+              <div className="velocity-days">{velocity.responded} days</div>
             </div>
             <div className="velocity-item">
               <div className="velocity-stage">Warm Lead</div>

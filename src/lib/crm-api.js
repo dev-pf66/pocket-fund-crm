@@ -426,6 +426,7 @@ export async function getStaleLeads() {
     const thresholds = {
       new_lead: 999, // New leads don't go stale — they haven't been contacted yet
       cold_outreach: settings.cold_outreach_threshold,
+      responded: settings.warm_lead_threshold, // Responded is in the warming phase — reuse warm threshold
       warm_lead: settings.warm_lead_threshold,
       active_conversation: settings.active_conversation_threshold,
       reach_out_later: 999 // Use exact date instead
@@ -510,6 +511,7 @@ export async function getPipelineStats() {
   const stats = {
     new_lead: 0,
     cold_outreach: 0,
+    responded: 0,
     warm_lead: 0,
     active_conversation: 0,
     client: 0,
@@ -525,6 +527,7 @@ export async function getPipelineStats() {
   // Calculate percentages
   stats.new_pct = (stats.new_lead / stats.total) * 100
   stats.cold_pct = (stats.cold_outreach / stats.total) * 100
+  stats.responded_pct = (stats.responded / stats.total) * 100
   stats.warm_pct = (stats.warm_lead / stats.total) * 100
   stats.active_pct = (stats.active_conversation / stats.total) * 100
   stats.client_pct = (stats.client / stats.total) * 100
@@ -585,6 +588,7 @@ export async function getConversionFunnelStats() {
   return {
     new_lead: stages.new_lead || 0,
     cold_outreach: stages.cold_outreach || 0,
+    responded: stages.responded || 0,
     warm_lead: stages.warm_lead || 0,
     active_conversation: stages.active_conversation || 0,
     client: stages.client || 0
@@ -671,6 +675,7 @@ export function calculateStaleness(lead, settings) {
   const thresholds = {
     new_lead: 999,
     cold_outreach: settings.cold_outreach_threshold,
+    responded: settings.warm_lead_threshold,
     warm_lead: settings.warm_lead_threshold,
     active_conversation: settings.active_conversation_threshold,
     client: 999,
@@ -987,6 +992,7 @@ export async function getAnalytics() {
   const stages = {
     new_lead: leads.filter(l => l.stage === 'new_lead').length,
     cold_outreach: leads.filter(l => l.stage === 'cold_outreach').length,
+    responded: leads.filter(l => l.stage === 'responded').length,
     warm_lead: leads.filter(l => l.stage === 'warm_lead').length,
     active_conversation: leads.filter(l => l.stage === 'active_conversation').length,
     client: leads.filter(l => l.stage === 'client').length
@@ -996,7 +1002,8 @@ export async function getAnalytics() {
   const conversion = {
     ...stages,
     new_to_cold_rate: stages.new_lead > 0 ? Math.round((stages.cold_outreach / stages.new_lead) * 100) : 0,
-    cold_to_warm_rate: stages.cold_outreach > 0 ? Math.round((stages.warm_lead / stages.cold_outreach) * 100) : 0,
+    cold_to_responded_rate: stages.cold_outreach > 0 ? Math.round((stages.responded / stages.cold_outreach) * 100) : 0,
+    responded_to_warm_rate: stages.responded > 0 ? Math.round((stages.warm_lead / stages.responded) * 100) : 0,
     warm_to_active_rate: stages.warm_lead > 0 ? Math.round((stages.active_conversation / stages.warm_lead) * 100) : 0,
     active_to_client_rate: stages.active_conversation > 0 ? Math.round((stages.client / stages.active_conversation) * 100) : 0,
     overall_rate: totalTop > 0 ? Math.round((stages.client / totalTop) * 100) : 0
@@ -1018,9 +1025,10 @@ export async function getAnalytics() {
   const velocity = {
     new_lead: getAvgDaysInStage('new_lead'),
     cold_outreach: getAvgDaysInStage('cold_outreach'),
+    responded: getAvgDaysInStage('responded'),
     warm_lead: getAvgDaysInStage('warm_lead'),
     active_conversation: getAvgDaysInStage('active_conversation'),
-    total: Math.round((getAvgDaysInStage('new_lead') + getAvgDaysInStage('cold_outreach') + getAvgDaysInStage('warm_lead') + getAvgDaysInStage('active_conversation')))
+    total: Math.round((getAvgDaysInStage('new_lead') + getAvgDaysInStage('cold_outreach') + getAvgDaysInStage('responded') + getAvgDaysInStage('warm_lead') + getAvgDaysInStage('active_conversation')))
   }
 
   // Lead sources
