@@ -24,6 +24,7 @@ const Analytics = lazy(() => import('./pages/Analytics'))
 const OutreachTracker = lazy(() => import('./pages/OutreachTracker'))
 const OutreachAdmin = lazy(() => import('./pages/OutreachAdmin'))
 const MyGoals = lazy(() => import('./pages/MyGoals'))
+const Admin = lazy(() => import('./pages/Admin'))
 const Help = lazy(() => import('./pages/Help'))
 const HelpAdmin = lazy(() => import('./pages/HelpAdmin'))
 const ChatTerminal = lazy(() => import('./components/ChatTerminal'))
@@ -114,6 +115,7 @@ function AppContent() {
               <Route path="outreach" element={<OutreachTracker />} />
               <Route path="outreach-admin" element={<OutreachAdmin />} />
               <Route path="my-goals" element={<MyGoals />} />
+              <Route path="admin" element={<Admin />} />
               <Route path="import" element={<ImportLeads />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="investors" element={<Investors />} />

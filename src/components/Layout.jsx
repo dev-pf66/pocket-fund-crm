@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../App'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, CheckSquare, Briefcase } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, CheckSquare, Briefcase, Shield } from 'lucide-react'
+
+const ADMIN_EMAIL = 'dev@pocket-fund.com'
 
 function Layout() {
   const { signOut } = useAuth()
@@ -36,6 +38,9 @@ function Layout() {
           <NavLink to="/templates" onClick={() => setMobileMenuOpen(false)}><Mail size={18} />Email Templates</NavLink>
           <NavLink to="/samples" onClick={() => setMobileMenuOpen(false)}><FileText size={18} />Sample Deals</NavLink>
           <NavLink to="/help" onClick={() => setMobileMenuOpen(false)}><HelpCircle size={18} />Help</NavLink>
+          {currentPerson?.email === ADMIN_EMAIL && (
+            <NavLink to="/admin" onClick={() => setMobileMenuOpen(false)}><Shield size={18} />Admin</NavLink>
+          )}
         </nav>
         <div className="user-info">
           <div className="user-avatar">
