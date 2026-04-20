@@ -345,6 +345,7 @@ function QueueRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
 }
 
 function BulkAddModal({ personId, onClose, onDone }) {
+  const { toast } = useToast()
   const [label, setLabel] = useState(defaultBatchLabel())
   const [text, setText] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -360,6 +361,7 @@ function BulkAddModal({ personId, onClose, onDone }) {
       setText(prev => prev ? (prev.replace(/\s+$/, '') + '\n' + content) : content)
     } catch (err) {
       console.error('Failed to read file:', err)
+      toast.error('Failed to read file: ' + err.message)
     }
     e.target.value = ''
   }
@@ -372,7 +374,7 @@ function BulkAddModal({ personId, onClose, onDone }) {
       onDone(result)
     } catch (err) {
       console.error('Bulk add failed:', err)
-      alert('Failed to add leads: ' + err.message)
+      toast.error('Failed to add leads: ' + err.message)
     } finally {
       setSubmitting(false)
     }
@@ -445,20 +447,20 @@ function BulkAddModal({ personId, onClose, onDone }) {
   )
 }
 
-// Pull every LinkedIn URL out of a blob of text. Handles URLs embedded in
-// CSV rows, plain lists, or messy paste, and dedupes within the input.
+// Pull every LinkedIn URL out of a blob of text. Stop at common CSV/JSON
+// separators so two URLs joined by "," don't get matched as one. Handles
+// plain lists, CSV rows, or messy paste; dedupes within the input.
 function extractLinkedInUrls(text) {
   if (!text) return []
-  const matches = text.match(/https?:\/\/\S+/gi) || []
+  const matches = text.match(/https?:\/\/[^\s,;"'<>()]+/gi) || []
   const out = []
   const seen = new Set()
   for (const raw of matches) {
-    const cleaned = raw.replace(/[,;"'<>()]+$/g, '')
-    if (!isLinkedInUrl(cleaned)) continue
-    const norm = cleaned.toLowerCase()
+    if (!isLinkedInUrl(raw)) continue
+    const norm = raw.toLowerCase()
     if (seen.has(norm)) continue
     seen.add(norm)
-    out.push(cleaned)
+    out.push(raw)
   }
   return out
 }

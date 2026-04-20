@@ -3,7 +3,7 @@
  */
 
 import { supabase } from './supabase'
-import { normalizeLinkedInUrl } from './linkedin'
+import { normalizeLinkedInUrl, nameFromLinkedInUrl } from './linkedin'
 
 // ============================================================================
 // IN-MEMORY CACHE
@@ -1834,7 +1834,7 @@ export async function bulkCreateLeads(urls, batchLabel, currentPersonId) {
   const now = new Date().toISOString()
 
   const rows = toInsert.map(url => ({
-    name: nameFromSlug(url) || 'Unknown',
+    name: nameFromLinkedInUrl(url) || 'Unknown',
     linkedin_url: url,
     stage: 'new_lead',
     lead_source: 'Bulk Import',
@@ -1855,22 +1855,6 @@ export async function bulkCreateLeads(urls, batchLabel, currentPersonId) {
   cacheClear('dashboard')
 
   return { added: data.length, skipped, batchId, batchLabel: label, leads: data }
-}
-
-// Local helper — nameFromLinkedInUrl is in ./linkedin but we want to avoid
-// circular import patterns when other modules grow; re-deriving here keeps
-// bulkCreateLeads self-contained within crm-api.
-function nameFromSlug(url) {
-  try {
-    const path = new URL(url).pathname
-    const slug = path.replace(/^\/in\//, '').replace(/\/$/, '')
-    if (!slug) return ''
-    const parts = slug.split('-').filter(Boolean)
-    while (parts.length > 2 && /\d/.test(parts[parts.length - 1])) parts.pop()
-    return parts.map(p => p[0].toUpperCase() + p.slice(1).toLowerCase()).join(' ')
-  } catch {
-    return ''
-  }
 }
 
 // Fetch this user's outreach queue: leads they created still at stage='new_lead'.
