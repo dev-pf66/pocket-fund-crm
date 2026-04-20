@@ -11,7 +11,7 @@ const anthropic = new Anthropic({
 
 function authenticate(req) {
   const apiKey = req.headers['x-api-key'] || req.query.api_key
-  const validKey = process.env.CRM_API_KEY || 'your-secret-api-key-here'
+  const validKey = process.env.CRM_API_KEY
   return apiKey === validKey
 }
 
