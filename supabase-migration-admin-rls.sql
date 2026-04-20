@@ -1,6 +1,17 @@
 -- Admin RLS + FK fixes so the Remove / Make Admin actions actually work.
--- Run in Supabase SQL Editor AFTER supabase-migration-admin.sql (which adds
--- the is_admin column). Safe to run multiple times.
+-- Self-contained — also adds the is_admin column if it's missing.
+-- Run in Supabase SQL Editor. Safe to run multiple times.
+
+-- ---------------------------------------------------------------------------
+-- 0. Ensure is_admin column exists and seed the bootstrap admin
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE people
+  ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
+
+UPDATE people SET is_admin = true WHERE email = 'dev@pocket-fund.com';
+
+CREATE INDEX IF NOT EXISTS idx_people_is_admin ON people(is_admin) WHERE is_admin = true;
 
 -- ---------------------------------------------------------------------------
 -- 1. RLS policies: admins can update and delete any person
