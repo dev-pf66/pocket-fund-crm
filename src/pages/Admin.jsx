@@ -9,7 +9,7 @@ import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff } from 'luci
 // Once the migration seeds is_admin=true for this email, this is moot.
 const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
 
-export function isAdminUser(person) {
+function isAdminUser(person) {
   if (!person) return false
   return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
 }
