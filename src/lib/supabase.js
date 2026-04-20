@@ -69,15 +69,21 @@ export async function setUserAdmin(id, isAdmin) {
     .update({ is_admin: isAdmin })
     .eq('id', id)
     .select()
-    .single()
   if (error) throw error
-  return data
+  if (!data || data.length === 0) {
+    throw new Error('No rows updated — RLS may be blocking this action. Run supabase-migration-admin-rls.sql.')
+  }
+  return data[0]
 }
 
 export async function deleteUser(id) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('people')
     .delete()
     .eq('id', id)
+    .select('id')
   if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error('No rows deleted — RLS may be blocking this action. Run supabase-migration-admin-rls.sql.')
+  }
 }
