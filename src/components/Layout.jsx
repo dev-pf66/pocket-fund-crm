@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../App'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, CheckSquare, Briefcase, Shield } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, CheckSquare, Briefcase, Shield, Inbox } from 'lucide-react'
 
 // Fallback until is_admin column is populated on every person record.
 const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
@@ -36,6 +36,7 @@ function Layout() {
           <NavLink to="/dashboard" onClick={() => setMobileMenuOpen(false)}><LayoutDashboard size={18} />Dashboard</NavLink>
           <NavLink to="/pipeline" onClick={() => setMobileMenuOpen(false)}><Users size={18} />Sales Pipeline</NavLink>
           <NavLink to="/outreach" onClick={() => setMobileMenuOpen(false)}><Target size={18} />Outreach Tracker</NavLink>
+          <NavLink to="/outreach-queue" onClick={() => setMobileMenuOpen(false)}><Inbox size={18} />Outreach Queue</NavLink>
           <NavLink to="/outreach-admin" onClick={() => setMobileMenuOpen(false)}><ClipboardList size={18} />Outreach Log</NavLink>
           <NavLink to="/my-goals" onClick={() => setMobileMenuOpen(false)}><CheckSquare size={18} />Goals</NavLink>
           <NavLink to="/analytics" onClick={() => setMobileMenuOpen(false)}><BarChart3 size={18} />Analytics</NavLink>

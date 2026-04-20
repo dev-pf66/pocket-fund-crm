@@ -23,6 +23,7 @@ const ImportLeads = lazy(() => import('./pages/ImportLeads'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 const OutreachTracker = lazy(() => import('./pages/OutreachTracker'))
 const OutreachAdmin = lazy(() => import('./pages/OutreachAdmin'))
+const OutreachQueue = lazy(() => import('./pages/OutreachQueue'))
 const MyGoals = lazy(() => import('./pages/MyGoals'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Help = lazy(() => import('./pages/Help'))
@@ -113,6 +114,7 @@ function AppContent() {
               <Route path="pipeline" element={<LeadsBoard />} />
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="outreach" element={<OutreachTracker />} />
+              <Route path="outreach-queue" element={<OutreachQueue />} />
               <Route path="outreach-admin" element={<OutreachAdmin />} />
               <Route path="my-goals" element={<MyGoals />} />
               <Route path="admin" element={<Admin />} />
