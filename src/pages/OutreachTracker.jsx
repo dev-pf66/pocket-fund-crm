@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getTodaysOutreachCount, getDailyOutreachStats, getOutreachStreak, getLeads } from '../lib/crm-api'
+import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getTodaysOutreachCount, getDailyOutreachStats, getOutreachStreak, getLeads, createLead, findLeadByLinkedInUrl } from '../lib/crm-api'
+import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
-import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Eye } from 'lucide-react'
+import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Eye, Zap } from 'lucide-react'
 import { useToast } from '../components/Toast'
 
 function OutreachTracker() {
@@ -36,6 +37,10 @@ function OutreachTracker() {
   const [csvUploading, setCsvUploading] = useState(false)
   const [selectedOutreach, setSelectedOutreach] = useState(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
+
+  // Quick-log via LinkedIn URL paste
+  const [quickUrl, setQuickUrl] = useState('')
+  const [quickLogging, setQuickLogging] = useState(false)
 
   const [filter, setFilter] = useState({
     view: 'today', // 'today', 'week', 'all'
@@ -86,6 +91,54 @@ function OutreachTracker() {
       console.error('Failed to load outreach data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleQuickLog() {
+    const url = quickUrl.trim()
+    if (!url) {
+      toast.warn('Paste a LinkedIn URL first')
+      return
+    }
+    if (!isLinkedInUrl(url)) {
+      toast.warn("That doesn't look like a LinkedIn URL")
+      return
+    }
+
+    setQuickLogging(true)
+    try {
+      // Reuse existing lead if we already have one for this profile;
+      // otherwise create a fresh lead so the outreach is linked.
+      let lead = await findLeadByLinkedInUrl(url)
+      let leadCreated = false
+      if (!lead) {
+        const guessedName = nameFromLinkedInUrl(url) || 'Unknown'
+        lead = await createLead({
+          name: guessedName,
+          linkedin_url: url,
+          stage: 'cold_outreach',
+          lead_source: 'LinkedIn'
+        }, currentPerson?.id)
+        leadCreated = true
+      }
+
+      await logOutreach({
+        lead_id: lead.id,
+        lead_name: lead.name,
+        firm_name: lead.firm_name || '',
+        outreach_type: 'linkedin_message',
+        status: 'sent',
+        platform_details: url
+      }, currentPerson?.id, currentPerson?.name)
+
+      setQuickUrl('')
+      toast.success(leadCreated ? `Logged + created lead "${lead.name}"` : `Logged DM to ${lead.name}`)
+      await loadData()
+    } catch (error) {
+      console.error('Quick-log failed:', error)
+      toast.error('Quick-log failed: ' + error.message)
+    } finally {
+      setQuickLogging(false)
     }
   }
 
@@ -256,6 +309,41 @@ function OutreachTracker() {
             onClick={() => setShowForm(!showForm)}
           >
             {showForm ? 'Cancel' : '+ Log Outreach'}
+          </button>
+        </div>
+      </div>
+
+      {/* Quick log: paste LinkedIn URL → creates lead (if new) + logs DM */}
+      <div className="card" style={{ marginBottom: '20px', padding: '16px', background: 'linear-gradient(to right, #eff6ff, #f0f9ff)', border: '1px solid #bfdbfe' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+          <Zap size={18} color="#1d4ed8" />
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#1e3a8a' }}>
+            Quick log a LinkedIn DM
+          </h3>
+          <span style={{ fontSize: '12px', color: '#64748b' }}>
+            Paste a profile URL — we'll create the lead and log it.
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Linkedin size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+            <input
+              type="url"
+              value={quickUrl}
+              onChange={(e) => setQuickUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleQuickLog() }}
+              placeholder="https://linkedin.com/in/..."
+              disabled={quickLogging}
+              style={{ width: '100%', padding: '10px 10px 10px 34px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', background: 'white' }}
+            />
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={handleQuickLog}
+            disabled={quickLogging || !quickUrl.trim()}
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            {quickLogging ? 'Logging…' : 'Log DM'}
           </button>
         </div>
       </div>

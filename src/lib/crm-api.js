@@ -3,6 +3,7 @@
  */
 
 import { supabase } from './supabase'
+import { normalizeLinkedInUrl } from './linkedin'
 
 // ============================================================================
 // IN-MEMORY CACHE
@@ -84,6 +85,21 @@ export async function getLeadById(id) {
 /**
  * Create new lead
  */
+/**
+ * Find a CRM lead whose linkedin_url matches the given URL after normalization.
+ * Returns null if none found.
+ */
+export async function findLeadByLinkedInUrl(linkedinUrl) {
+  if (!linkedinUrl) return null
+  const normalized = normalizeLinkedInUrl(linkedinUrl)
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .select('*')
+    .not('linkedin_url', 'is', null)
+  if (error) throw error
+  return data?.find(l => normalizeLinkedInUrl(l.linkedin_url) === normalized) || null
+}
+
 export async function createLead(leadData, currentPersonId) {
   const { data, error } = await supabase
     .from('crm_leads')

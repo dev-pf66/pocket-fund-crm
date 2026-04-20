@@ -1,35 +1,9 @@
 import { useState } from 'react'
 import { createLead, updateLead, previewLinkedInEnrichment } from '../lib/crm-api'
+import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { Sparkles } from 'lucide-react'
-
-// Pull a "First Last" guess from a LinkedIn slug like "john-smith-ab12cd".
-// Strips the trailing random ID segment LinkedIn tacks on and title-cases.
-function nameFromLinkedInUrl(url) {
-  try {
-    const path = new URL(url).pathname
-    const slug = path.replace(/^\/in\//, '').replace(/\/$/, '')
-    if (!slug) return ''
-    const parts = slug.split('-').filter(Boolean)
-    // Drop the trailing random suffix (hex-ish tail with digits)
-    while (parts.length > 2 && /\d/.test(parts[parts.length - 1])) {
-      parts.pop()
-    }
-    return parts.map(p => p[0].toUpperCase() + p.slice(1).toLowerCase()).join(' ')
-  } catch {
-    return ''
-  }
-}
-
-function isLinkedInUrl(url) {
-  try {
-    const host = new URL(url).hostname
-    return host === 'linkedin.com' || host === 'www.linkedin.com' || host.endsWith('.linkedin.com')
-  } catch {
-    return false
-  }
-}
 
 function LeadForm({ onClose, onSave, lead = null }) {
   const { currentPerson } = useApp()
