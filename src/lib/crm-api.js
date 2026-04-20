@@ -1629,198 +1629,142 @@ export async function getAllOutreachLogs(filters = {}) {
 }
 
 // ============================================================================
-// WEEKLY GOALS SYSTEM
+// GOALS SYSTEM
+// Structured goals (text + target_count + frequency) with per-period progress.
 // ============================================================================
 
-/**
- * Get all goal templates (optionally filtered by person or role)
- */
-export async function getGoalTemplates(filters = {}) {
-  let query = supabase
-    .from('crm_weekly_goal_templates')
-    .select('*')
-    .eq('is_active', true)
-    .order('goal_order', { ascending: true })
-
-  if (filters.person_id) {
-    query = query.eq('person_id', filters.person_id)
-  }
-
-  if (filters.role) {
-    query = query.eq('role', filters.role)
-  }
-
-  const { data, error } = await query
-  if (error) throw error
-  return data || []
-}
-
-/**
- * Create a goal template
- */
-export async function createGoalTemplate(templateData) {
-  const { data, error } = await supabase
-    .from('crm_weekly_goal_templates')
-    .insert([templateData])
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
-}
-
-/**
- * Update a goal template
- */
-export async function updateGoalTemplate(id, updates) {
-  const { data, error } = await supabase
-    .from('crm_weekly_goal_templates')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
-}
-
-/**
- * Delete a goal template
- */
-export async function deleteGoalTemplate(id) {
-  const { error } = await supabase
-    .from('crm_weekly_goal_templates')
-    .delete()
-    .eq('id', id)
-
-  if (error) throw error
-}
-
-/**
- * Get weekly goals for a person and week
- * @param personId - ID of the person
- * @param weekStartDate - Monday of the week (YYYY-MM-DD format)
- */
-export async function getWeeklyGoals(personId, weekStartDate) {
-  const { data, error } = await supabase
-    .from('crm_weekly_goals')
-    .select('*')
-    .eq('person_id', personId)
-    .eq('week_start_date', weekStartDate)
-    .order('goal_order', { ascending: true })
-
-  if (error) throw error
-  return data || []
-}
-
-/**
- * Create/Initialize weekly goals for a person from templates
- */
-export async function initializeWeeklyGoals(personId, weekStartDate) {
-  // Get templates for this person (or their role)
-  const templates = await getGoalTemplates({ person_id: personId })
-
-  if (templates.length === 0) {
-    return []
-  }
-
-  // Create goals from templates
-  const goals = templates.map(template => ({
-    person_id: personId,
-    week_start_date: weekStartDate,
-    goal_text: template.goal_text,
-    goal_order: template.goal_order,
-    is_completed: false
-  }))
-
-  const { data, error } = await supabase
-    .from('crm_weekly_goals')
-    .upsert(goals, { 
-      onConflict: 'person_id,week_start_date,goal_text',
-      ignoreDuplicates: true 
-    })
-    .select()
-
-  if (error) throw error
-  return data || []
-}
-
-/**
- * Add a custom goal for the week
- */
-export async function addWeeklyGoal(goalData) {
-  const { data, error } = await supabase
-    .from('crm_weekly_goals')
-    .insert([goalData])
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
-}
-
-/**
- * Update a weekly goal (toggle completion, edit text, add notes)
- */
-export async function updateWeeklyGoal(id, updates) {
-  // If marking as completed, set completed_at
-  if (updates.is_completed && !updates.completed_at) {
-    updates.completed_at = new Date().toISOString()
-  }
-
-  // If marking as incomplete, clear completed_at
-  if (updates.is_completed === false) {
-    updates.completed_at = null
-  }
-
-  const { data, error } = await supabase
-    .from('crm_weekly_goals')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
-}
-
-/**
- * Delete a weekly goal
- */
-export async function deleteWeeklyGoal(id) {
-  const { error } = await supabase
-    .from('crm_weekly_goals')
-    .delete()
-    .eq('id', id)
-
-  if (error) throw error
-}
-
-/**
- * Get Monday of current week (or any date)
- */
-export function getWeekStartDate(date = new Date()) {
+function getWeekStartDate(date = new Date()) {
   const d = new Date(date)
   const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1) // adjust when day is sunday
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
   const monday = new Date(d.setDate(diff))
   return monday.toISOString().split('T')[0]
 }
 
 /**
- * Get weekly goal stats for a person
+ * Period-start (YYYY-MM-DD) for a given frequency.
+ * - daily:   today
+ * - weekly:  Monday of this week
+ * - monthly: first day of this month
  */
-export async function getWeeklyGoalStats(personId, weekStartDate) {
-  const goals = await getWeeklyGoals(personId, weekStartDate)
-  
-  const total = goals.length
-  const completed = goals.filter(g => g.is_completed).length
-  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
-
-  return {
-    total,
-    completed,
-    remaining: total - completed,
-    percentage
+export function getPeriodStart(frequency, date = new Date()) {
+  const d = new Date(date)
+  if (frequency === 'daily') {
+    return d.toISOString().split('T')[0]
   }
+  if (frequency === 'weekly') {
+    return getWeekStartDate(d)
+  }
+  if (frequency === 'monthly') {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  }
+  throw new Error(`Unknown frequency: ${frequency}`)
+}
+
+/**
+ * Fetch active goals for a person with current-period progress attached as
+ * `current_count` and `period_start` on each goal.
+ */
+export async function getGoals(personId) {
+  const { data: goals, error } = await supabase
+    .from('crm_goals')
+    .select('*')
+    .eq('person_id', personId)
+    .eq('is_active', true)
+    .order('goal_order', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  if (!goals || goals.length === 0) return []
+
+  const goalIds = goals.map(g => g.id)
+  const { data: progressRows, error: progError } = await supabase
+    .from('crm_goal_progress')
+    .select('*')
+    .in('goal_id', goalIds)
+
+  if (progError) throw progError
+
+  return goals.map(goal => {
+    const periodStart = getPeriodStart(goal.frequency)
+    const row = progressRows?.find(p => p.goal_id === goal.id && p.period_start === periodStart)
+    return {
+      ...goal,
+      current_count: row?.count || 0,
+      period_start: periodStart
+    }
+  })
+}
+
+export async function createGoal(goalData) {
+  const { data, error } = await supabase
+    .from('crm_goals')
+    .insert([goalData])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateGoal(id, updates) {
+  const { data, error } = await supabase
+    .from('crm_goals')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteGoal(id) {
+  const { error } = await supabase
+    .from('crm_goals')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+/**
+ * Add `delta` (default +1) to the current period's progress row for a goal.
+ * Creates the row if missing. Floors the count at 0. Returns the new count.
+ */
+export async function incrementGoalProgress(goalId, delta = 1) {
+  const { data: goal, error: goalError } = await supabase
+    .from('crm_goals')
+    .select('frequency')
+    .eq('id', goalId)
+    .single()
+  if (goalError) throw goalError
+
+  const periodStart = getPeriodStart(goal.frequency)
+
+  const { data: existing, error: selError } = await supabase
+    .from('crm_goal_progress')
+    .select('id, count')
+    .eq('goal_id', goalId)
+    .eq('period_start', periodStart)
+    .maybeSingle()
+  if (selError) throw selError
+
+  if (existing) {
+    const newCount = Math.max(0, existing.count + delta)
+    const { data, error } = await supabase
+      .from('crm_goal_progress')
+      .update({ count: newCount })
+      .eq('id', existing.id)
+      .select()
+      .single()
+    if (error) throw error
+    return data.count
+  }
+
+  const initialCount = Math.max(0, delta)
+  const { data, error } = await supabase
+    .from('crm_goal_progress')
+    .insert([{ goal_id: goalId, period_start: periodStart, count: initialCount }])
+    .select()
+    .single()
+  if (error) throw error
+  return data.count
 }

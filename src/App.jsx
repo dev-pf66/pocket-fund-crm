@@ -23,8 +23,7 @@ const ImportLeads = lazy(() => import('./pages/ImportLeads'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 const OutreachTracker = lazy(() => import('./pages/OutreachTracker'))
 const OutreachAdmin = lazy(() => import('./pages/OutreachAdmin'))
-const MyWeeklyGoals = lazy(() => import('./pages/MyWeeklyGoals'))
-const GoalTemplates = lazy(() => import('./pages/GoalTemplates'))
+const MyGoals = lazy(() => import('./pages/MyGoals'))
 const Help = lazy(() => import('./pages/Help'))
 const HelpAdmin = lazy(() => import('./pages/HelpAdmin'))
 const ChatTerminal = lazy(() => import('./components/ChatTerminal'))
@@ -114,8 +113,7 @@ function AppContent() {
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="outreach" element={<OutreachTracker />} />
               <Route path="outreach-admin" element={<OutreachAdmin />} />
-              <Route path="my-goals" element={<MyWeeklyGoals />} />
-              <Route path="goal-templates" element={<GoalTemplates />} />
+              <Route path="my-goals" element={<MyGoals />} />
               <Route path="import" element={<ImportLeads />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="investors" element={<Investors />} />
