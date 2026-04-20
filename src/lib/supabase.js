@@ -62,3 +62,22 @@ export async function getPeople() {
   if (error) throw error
   return data || []
 }
+
+export async function setUserAdmin(id, isAdmin) {
+  const { data, error } = await supabase
+    .from('people')
+    .update({ is_admin: isAdmin })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteUser(id) {
+  const { error } = await supabase
+    .from('people')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}

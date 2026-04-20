@@ -4,7 +4,12 @@ import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../App'
 import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, CheckSquare, Briefcase, Shield } from 'lucide-react'
 
-const ADMIN_EMAIL = 'dev@pocket-fund.com'
+// Fallback until is_admin column is populated on every person record.
+const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
+function isAdminUser(person) {
+  if (!person) return false
+  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
 
 function Layout() {
   const { signOut } = useAuth()
@@ -38,7 +43,7 @@ function Layout() {
           <NavLink to="/templates" onClick={() => setMobileMenuOpen(false)}><Mail size={18} />Email Templates</NavLink>
           <NavLink to="/samples" onClick={() => setMobileMenuOpen(false)}><FileText size={18} />Sample Deals</NavLink>
           <NavLink to="/help" onClick={() => setMobileMenuOpen(false)}><HelpCircle size={18} />Help</NavLink>
-          {currentPerson?.email === ADMIN_EMAIL && (
+          {isAdminUser(currentPerson) && (
             <NavLink to="/admin" onClick={() => setMobileMenuOpen(false)}><Shield size={18} />Admin</NavLink>
           )}
         </nav>
