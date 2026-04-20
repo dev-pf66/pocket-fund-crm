@@ -5655,6 +5655,52 @@ input, select, textarea {
   color: var(--gray-900);
 }
 
+/* Click-to-edit inline fields on LeadDetail */
+.inline-field-display {
+  color: var(--gray-900);
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: 6px;
+  cursor: text;
+  min-height: 28px;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+}
+
+.inline-field-display:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-200);
+}
+
+.inline-field-display:focus {
+  outline: 2px solid var(--primary-200, #bfdbfe);
+  outline-offset: 0;
+}
+
+.inline-field-empty {
+  color: var(--gray-400);
+  font-style: italic;
+}
+
+.info-item input,
+.info-item select,
+.info-item textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--primary, #3b82f6);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--gray-900);
+  background: white;
+  box-shadow: 0 0 0 3px var(--primary-100, rgba(59, 130, 246, 0.15));
+}
+
+.info-item textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

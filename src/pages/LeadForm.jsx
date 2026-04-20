@@ -1,12 +1,41 @@
 import { useState } from 'react'
-import { createLead, updateLead } from '../lib/crm-api'
+import { createLead, updateLead, previewLinkedInEnrichment } from '../lib/crm-api'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
+import { Sparkles } from 'lucide-react'
+
+// Pull a "First Last" guess from a LinkedIn slug like "john-smith-ab12cd".
+// Strips the trailing random ID segment LinkedIn tacks on and title-cases.
+function nameFromLinkedInUrl(url) {
+  try {
+    const path = new URL(url).pathname
+    const slug = path.replace(/^\/in\//, '').replace(/\/$/, '')
+    if (!slug) return ''
+    const parts = slug.split('-').filter(Boolean)
+    // Drop the trailing random suffix (hex-ish tail with digits)
+    while (parts.length > 2 && /\d/.test(parts[parts.length - 1])) {
+      parts.pop()
+    }
+    return parts.map(p => p[0].toUpperCase() + p.slice(1).toLowerCase()).join(' ')
+  } catch {
+    return ''
+  }
+}
+
+function isLinkedInUrl(url) {
+  try {
+    const host = new URL(url).hostname
+    return host === 'linkedin.com' || host === 'www.linkedin.com' || host.endsWith('.linkedin.com')
+  } catch {
+    return false
+  }
+}
 
 function LeadForm({ onClose, onSave, lead = null }) {
   const { currentPerson } = useApp()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [autoFilling, setAutoFilling] = useState(false)
   const [formData, setFormData] = useState({
     name: lead?.name || '',
     firm_name: lead?.firm_name || '',
@@ -22,7 +51,49 @@ function LeadForm({ onClose, onSave, lead = null }) {
 
   function handleChange(e) {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData(prev => {
+      const next = { ...prev, [name]: value }
+      // When pasting a LinkedIn URL and name is empty, pre-populate the name
+      // from the slug so the user doesn't have to retype it.
+      if (name === 'linkedin_url' && !prev.name.trim() && isLinkedInUrl(value)) {
+        const guessed = nameFromLinkedInUrl(value)
+        if (guessed) next.name = guessed
+      }
+      return next
+    })
+  }
+
+  async function handleAutoFill() {
+    if (!formData.linkedin_url.trim()) {
+      toast.warn('Paste a LinkedIn URL first')
+      return
+    }
+    if (!isLinkedInUrl(formData.linkedin_url)) {
+      toast.warn('That doesn\'t look like a LinkedIn URL')
+      return
+    }
+
+    setAutoFilling(true)
+    try {
+      const enrichment = await previewLinkedInEnrichment(formData.linkedin_url, {
+        name: formData.name,
+        firm_name: formData.firm_name,
+        lead_type: formData.lead_type
+      })
+      // Only fill empty fields — don't clobber what the user already typed.
+      setFormData(prev => ({
+        ...prev,
+        name: prev.name.trim() || enrichment.suggested_name || prev.name,
+        lead_type: prev.lead_type || enrichment.suggested_lead_type || prev.lead_type,
+        notes: prev.notes.trim() ? prev.notes : (enrichment.enrichment_notes || prev.notes)
+      }))
+      toast.success('Auto-filled from LinkedIn')
+    } catch (error) {
+      console.error('Auto-fill failed:', error)
+      toast.error('Auto-fill failed: ' + error.message)
+    } finally {
+      setAutoFilling(false)
+    }
   }
 
   async function handleSubmit(e) {
@@ -111,13 +182,27 @@ function LeadForm({ onClose, onSave, lead = null }) {
 
           <div className="form-group">
             <label>LinkedIn URL</label>
-            <input
-              type="url"
-              name="linkedin_url"
-              value={formData.linkedin_url}
-              onChange={handleChange}
-              placeholder="https://linkedin.com/in/..."
-            />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+              <input
+                type="url"
+                name="linkedin_url"
+                value={formData.linkedin_url}
+                onChange={handleChange}
+                placeholder="https://linkedin.com/in/..."
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleAutoFill}
+                disabled={autoFilling || !formData.linkedin_url.trim()}
+                title="Fill name, lead type, and notes from the LinkedIn URL"
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                <Sparkles size={16} />
+                {autoFilling ? 'Filling...' : 'Auto-fill'}
+              </button>
+            </div>
           </div>
 
           <div className="form-row">

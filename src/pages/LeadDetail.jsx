@@ -1,9 +1,134 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript } from '../lib/crm-api'
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck } from 'lucide-react'
 import { useToast } from '../components/Toast'
+
+// Click-to-edit field: renders value, clicks open an input, blur/Enter saves,
+// Escape cancels. For multiline, use Cmd/Ctrl+Enter to save.
+function InlineField({ value, onSave, type = 'text', options = null, placeholder = 'Click to add', multiline = false, renderValue = null, inputStyle = {} }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value ?? '')
+  const [saving, setSaving] = useState(false)
+  const savedRef = useRef(false)
+
+  useEffect(() => {
+    if (!editing) setDraft(value ?? '')
+  }, [value, editing])
+
+  async function commit() {
+    if (savedRef.current) return
+    savedRef.current = true
+    const next = typeof draft === 'string' ? draft.trim() : draft
+    const current = value ?? ''
+    if (next === current) {
+      setEditing(false)
+      savedRef.current = false
+      return
+    }
+    setSaving(true)
+    try {
+      await onSave(next)
+      setEditing(false)
+    } catch {
+      setDraft(current)
+    } finally {
+      setSaving(false)
+      savedRef.current = false
+    }
+  }
+
+  function cancel() {
+    setDraft(value ?? '')
+    setEditing(false)
+  }
+
+  if (!editing) {
+    const displayed = value
+      ? (renderValue ? renderValue(value) : value)
+      : <span className="inline-field-empty">{placeholder}</span>
+    return (
+      <div
+        className="inline-field-display"
+        onClick={() => setEditing(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true) } }}
+      >
+        {displayed}
+      </div>
+    )
+  }
+
+  if (type === 'select') {
+    return (
+      <select
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Escape') cancel() }}
+        disabled={saving}
+        style={inputStyle}
+      >
+        {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+      </select>
+    )
+  }
+
+  if (multiline) {
+    return (
+      <textarea
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') cancel()
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commit()
+        }}
+        disabled={saving}
+        rows={3}
+        style={inputStyle}
+      />
+    )
+  }
+
+  return (
+    <input
+      autoFocus
+      type={type}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') cancel()
+        if (e.key === 'Enter') commit()
+      }}
+      disabled={saving}
+      style={inputStyle}
+    />
+  )
+}
+
+const LEAD_TYPE_OPTIONS = [
+  { value: '', label: 'Select type...' },
+  { value: 'PE Firm', label: 'PE Firm' },
+  { value: 'Family Office', label: 'Family Office' },
+  { value: 'Independent Sponsor', label: 'Independent Sponsor' },
+  { value: 'Other', label: 'Other' }
+]
+
+const STAGE_OPTIONS = [
+  { value: 'new_lead', label: 'New Lead' },
+  { value: 'cold_outreach', label: 'Cold Outreach' },
+  { value: 'responded', label: 'Responded' },
+  { value: 'warm_lead', label: 'Warm Lead' },
+  { value: 'active_conversation', label: 'Active Conversation' },
+  { value: 'client', label: 'Client' },
+  { value: 'passed', label: 'Passed' }
+]
 
 function LeadDetail() {
   const { id } = useParams()
@@ -87,6 +212,24 @@ function LeadDetail() {
     } catch (error) {
       console.error('Failed to update lead:', error)
       toast.error(`Failed to update lead: ${error.message}`)
+    }
+  }
+
+  // Single-field save for inline editing. Updates local state optimistically,
+  // rolls back on error.
+  async function saveField(field, value) {
+    const prev = lead[field]
+    const normalized = value === '' ? null : value
+    setLead(l => ({ ...l, [field]: normalized }))
+    setEditedLead(l => ({ ...l, [field]: normalized }))
+    try {
+      await updateLead(id, { [field]: normalized })
+    } catch (error) {
+      console.error(`Failed to update ${field}:`, error)
+      toast.error(`Failed to save: ${error.message}`)
+      setLead(l => ({ ...l, [field]: prev }))
+      setEditedLead(l => ({ ...l, [field]: prev }))
+      throw error
     }
   }
 
@@ -266,9 +409,9 @@ function LeadDetail() {
         <div style={{ display: 'flex', gap: '8px' }}>
           {!isEditing ? (
             <>
-              <button className="btn btn-secondary" onClick={() => setIsEditing(true)}>
+              <button className="btn btn-secondary" onClick={() => setIsEditing(true)} title="Edit firmographics, decision timeline, and relationship fields">
                 <Edit2 size={16} />
-                Edit
+                More Fields
               </button>
               <button className="btn btn-danger" onClick={handleDelete}>
                 <Trash2 size={16} />
@@ -656,76 +799,110 @@ function LeadDetail() {
             </div>
           ) : (
             <div className="info-grid">
-              {lead.firm_name && (
-                <div className="info-item">
-                  <label>Firm</label>
-                  <div>{lead.firm_name}</div>
-                </div>
-              )}
+              <div className="info-item">
+                <label>Firm</label>
+                <InlineField value={lead.firm_name} onSave={(v) => saveField('firm_name', v)} placeholder="Click to add firm" />
+              </div>
 
-              {lead.email && (
-                <div className="info-item">
-                  <label>Email</label>
-                  <div><a href={`mailto:${lead.email}`}>{lead.email}</a></div>
-                </div>
-              )}
+              <div className="info-item">
+                <label>Email</label>
+                <InlineField
+                  value={lead.email}
+                  onSave={(v) => saveField('email', v)}
+                  type="email"
+                  placeholder="Click to add email"
+                  renderValue={(v) => <a href={`mailto:${v}`} onClick={(e) => e.stopPropagation()}>{v}</a>}
+                />
+              </div>
 
-              {lead.phone && (
-                <div className="info-item">
-                  <label>Phone</label>
-                  <div><a href={`tel:${lead.phone}`}>{lead.phone}</a></div>
-                </div>
-              )}
+              <div className="info-item">
+                <label>Phone</label>
+                <InlineField
+                  value={lead.phone}
+                  onSave={(v) => saveField('phone', v)}
+                  type="tel"
+                  placeholder="Click to add phone"
+                  renderValue={(v) => <a href={`tel:${v}`} onClick={(e) => e.stopPropagation()}>{v}</a>}
+                />
+              </div>
 
-              {lead.linkedin_url && (
-                <div className="info-item">
-                  <label>LinkedIn</label>
-                  <div><a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer">View Profile</a></div>
-                </div>
-              )}
+              <div className="info-item">
+                <label>LinkedIn</label>
+                <InlineField
+                  value={lead.linkedin_url}
+                  onSave={(v) => saveField('linkedin_url', v)}
+                  type="url"
+                  placeholder="Click to add LinkedIn"
+                  renderValue={(v) => <a href={v} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>View Profile</a>}
+                />
+              </div>
 
-              {lead.lead_type && (
-                <div className="info-item">
-                  <label>Lead Type</label>
-                  <div><span className="lead-type-badge">{lead.lead_type}</span></div>
-                </div>
-              )}
+              <div className="info-item">
+                <label>Lead Type</label>
+                <InlineField
+                  value={lead.lead_type || ''}
+                  onSave={(v) => saveField('lead_type', v)}
+                  type="select"
+                  options={LEAD_TYPE_OPTIONS}
+                  placeholder="Click to set type"
+                  renderValue={(v) => <span className="lead-type-badge">{v}</span>}
+                />
+              </div>
 
               <div className="info-item">
                 <label>Stage</label>
-                <div>{lead.stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                <InlineField
+                  value={lead.stage}
+                  onSave={(v) => saveField('stage', v)}
+                  type="select"
+                  options={STAGE_OPTIONS}
+                  renderValue={(v) => v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                />
               </div>
 
-              {lead.assigned_to && (
-                <div className="info-item">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <UserCheck size={16} />
-                    Assigned To
-                  </label>
-                  <div>
-                    {people.find(p => p.id === lead.assigned_to)?.name || 'Unknown'}
-                    {lead.assigned_date && (
-                      <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
-                        Assigned {new Date(lead.assigned_date).toLocaleDateString()}
-                      </div>
-                    )}
+              <div className="info-item">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserCheck size={16} />
+                  Assigned To
+                </label>
+                <InlineField
+                  value={lead.assigned_to ? String(lead.assigned_to) : ''}
+                  onSave={(v) => handleAssignment(v)}
+                  type="select"
+                  options={[{ value: '', label: 'Unassigned' }, ...people.map(p => ({ value: String(p.id), label: p.name }))]}
+                  placeholder="Click to assign"
+                  renderValue={(v) => {
+                    const person = people.find(p => p.id === parseInt(v))
+                    return person ? person.name : 'Unknown'
+                  }}
+                />
+                {lead.assigned_date && (
+                  <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>
+                    Assigned {new Date(lead.assigned_date).toLocaleDateString()}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              {lead.deal_criteria && (
-                <div className="info-item full-width">
-                  <label>Deal Criteria</label>
-                  <div>{lead.deal_criteria}</div>
-                </div>
-              )}
+              <div className="info-item full-width">
+                <label>Deal Criteria</label>
+                <InlineField
+                  value={lead.deal_criteria}
+                  onSave={(v) => saveField('deal_criteria', v)}
+                  multiline
+                  placeholder="Click to add deal criteria (Cmd+Enter to save)"
+                />
+              </div>
 
-              {lead.notes && (
-                <div className="info-item full-width">
-                  <label>Notes</label>
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{lead.notes}</div>
-                </div>
-              )}
+              <div className="info-item full-width">
+                <label>Notes</label>
+                <InlineField
+                  value={lead.notes}
+                  onSave={(v) => saveField('notes', v)}
+                  multiline
+                  placeholder="Click to add notes (Cmd+Enter to save)"
+                  renderValue={(v) => <span style={{ whiteSpace: 'pre-wrap' }}>{v}</span>}
+                />
+              </div>
 
               {lead.needs_sample_deals && (
                 <div className="info-item">

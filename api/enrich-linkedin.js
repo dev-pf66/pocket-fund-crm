@@ -11,7 +11,7 @@ const anthropic = new Anthropic({
 
 function authenticate(req) {
   const apiKey = req.headers['x-api-key'] || req.query.api_key
-  const validKey = process.env.CRM_API_KEY || 'your-secret-api-key-here'
+  const validKey = process.env.CRM_API_KEY
   return apiKey === validKey
 }
 
@@ -43,37 +43,56 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized. Provide valid x-api-key header.' })
   }
 
-  const { leadId, linkedinUrl } = req.body
+  const { leadId, linkedinUrl, context } = req.body
 
-  if (!leadId || !linkedinUrl) {
-    return res.status(400).json({ error: 'leadId and linkedinUrl are required' })
+  if (!linkedinUrl) {
+    return res.status(400).json({ error: 'linkedinUrl is required' })
   }
 
   if (!isValidLinkedInUrl(linkedinUrl)) {
     return res.status(400).json({ error: 'Invalid LinkedIn URL' })
   }
 
+  // Preview mode: leadId omitted. Generate enrichment from provided context
+  // without touching the DB. Used by the Add Lead form to pre-fill fields.
+  const previewMode = !leadId
+
   try {
-    // Fetch existing lead data to provide context to Claude
-    const { data: lead, error: fetchError } = await supabase
-      .from('crm_leads')
-      .select('*')
-      .eq('id', leadId)
-      .single()
+    let lead
+    if (previewMode) {
+      lead = {
+        name: context?.name || '',
+        firm_name: context?.firm_name || '',
+        lead_type: context?.lead_type || '',
+        notes: '',
+        deal_criteria: ''
+      }
+    } else {
+      const { data, error: fetchError } = await supabase
+        .from('crm_leads')
+        .select('*')
+        .eq('id', leadId)
+        .single()
 
-    if (fetchError || !lead) {
-      return res.status(404).json({ error: 'Lead not found' })
+      if (fetchError || !data) {
+        return res.status(404).json({ error: 'Lead not found' })
+      }
+      lead = data
+
+      // Mark as enriching
+      await supabase
+        .from('crm_leads')
+        .update({ enrichment_status: 'enriching' })
+        .eq('id', leadId)
     }
-
-    // Mark as enriching
-    await supabase
-      .from('crm_leads')
-      .update({ enrichment_status: 'enriching' })
-      .eq('id', leadId)
 
     // Extract profile slug from URL for hints
     const urlPath = new URL(linkedinUrl).pathname
     const profileSlug = urlPath.replace(/^\/in\//, '').replace(/\/$/, '')
+
+    const previewInstruction = previewMode
+      ? `\n\nSince we're pre-filling an Add Lead form, ALSO infer a likely name (from the LinkedIn slug — format "first-last" → "First Last") and lead_type ("PE Firm", "Family Office", "Independent Sponsor", or "Other") based on the profile slug and firm name. Include a suggested_name and suggested_lead_type field in your response.`
+      : ''
 
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -92,7 +111,7 @@ Lead info:
 - Current notes: ${lead.notes || 'None'}
 - Deal criteria: ${lead.deal_criteria || 'None'}
 
-Based on this person's name, firm, role type (${lead.lead_type}), and LinkedIn profile slug, generate plausible professional details. For someone at "${lead.firm_name || 'their firm'}" who is a "${lead.lead_type || 'finance professional'}", what would their background likely look like?
+Based on this person's name, firm, role type (${lead.lead_type}), and LinkedIn profile slug, generate plausible professional details. For someone at "${lead.firm_name || 'their firm'}" who is a "${lead.lead_type || 'finance professional'}", what would their background likely look like?${previewInstruction}
 
 Respond with this exact JSON structure:
 {
@@ -100,7 +119,9 @@ Respond with this exact JSON structure:
   "current_position": "Their most likely current role and title at their firm",
   "past_experience": "2-3 bullet points of plausible past roles, separated by newlines",
   "education": "Most likely educational background (e.g., 'MBA, Wharton School of Business; BS Finance, NYU')",
-  "enrichment_notes": "Brief summary of key insights about this person's likely background and how to approach them"
+  "enrichment_notes": "Brief summary of key insights about this person's likely background and how to approach them"${previewMode ? `,
+  "suggested_name": "Inferred name from LinkedIn slug (First Last format)",
+  "suggested_lead_type": "One of: PE Firm, Family Office, Independent Sponsor, Other"` : ''}
 }`
         }
       ]
@@ -113,11 +134,12 @@ Respond with this exact JSON structure:
     try {
       enrichmentData = JSON.parse(jsonText)
     } catch {
-      // If parsing fails, reset status and return error
-      await supabase
-        .from('crm_leads')
-        .update({ enrichment_status: 'failed' })
-        .eq('id', leadId)
+      if (!previewMode) {
+        await supabase
+          .from('crm_leads')
+          .update({ enrichment_status: 'failed' })
+          .eq('id', leadId)
+      }
       return res.status(500).json({ error: 'Failed to parse AI response', raw: rawText })
     }
 
@@ -130,6 +152,19 @@ Respond with this exact JSON structure:
       education: String(enrichmentData.education || ''),
       enrichment_status: 'enriched',
       enriched_at: new Date().toISOString()
+    }
+
+    if (previewMode) {
+      return res.status(200).json({
+        success: true,
+        preview: true,
+        enrichment: {
+          ...validatedData,
+          enrichment_notes: enrichmentData.enrichment_notes || '',
+          suggested_name: String(enrichmentData.suggested_name || '').slice(0, 120),
+          suggested_lead_type: String(enrichmentData.suggested_lead_type || '').slice(0, 40)
+        }
+      })
     }
 
     // Update lead with enrichment data
@@ -160,13 +195,14 @@ Respond with this exact JSON structure:
   } catch (error) {
     console.error('enrich-linkedin error:', error)
 
-    // Attempt to mark as failed
-    try {
-      await supabase
-        .from('crm_leads')
-        .update({ enrichment_status: 'failed' })
-        .eq('id', leadId)
-    } catch { /* ignore */ }
+    if (!previewMode) {
+      try {
+        await supabase
+          .from('crm_leads')
+          .update({ enrichment_status: 'failed' })
+          .eq('id', leadId)
+      } catch { /* ignore */ }
+    }
 
     return res.status(500).json({ success: false, error: error.message })
   }

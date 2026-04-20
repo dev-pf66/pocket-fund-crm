@@ -1260,6 +1260,29 @@ export async function enrichLeadFromLinkedIn(leadId, linkedinUrl) {
   }
 }
 
+/**
+ * Preview-enrich from a LinkedIn URL WITHOUT saving a lead.
+ * Used by the Add Lead form to pre-fill fields before the lead exists.
+ * Returns { suggested_name, suggested_lead_type, linkedin_headline, current_position, past_experience, education, enrichment_notes }.
+ */
+export async function previewLinkedInEnrichment(linkedinUrl, context = {}) {
+  const apiKey = import.meta.env.VITE_CRM_API_KEY
+  const response = await fetch('/api/enrich-linkedin', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey
+    },
+    body: JSON.stringify({ linkedinUrl, context })
+  })
+
+  const result = await response.json()
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || 'Enrichment preview failed')
+  }
+  return result.enrichment
+}
+
 // ============================================================================
 // OUTREACH TRACKER
 // ============================================================================
