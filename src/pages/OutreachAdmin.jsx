@@ -3,15 +3,17 @@ import { Link } from 'react-router-dom'
 import { getAllOutreachLogs } from '../lib/crm-api'
 import { Target, ChevronDown, ChevronUp, Filter, Eye, EyeOff } from 'lucide-react'
 
+// Keys MUST match the values written by OutreachTracker's form + quick-log
+// and by markLeadReachedOut — otherwise the badge shows the raw enum and
+// the filter dropdown returns zero results.
 const PLATFORM_LABELS = {
   cold_email: 'Email',
-  linkedin_dm: 'LinkedIn DM',
+  linkedin_message: 'LinkedIn',
   phone_call: 'Phone',
-  text_message: 'Text',
   other: 'Other'
 }
 
-const PLATFORMS = ['cold_email', 'linkedin_dm', 'phone_call', 'text_message', 'other']
+const PLATFORMS = ['cold_email', 'linkedin_message', 'phone_call', 'other']
 
 function FitStars({ score }) {
   if (!score) return <span style={{ color: '#9ca3af', fontSize: '13px' }}>—</span>
