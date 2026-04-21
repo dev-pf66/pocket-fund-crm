@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { getAllOutreachLogs } from '../lib/crm-api'
-import { Target, ChevronDown, ChevronUp, Filter, Eye, EyeOff } from 'lucide-react'
+import { getAllOutreachLogs, updateOutreach } from '../lib/crm-api'
+import { Target, ChevronDown, ChevronUp, Filter, Check } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 // Keys MUST match the values written by OutreachTracker's form + quick-log
 // and by markLeadReachedOut — otherwise the badge shows the raw enum and
@@ -27,9 +28,11 @@ function FitStars({ score }) {
 }
 
 function OutreachAdmin() {
+  const { toast } = useToast()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState(null)
+  const [togglingId, setTogglingId] = useState(null)
 
   const [filters, setFilters] = useState({
     platform: '',
@@ -71,7 +74,23 @@ function OutreachAdmin() {
   }
 
   const totalCount = entries.length
-  const withResponse = entries.filter(e => e.response_received && e.response_received.trim()).length
+  const withResponse = entries.filter(e => e.status === 'replied').length
+
+  async function toggleResponded(entry, e) {
+    e.stopPropagation()
+    const next = entry.status === 'replied' ? 'sent' : 'replied'
+    setTogglingId(entry.id)
+    try {
+      await updateOutreach(entry.id, { status: next })
+      setEntries(prev => prev.map(x => x.id === entry.id ? { ...x, status: next } : x))
+      toast.success(next === 'replied' ? 'Marked as responded' : 'Marked as no response')
+    } catch (err) {
+      console.error('Failed to toggle status:', err)
+      toast.error('Failed to update status')
+    } finally {
+      setTogglingId(null)
+    }
+  }
 
   return (
     <div className="page-container">
@@ -235,11 +254,23 @@ function OutreachAdmin() {
                     </td>
                     <td style={tdStyle}><FitStars score={entry.fit_score} /></td>
                     <td style={tdStyle}>
-                      {entry.response_received && entry.response_received.trim() ? (
-                        <span style={{ color: '#15803d', fontSize: '13px', fontWeight: '500' }}>✓ Yes</span>
-                      ) : (
-                        <span style={{ color: '#9ca3af', fontSize: '13px' }}>—</span>
-                      )}
+                      <button
+                        onClick={(ev) => toggleResponded(entry, ev)}
+                        disabled={togglingId === entry.id}
+                        title={entry.status === 'replied' ? 'Click to mark as no response' : 'Click to mark as responded'}
+                        style={{
+                          background: 'none',
+                          border: entry.status === 'replied' ? '1px solid #bbf7d0' : '1px dashed #e5e7eb',
+                          borderRadius: '999px',
+                          padding: '3px 10px',
+                          fontSize: '12px',
+                          fontWeight: entry.status === 'replied' ? 600 : 400,
+                          color: entry.status === 'replied' ? '#15803d' : '#9ca3af',
+                          cursor: togglingId === entry.id ? 'wait' : 'pointer'
+                        }}
+                      >
+                        {entry.status === 'replied' ? <><Check size={12} /> Responded</> : 'Mark responded'}
+                      </button>
                     </td>
                     <td style={tdStyle}>
                       {expandedId === entry.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -306,14 +337,6 @@ function OutreachAdmin() {
                               <div>
                                 <div style={metaLabelStyle}>Notes</div>
                                 <div style={metaValueStyle}>{entry.notes}</div>
-                              </div>
-                            )}
-                            {entry.response_received && entry.response_received.trim() && (
-                              <div>
-                                <div style={metaLabelStyle}>Response Received</div>
-                                <div style={{ ...metaValueStyle, background: '#f0fdf4', borderColor: '#bbf7d0', color: '#15803d' }}>
-                                  {entry.response_received}
-                                </div>
                               </div>
                             )}
                           </div>

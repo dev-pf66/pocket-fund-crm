@@ -1628,9 +1628,9 @@ export async function getAllOutreachLogs(filters = {}) {
   }
 
   if (filters.has_response === true) {
-    query = query.not('response_received', 'is', null).neq('response_received', '')
+    query = query.eq('status', 'replied')
   } else if (filters.has_response === false) {
-    query = query.or('response_received.is.null,response_received.eq.')
+    query = query.neq('status', 'replied')
   }
 
   if (filters.days_back) {
