@@ -37,7 +37,8 @@ function OutreachAdmin() {
   const [filters, setFilters] = useState({
     platform: '',
     days_back: '',
-    has_response: ''
+    has_response: '',
+    logged_by: ''
   })
 
   useEffect(() => {
@@ -73,8 +74,28 @@ function OutreachAdmin() {
     })
   }
 
-  const totalCount = entries.length
-  const withResponse = entries.filter(e => e.status === 'replied').length
+  // Team breakdown is always computed across everyone matching the server
+  // filters, so clicking a person card narrows the table without making the
+  // other people disappear from the panel.
+  const teamStats = (() => {
+    const byPerson = new Map()
+    for (const e of entries) {
+      const id = e.logged_by ?? 'unassigned'
+      const name = e.logged_by_person?.name || 'Unassigned'
+      if (!byPerson.has(id)) byPerson.set(id, { id, name, total: 0, replied: 0 })
+      const s = byPerson.get(id)
+      s.total += 1
+      if (e.status === 'replied') s.replied += 1
+    }
+    return Array.from(byPerson.values()).sort((a, b) => b.total - a.total)
+  })()
+
+  const visibleEntries = filters.logged_by
+    ? entries.filter(e => String(e.logged_by ?? 'unassigned') === String(filters.logged_by))
+    : entries
+
+  const totalCount = visibleEntries.length
+  const withResponse = visibleEntries.filter(e => e.status === 'replied').length
 
   async function toggleResponded(entry, e) {
     e.stopPropagation()
@@ -123,10 +144,61 @@ function OutreachAdmin() {
         </div>
       </div>
 
+      {/* By Team Member */}
+      {!loading && teamStats.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+            By Team Member
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {teamStats.map(p => {
+              const rate = p.total > 0 ? Math.round((p.replied / p.total) * 100) : 0
+              const isActive = String(filters.logged_by) === String(p.id)
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setFilters(f => ({ ...f, logged_by: isActive ? '' : String(p.id) }))}
+                  className="card"
+                  style={{
+                    padding: '12px 16px',
+                    minWidth: '170px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    border: isActive ? '2px solid #1d4ed8' : '1px solid #e5e7eb',
+                    background: isActive ? '#eff6ff' : 'white'
+                  }}
+                >
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', marginBottom: '6px' }}>
+                    {p.name}
+                  </div>
+                  <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: '#6b7280' }}>
+                    <span><strong style={{ color: '#1d4ed8' }}>{p.total}</strong> sent</span>
+                    <span><strong style={{ color: '#15803d' }}>{p.replied}</strong> replied</span>
+                    <span><strong style={{ color: '#92400e' }}>{rate}%</strong></span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="card" style={{ padding: '16px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <Filter size={16} style={{ color: '#6b7280' }} />
+
+          <select
+            value={filters.logged_by}
+            onChange={e => setFilters(f => ({ ...f, logged_by: e.target.value }))}
+            className="form-control"
+            style={{ width: 'auto', fontSize: '13px' }}
+          >
+            <option value="">All Team Members</option>
+            {teamStats.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
 
           <select
             value={filters.platform}
@@ -164,10 +236,10 @@ function OutreachAdmin() {
             <option value="no">No response</option>
           </select>
 
-          {(filters.platform || filters.days_back || filters.has_response) && (
+          {(filters.platform || filters.days_back || filters.has_response || filters.logged_by) && (
             <button
               className="btn btn-sm"
-              onClick={() => setFilters({ platform: '', days_back: '', has_response: '' })}
+              onClick={() => setFilters({ platform: '', days_back: '', has_response: '', logged_by: '' })}
             >
               Clear filters
             </button>
@@ -182,7 +254,7 @@ function OutreachAdmin() {
             <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
             Loading outreach logs…
           </div>
-        ) : entries.length === 0 ? (
+        ) : visibleEntries.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
             No outreach entries found.
           </div>
@@ -201,7 +273,7 @@ function OutreachAdmin() {
               </tr>
             </thead>
             <tbody>
-              {entries.map(entry => (
+              {visibleEntries.map(entry => (
                 <>
                   <tr
                     key={entry.id}
