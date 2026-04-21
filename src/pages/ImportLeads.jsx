@@ -128,7 +128,7 @@ function ImportLeads() {
 
     for (const lead of leads) {
       try {
-        await createLead(lead)
+        await createLead(lead, currentPerson?.id)
         results.success++
       } catch (error) {
         results.failed++

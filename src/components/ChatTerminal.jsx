@@ -142,9 +142,7 @@ Examples:
           return
         }
 
-        leadData.created_by = currentPerson?.id
-
-        const newLead = await createLead(leadData)
+        const newLead = await createLead(leadData, currentPerson?.id)
 
         setMessages(prev => [...prev, {
           type: 'success',
