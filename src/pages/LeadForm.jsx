@@ -3,6 +3,7 @@ import { createLead, updateLead, previewLinkedInEnrichment } from '../lib/crm-ap
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
 import { Sparkles } from 'lucide-react'
 
 function LeadForm({ onClose, onSave, lead = null }) {
@@ -10,7 +11,9 @@ function LeadForm({ onClose, onSave, lead = null }) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [autoFilling, setAutoFilling] = useState(false)
-  const [formData, setFormData] = useState({
+  // Only persist the new-lead draft across navigation; edit mode is seeded
+  // from the `lead` prop so persistence would desync if the lead changed.
+  const initialForm = {
     name: lead?.name || '',
     firm_name: lead?.firm_name || '',
     email: lead?.email || '',
@@ -21,7 +24,11 @@ function LeadForm({ onClose, onSave, lead = null }) {
     stage: lead?.stage || 'new_lead',
     lead_source: lead?.lead_source || '',
     notes: lead?.notes || ''
-  })
+  }
+  const [formData, setFormData, clearFormData] = useSessionState(
+    lead ? `lf:edit:${lead.id}` : 'lf:new',
+    initialForm
+  )
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -89,6 +96,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
       } else {
         await createLead(formData, currentPerson.id)
       }
+      clearFormData()
       onSave()
     } catch (error) {
       console.error('Failed to save lead:', error)

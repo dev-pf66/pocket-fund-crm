@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 import { ArrowLeft, Plus, Edit2, Trash2, Save, X } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
 
 const CATEGORIES = [
   { value: 'getting_started', label: '🚀 Getting Started' },
@@ -13,22 +14,24 @@ const CATEGORIES = [
   { value: 'analytics', label: '📊 Analytics' }
 ]
 
+const EMPTY_ARTICLE = {
+  title: '',
+  category: 'getting_started',
+  content: '',
+  order_index: 0,
+  is_published: true
+}
+
 function HelpAdmin() {
   const navigate = useNavigate()
   const { currentPerson } = useApp()
   const { toast } = useToast()
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editingArticle, setEditingArticle] = useState(null)
-  const [showForm, setShowForm] = useState(false)
+  const [editingArticle, setEditingArticle, clearEditingArticle] = useSessionState('ha:editingArticle', null)
+  const [showForm, setShowForm] = useSessionState('ha:showForm', false)
 
-  const [formData, setFormData] = useState({
-    title: '',
-    category: 'getting_started',
-    content: '',
-    order_index: 0,
-    is_published: true
-  })
+  const [formData, setFormData, clearFormData] = useSessionState('ha:formData', EMPTY_ARTICLE)
 
   useEffect(() => {
     loadArticles()
@@ -66,26 +69,14 @@ function HelpAdmin() {
 
   function handleNew() {
     setEditingArticle(null)
-    setFormData({
-      title: '',
-      category: 'getting_started',
-      content: '',
-      order_index: 0,
-      is_published: true
-    })
+    setFormData(EMPTY_ARTICLE)
     setShowForm(true)
   }
 
   function handleCancel() {
     setShowForm(false)
-    setEditingArticle(null)
-    setFormData({
-      title: '',
-      category: 'getting_started',
-      content: '',
-      order_index: 0,
-      is_published: true
-    })
+    clearEditingArticle()
+    clearFormData()
   }
 
   async function handleSave() {

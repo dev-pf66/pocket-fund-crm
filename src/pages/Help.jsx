@@ -4,6 +4,7 @@ import { Search, BookOpen, ChevronRight, ChevronDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
+import { useSessionState } from '../hooks/useSessionState'
 
 const CATEGORIES = {
   getting_started: { label: 'Getting Started', icon: '🚀', color: '#3b82f6' },
@@ -16,9 +17,9 @@ const CATEGORIES = {
 function Help() {
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [expandedArticles, setExpandedArticles] = useState({})
+  const [searchQuery, setSearchQuery] = useSessionState('help:searchQuery', '')
+  const [selectedCategory, setSelectedCategory] = useSessionState('help:selectedCategory', 'all')
+  const [expandedArticles, setExpandedArticles] = useSessionState('help:expandedArticles', {})
   const [lastUpdated, setLastUpdated] = useState(null)
 
   useEffect(() => {

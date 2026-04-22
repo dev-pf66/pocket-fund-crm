@@ -3,21 +3,19 @@ import { getEmailTemplates, createEmailTemplate, updateEmailTemplate, deleteEmai
 import { useApp } from '../App'
 import { Copy, Plus, Edit2, Trash2, Check } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
+
+const EMPTY_TEMPLATE = { name: '', subject: '', body: '', category: 'outreach' }
 
 function EmailTemplates() {
   const { currentPerson } = useApp()
   const { toast } = useToast()
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editingTemplate, setEditingTemplate] = useState(null)
-  const [showForm, setShowForm] = useState(false)
+  const [editingTemplate, setEditingTemplate, clearEditingTemplate] = useSessionState('et:editingTemplate', null)
+  const [showForm, setShowForm] = useSessionState('et:showForm', false)
   const [copiedId, setCopiedId] = useState(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    subject: '',
-    body: '',
-    category: 'outreach'
-  })
+  const [formData, setFormData, clearFormData] = useSessionState('et:formData', EMPTY_TEMPLATE)
 
   useEffect(() => {
     loadTemplates()
@@ -42,8 +40,8 @@ function EmailTemplates() {
       } else {
         await createEmailTemplate({ ...formData, created_by: currentPerson?.id })
       }
-      setFormData({ name: '', subject: '', body: '', category: 'outreach' })
-      setEditingTemplate(null)
+      clearFormData()
+      clearEditingTemplate()
       setShowForm(false)
       await loadTemplates()
     } catch (error) {
@@ -102,7 +100,7 @@ function EmailTemplates() {
           onClick={() => {
             setShowForm(true)
             setEditingTemplate(null)
-            setFormData({ name: '', subject: '', body: '', category: 'outreach' })
+            setFormData(EMPTY_TEMPLATE)
           }}
         >
           <Plus size={18} />

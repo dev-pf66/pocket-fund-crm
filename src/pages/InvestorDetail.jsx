@@ -4,6 +4,13 @@ import { getInvestorById, getInvestorInteractions, logInvestorInteraction, updat
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, Trash2, Edit2, Save, X, MessageSquare, Users, Handshake, StickyNote, Plus } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
+
+const emptyInteraction = () => ({
+  interaction_type: 'call',
+  interaction_date: new Date().toISOString().split('T')[0],
+  notes: ''
+})
 
 const INVESTOR_TYPES = [
   'Individual LP',
@@ -69,12 +76,8 @@ function InvestorDetail() {
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editedInvestor, setEditedInvestor] = useState(null)
-  const [showInteractionForm, setShowInteractionForm] = useState(false)
-  const [newInteraction, setNewInteraction] = useState({
-    interaction_type: 'call',
-    interaction_date: new Date().toISOString().split('T')[0],
-    notes: ''
-  })
+  const [showInteractionForm, setShowInteractionForm] = useSessionState(`idet:${id}:showInteractionForm`, false)
+  const [newInteraction, setNewInteraction, clearNewInteraction] = useSessionState(`idet:${id}:newInteraction`, emptyInteraction())
 
   useEffect(() => {
     loadData()
@@ -126,11 +129,7 @@ function InvestorDetail() {
   async function handleAddInteraction() {
     try {
       await logInvestorInteraction(id, newInteraction, currentPerson?.id)
-      setNewInteraction({
-        interaction_type: 'call',
-        interaction_date: new Date().toISOString().split('T')[0],
-        notes: ''
-      })
+      clearNewInteraction()
       setShowInteractionForm(false)
       await loadData()
     } catch (error) {

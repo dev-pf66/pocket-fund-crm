@@ -9,6 +9,7 @@ import {
 } from '../lib/crm-api'
 import { Target, Plus, Trash2, Edit2, Save, X, Minus } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
 
 const FREQUENCIES = [
   { value: 'daily', label: 'Daily' },
@@ -21,13 +22,13 @@ const EMPTY_DRAFT = { goal_text: '', target_count: 10, frequency: 'daily' }
 function MyGoals() {
   const { currentPerson, people } = useApp()
   const { toast } = useToast()
-  const [selectedPersonId, setSelectedPersonId] = useState(null)
+  const [selectedPersonId, setSelectedPersonId] = useSessionState('goals:selectedPersonId', null)
   const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [draft, setDraft] = useState(EMPTY_DRAFT)
-  const [editingId, setEditingId] = useState(null)
-  const [editDraft, setEditDraft] = useState(EMPTY_DRAFT)
+  const [showAddForm, setShowAddForm] = useSessionState('goals:showAddForm', false)
+  const [draft, setDraft, clearDraft] = useSessionState('goals:draft', EMPTY_DRAFT)
+  const [editingId, setEditingId, clearEditingId] = useSessionState('goals:editingId', null)
+  const [editDraft, setEditDraft] = useSessionState('goals:editDraft', EMPTY_DRAFT)
   const [savingGoal, setSavingGoal] = useState(false)
 
   useEffect(() => {
@@ -73,7 +74,7 @@ function MyGoals() {
         frequency: draft.frequency,
         goal_order: goals.length
       })
-      setDraft(EMPTY_DRAFT)
+      clearDraft()
       setShowAddForm(false)
       await loadGoals()
     } catch (err) {
@@ -108,7 +109,7 @@ function MyGoals() {
         target_count: Number(editDraft.target_count),
         frequency: editDraft.frequency
       })
-      setEditingId(null)
+      clearEditingId()
       await loadGoals()
     } catch (err) {
       console.error('Failed to update goal:', err)
@@ -223,7 +224,7 @@ function MyGoals() {
               <button className="btn btn-primary btn-sm" onClick={handleAddGoal} disabled={savingGoal}>
                 <Save size={14} /> {savingGoal ? 'Saving…' : 'Save'}
               </button>
-              <button className="btn btn-sm" onClick={() => { setShowAddForm(false); setDraft(EMPTY_DRAFT) }}>
+              <button className="btn btn-sm" onClick={() => { setShowAddForm(false); clearDraft() }}>
                 <X size={14} />
               </button>
             </div>
@@ -259,7 +260,7 @@ function MyGoals() {
                 editDraft={editDraft}
                 setEditDraft={setEditDraft}
                 onStartEdit={() => startEdit(goal)}
-                onCancelEdit={() => setEditingId(null)}
+                onCancelEdit={() => clearEditingId()}
                 onSaveEdit={() => handleSaveEdit(goal.id)}
                 onDelete={() => handleDelete(goal.id)}
                 onIncrement={(delta) => handleIncrement(goal.id, delta)}

@@ -4,6 +4,7 @@ import { getInvestors, createInvestor, updateInvestor, deleteInvestor, cachePeek
 import { useApp } from '../App'
 import { Plus, Search, Edit2, Trash2, X } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
 
 const INVESTOR_TYPES = [
   'Individual LP',
@@ -64,12 +65,12 @@ function Investors() {
   // Seed from cache so sidebar nav back to Investors renders instantly.
   const [investors, setInvestors] = useState(() => cachePeek('investors:{}') || [])
   const [loading, setLoading] = useState(() => !cachePeek('investors:{}'))
-  const [showForm, setShowForm] = useState(false)
-  const [editingInvestor, setEditingInvestor] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [formData, setFormData] = useState(EMPTY_FORM)
+  const [showForm, setShowForm] = useSessionState('inv:showForm', false)
+  const [editingInvestor, setEditingInvestor, clearEditingInvestor] = useSessionState('inv:editingInvestor', null)
+  const [searchQuery, setSearchQuery] = useSessionState('inv:searchQuery', '')
+  const [filterType, setFilterType] = useSessionState('inv:filterType', '')
+  const [filterStatus, setFilterStatus] = useSessionState('inv:filterStatus', '')
+  const [formData, setFormData, clearFormData] = useSessionState('inv:formData', EMPTY_FORM)
 
   useEffect(() => {
     loadInvestors()
@@ -148,8 +149,8 @@ function Investors() {
       }
 
       setShowForm(false)
-      setEditingInvestor(null)
-      setFormData(EMPTY_FORM)
+      clearEditingInvestor()
+      clearFormData()
       await loadInvestors()
     } catch (error) {
       console.error('Failed to save investor:', error)
@@ -159,8 +160,8 @@ function Investors() {
 
   function handleCancel() {
     setShowForm(false)
-    setEditingInvestor(null)
-    setFormData(EMPTY_FORM)
+    clearEditingInvestor()
+    clearFormData()
   }
 
   const filtered = getFilteredInvestors()

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { getAllOutreachLogs, updateOutreach } from '../lib/crm-api'
 import { Target, ChevronDown, ChevronUp, Filter, Check } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
 
 // Keys MUST match the values written by OutreachTracker's form + quick-log
 // and by markLeadReachedOut — otherwise the badge shows the raw enum and
@@ -31,10 +32,10 @@ function OutreachAdmin() {
   const { toast } = useToast()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState(null)
+  const [expandedId, setExpandedId] = useSessionState('oa:expandedId', null)
   const [togglingId, setTogglingId] = useState(null)
 
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useSessionState('oa:filters', {
     platform: '',
     days_back: '',
     has_response: '',

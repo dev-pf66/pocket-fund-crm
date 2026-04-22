@@ -3,25 +3,28 @@ import { getSampleDeals, createSampleDeal, updateSampleDeal, deleteSampleDeal } 
 import { useApp } from '../App'
 import { Plus, Edit2, Trash2, ExternalLink } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
+
+const EMPTY_DEAL = {
+  title: '',
+  description: '',
+  client_type: '',
+  deal_size_range: '',
+  industry: '',
+  what_we_did: '',
+  outcome: '',
+  timeline: '',
+  metrics: ''
+}
 
 function SampleDeals() {
   const { currentPerson } = useApp()
   const { toast } = useToast()
   const [deals, setDeals] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editingDeal, setEditingDeal] = useState(null)
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    client_type: '',
-    deal_size_range: '',
-    industry: '',
-    what_we_did: '',
-    outcome: '',
-    timeline: '',
-    metrics: ''
-  })
+  const [editingDeal, setEditingDeal, clearEditingDeal] = useSessionState('sd:editingDeal', null)
+  const [showForm, setShowForm] = useSessionState('sd:showForm', false)
+  const [formData, setFormData, clearFormData] = useSessionState('sd:formData', EMPTY_DEAL)
 
   useEffect(() => {
     loadDeals()
@@ -83,18 +86,8 @@ function SampleDeals() {
   }
 
   function resetForm() {
-    setFormData({
-      title: '',
-      description: '',
-      client_type: '',
-      deal_size_range: '',
-      industry: '',
-      what_we_did: '',
-      outcome: '',
-      timeline: '',
-      metrics: ''
-    })
-    setEditingDeal(null)
+    clearFormData()
+    clearEditingDeal()
     setShowForm(false)
   }
 

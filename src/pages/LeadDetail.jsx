@@ -4,6 +4,11 @@ import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, ge
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
+
+const today = () => new Date().toISOString().split('T')[0]
+const emptyActivity = () => ({ activity_type: 'call', notes: '', transcript: '', activity_date: today() })
+const emptyTranscript = () => ({ title: '', transcript: '', call_date: today() })
 
 // Click-to-edit field: renders value, clicks open an input, blur/Enter saves,
 // Escape cancels. For multiline, use Cmd/Ctrl+Enter to save.
@@ -141,10 +146,10 @@ function LeadDetail() {
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editedLead, setEditedLead] = useState(null)
-  const [showActivityForm, setShowActivityForm] = useState(false)
-  const [showTranscriptForm, setShowTranscriptForm] = useState(false)
-  const [newActivity, setNewActivity] = useState({ activity_type: 'call', notes: '', transcript: '', activity_date: new Date().toISOString().split('T')[0] })
-  const [newTranscript, setNewTranscript] = useState({ title: '', transcript: '', call_date: new Date().toISOString().split('T')[0] })
+  const [showActivityForm, setShowActivityForm] = useSessionState(`ld:${id}:showActivityForm`, false)
+  const [showTranscriptForm, setShowTranscriptForm] = useSessionState(`ld:${id}:showTranscriptForm`, false)
+  const [newActivity, setNewActivity, clearNewActivity] = useSessionState(`ld:${id}:newActivity`, emptyActivity())
+  const [newTranscript, setNewTranscript, clearNewTranscript] = useSessionState(`ld:${id}:newTranscript`, emptyTranscript())
   const [allTags, setAllTags] = useState([])
   const [leadTags, setLeadTags] = useState([])
   const [enriching, setEnriching] = useState(false)
@@ -261,7 +266,7 @@ function LeadDetail() {
         if (saved?.id) triggerAnalysis(saved.id, transcript)
       }
 
-      setNewActivity({ activity_type: 'call', notes: '', transcript: '', activity_date: new Date().toISOString().split('T')[0] })
+      clearNewActivity()
       setShowActivityForm(false)
       await refreshActivities()
       if (transcript?.trim()) await refreshTranscripts()
@@ -278,7 +283,7 @@ function LeadDetail() {
         ...newTranscript,
         created_by: currentPerson?.id
       })
-      setNewTranscript({ title: '', transcript: '', call_date: new Date().toISOString().split('T')[0] })
+      clearNewTranscript()
       setShowTranscriptForm(false)
       await refreshTranscripts()
 
