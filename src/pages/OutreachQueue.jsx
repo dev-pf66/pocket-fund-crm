@@ -9,6 +9,7 @@ import {
 } from '../lib/crm-api'
 import { isLinkedInUrl } from '../lib/linkedin'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
 import {
   Inbox,
   Plus,
@@ -29,7 +30,8 @@ function OutreachQueue() {
   const [leads, setLeads] = useState([])
   const [batchStats, setBatchStats] = useState({})
   const [loading, setLoading] = useState(true)
-  const [showAddModal, setShowAddModal] = useState(false)
+  // Keep the modal mounted across navigations if the user was mid-paste.
+  const [showAddModal, setShowAddModal] = useSessionState('oq:showAddModal', false)
   const [collapsed, setCollapsed] = useState({})
   const [pendingId, setPendingId] = useState(null)
 
@@ -346,8 +348,10 @@ function QueueRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
 
 function BulkAddModal({ personId, onClose, onDone }) {
   const { toast } = useToast()
-  const [label, setLabel] = useState(defaultBatchLabel())
-  const [text, setText] = useState('')
+  // Persist paste buffer + label across modal close and page navigation so
+  // a half-entered list isn't lost when the user clicks away.
+  const [label, setLabel, clearLabel] = useSessionState('oq:modal:label', defaultBatchLabel())
+  const [text, setText, clearText] = useSessionState('oq:modal:text', '')
   const [submitting, setSubmitting] = useState(false)
   const fileRef = useRef(null)
 
@@ -371,6 +375,8 @@ function BulkAddModal({ personId, onClose, onDone }) {
     setSubmitting(true)
     try {
       const result = await bulkCreateLeads(urls, label, personId)
+      clearText()
+      clearLabel()
       onDone(result)
     } catch (err) {
       console.error('Bulk add failed:', err)

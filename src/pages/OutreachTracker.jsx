@@ -4,6 +4,23 @@ import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Eye, Zap } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
+
+const EMPTY_OUTREACH = {
+  lead_id: null,
+  lead_name: '',
+  firm_name: '',
+  outreach_type: 'cold_email',
+  status: 'sent',
+  notes: '',
+  message_content: '',
+  platform_details: '',
+  fit_score: null,
+  industry: '',
+  deal_size: '',
+  location: '',
+  lead_source: ''
+}
 
 function OutreachTracker() {
   const { currentPerson } = useApp()
@@ -14,23 +31,11 @@ function OutreachTracker() {
   const [weeklyStats, setWeeklyStats] = useState([])
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
 
-  const [newOutreach, setNewOutreach] = useState({
-    lead_id: null,
-    lead_name: '',
-    firm_name: '',
-    outreach_type: 'cold_email',
-    status: 'sent',
-    notes: '',
-    message_content: '',
-    platform_details: '',
-    fit_score: null,
-    industry: '',
-    deal_size: '',
-    location: '',
-    lead_source: ''
-  })
+  // Persist in-progress form input across page navigations within the tab.
+  const [showForm, setShowForm] = useSessionState('ot:showForm', false)
+  const [newOutreach, setNewOutreach, clearNewOutreach] = useSessionState('ot:newOutreach', EMPTY_OUTREACH)
+  const [quickUrl, setQuickUrl] = useSessionState('ot:quickUrl', '')
 
   const [showCsvUpload, setShowCsvUpload] = useState(false)
   const [csvFile, setCsvFile] = useState(null)
@@ -38,8 +43,6 @@ function OutreachTracker() {
   const [selectedOutreach, setSelectedOutreach] = useState(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
 
-  // Quick-log via LinkedIn URL paste
-  const [quickUrl, setQuickUrl] = useState('')
   const [quickLogging, setQuickLogging] = useState(false)
 
   const [filter, setFilter] = useState({
@@ -150,21 +153,7 @@ function OutreachTracker() {
 
     try {
       await logOutreach(newOutreach, currentPerson?.id, currentPerson?.name)
-      setNewOutreach({
-        lead_id: null,
-        lead_name: '',
-        firm_name: '',
-        outreach_type: 'cold_email',
-        status: 'sent',
-        notes: '',
-        message_content: '',
-        platform_details: '',
-        fit_score: null,
-        industry: '',
-        deal_size: '',
-        location: '',
-        lead_source: ''
-      })
+      clearNewOutreach()
       setShowForm(false)
       await loadData()
     } catch (error) {

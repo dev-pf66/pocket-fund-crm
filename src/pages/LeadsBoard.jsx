@@ -6,6 +6,7 @@ import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
 import QuickAddCard from '../components/QuickAddCard'
 import { Plus, Search, Filter, Upload, Save, ChevronDown, X, Bookmark } from 'lucide-react'
+import { useSessionState } from '../hooks/useSessionState'
 
 const STAGES = [
   { key: 'new_lead', label: 'New Leads', color: '#a78bfa' },
@@ -84,18 +85,19 @@ function LeadsBoard() {
   const [settings, setSettings] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [draggedLead, setDraggedLead] = useState(null)
-  const [showFilters, setShowFilters] = useState(false)
+  const [showFilters, setShowFilters] = useSessionState('lb:showFilters', false)
 
-  // Filter state
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState('all')
-  const [assignmentFilter, setAssignmentFilter] = useState('all')
-  const [scoreMin, setScoreMin] = useState(0)
-  const [scoreMax, setScoreMax] = useState(100)
-  const [sourceFilter, setSourceFilter] = useState('all')
-  const [activityFilter, setActivityFilter] = useState('all')
-  const [followUpFilter, setFollowUpFilter] = useState('all')
-  const [hasLinkedin, setHasLinkedin] = useState('all')
+  // Filter state — persisted to sessionStorage so navigating away and back
+  // doesn't reset what the user is looking at.
+  const [searchQuery, setSearchQuery] = useSessionState('lb:searchQuery', '')
+  const [filterType, setFilterType] = useSessionState('lb:filterType', 'all')
+  const [assignmentFilter, setAssignmentFilter] = useSessionState('lb:assignmentFilter', 'all')
+  const [scoreMin, setScoreMin] = useSessionState('lb:scoreMin', 0)
+  const [scoreMax, setScoreMax] = useSessionState('lb:scoreMax', 100)
+  const [sourceFilter, setSourceFilter] = useSessionState('lb:sourceFilter', 'all')
+  const [activityFilter, setActivityFilter] = useSessionState('lb:activityFilter', 'all')
+  const [followUpFilter, setFollowUpFilter] = useSessionState('lb:followUpFilter', 'all')
+  const [hasLinkedin, setHasLinkedin] = useSessionState('lb:hasLinkedin', 'all')
 
   // Saved searches state
   const [savedSearches, setSavedSearches] = useState(() => loadSavedSearches())
