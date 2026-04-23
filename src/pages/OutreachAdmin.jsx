@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { getAllOutreachLogs, updateOutreach } from '../lib/crm-api'
-import { Target, ChevronDown, ChevronUp, Filter, Check } from 'lucide-react'
+import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach } from '../lib/crm-api'
+import { useApp } from '../App'
+import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 
-// Keys MUST match the values written by OutreachTracker's form + quick-log
-// and by markLeadReachedOut — otherwise the badge shows the raw enum and
-// the filter dropdown returns zero results.
+const DAILY_GOAL = 10
+const WEEKLY_GOAL = 50
+
 const PLATFORM_LABELS = {
   cold_email: 'Email',
   linkedin_message: 'LinkedIn',
@@ -16,6 +17,29 @@ const PLATFORM_LABELS = {
 }
 
 const PLATFORMS = ['cold_email', 'linkedin_message', 'phone_call', 'other']
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0]
+}
+
+// Monday-anchored week start.
+function weekStart(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  const day = d.getDay()
+  const offset = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + offset)
+  return d.toISOString().split('T')[0]
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return d.toISOString().split('T')[0]
+}
+
+function formatShort(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 function FitStars({ score }) {
   if (!score) return <span style={{ color: '#9ca3af', fontSize: '13px' }}>—</span>
@@ -28,12 +52,284 @@ function FitStars({ score }) {
   )
 }
 
+// Compute dashboard metrics from a person's daily count buckets.
+// dailyCounts: Map<dateStr, number>
+function computeMetrics(dailyCounts) {
+  const today = todayStr()
+  const todayCount = dailyCounts.get(today) || 0
+
+  // Streak: consecutive days meeting the daily goal. Include today if hit;
+  // otherwise count backward from yesterday so a mid-day lull doesn't erase
+  // the streak.
+  let streak = 0
+  let cursor = todayCount >= DAILY_GOAL ? today : addDays(today, -1)
+  while ((dailyCounts.get(cursor) || 0) >= DAILY_GOAL) {
+    streak += 1
+    cursor = addDays(cursor, -1)
+  }
+
+  // Weekly: Mon-Sun ending this week.
+  const thisWeekStart = weekStart(today)
+  let thisWeekCount = 0
+  for (let i = 0; i < 7; i += 1) {
+    thisWeekCount += dailyCounts.get(addDays(thisWeekStart, i)) || 0
+  }
+
+  // Personal bests across the loaded window.
+  let bestDay = { date: null, count: 0 }
+  const weekBuckets = new Map()
+  for (const [date, count] of dailyCounts) {
+    if (count > bestDay.count) bestDay = { date, count }
+    const ws = weekStart(date)
+    weekBuckets.set(ws, (weekBuckets.get(ws) || 0) + count)
+  }
+  let bestWeek = { start: null, count: 0 }
+  for (const [start, count] of weekBuckets) {
+    if (count > bestWeek.count) bestWeek = { start, count }
+  }
+
+  // 14-day sparkline (oldest first).
+  const sparkline = []
+  for (let i = 13; i >= 0; i -= 1) {
+    const date = addDays(today, -i)
+    sparkline.push({ date, count: dailyCounts.get(date) || 0 })
+  }
+
+  return { todayCount, streak, thisWeekCount, bestDay, bestWeek, sparkline, thisWeekStart }
+}
+
+function ProgressRing({ value, goal, size = 96, stroke = 8, color = '#2563eb' }) {
+  const pct = Math.min(1, value / goal)
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const dash = circ * pct
+  const hit = value >= goal
+  return (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
+        <circle
+          cx={size / 2} cy={size / 2} r={r}
+          fill="none"
+          stroke={hit ? '#16a34a' : color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ - dash}`}
+          style={{ transition: 'stroke-dasharray 0.4s ease' }}
+        />
+      </svg>
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center'
+      }}>
+        <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          {value}
+        </div>
+        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
+          / {goal}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Sparkline({ data, goal = DAILY_GOAL }) {
+  const max = Math.max(goal, ...data.map(d => d.count))
+  const today = todayStr()
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '60px' }}>
+      {data.map(d => {
+        const h = max > 0 ? Math.round((d.count / max) * 100) : 0
+        const hit = d.count >= goal
+        const isToday = d.date === today
+        return (
+          <div key={d.date} title={`${formatShort(d.date)}: ${d.count}`} style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
+          }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
+              <div style={{
+                width: '100%',
+                height: `${Math.max(h, 2)}%`,
+                background: hit ? '#16a34a' : (d.count > 0 ? '#93c5fd' : '#e5e7eb'),
+                borderRadius: '3px 3px 0 0',
+                outline: isToday ? '2px solid #2563eb' : 'none',
+                outlineOffset: '1px',
+                transition: 'height 0.3s ease'
+              }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function WeeklyBar({ value, goal }) {
+  const pct = Math.min(100, (value / goal) * 100)
+  const hit = value >= goal
+  return (
+    <div>
+      <div style={{
+        height: '10px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden'
+      }}>
+        <div style={{
+          width: `${pct}%`, height: '100%',
+          background: hit ? '#16a34a' : 'linear-gradient(90deg, #3b82f6, #2563eb)',
+          transition: 'width 0.4s ease'
+        }} />
+      </div>
+    </div>
+  )
+}
+
+function Nudge({ todayCount, streak, thisWeekCount, bestDay }) {
+  const remaining = DAILY_GOAL - todayCount
+  let text, tone
+  if (todayCount === 0) {
+    text = 'Log your first outreach to get on the board today.'
+    tone = 'info'
+  } else if (remaining > 0 && remaining <= 3) {
+    text = `${remaining} away from today's goal — you got this.`
+    tone = 'warn'
+  } else if (remaining > 0) {
+    text = `${remaining} more to hit today's goal.`
+    tone = 'info'
+  } else if (streak >= 3) {
+    text = `🔥 ${streak}-day streak — don't break it tomorrow.`
+    tone = 'good'
+  } else if (bestDay?.count && todayCount > bestDay.count) {
+    text = `New personal best! ${todayCount} in a single day.`
+    tone = 'good'
+  } else {
+    text = "Goal hit for today. Keep the momentum going."
+    tone = 'good'
+  }
+  const styles = {
+    good: { bg: '#f0fdf4', fg: '#166534', border: '#bbf7d0' },
+    warn: { bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },
+    info: { bg: '#eff6ff', fg: '#1e40af', border: '#bfdbfe' }
+  }[tone]
+  return (
+    <div style={{
+      padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 500,
+      background: styles.bg, color: styles.fg, border: `1px solid ${styles.border}`
+    }}>
+      {text}
+    </div>
+  )
+}
+
+function AnalystDashboard({ personName, metrics }) {
+  const { todayCount, streak, thisWeekCount, bestDay, bestWeek, sparkline } = metrics
+  return (
+    <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: '18px', flexWrap: 'wrap', gap: '10px'
+      }}>
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Today's Progress
+          </div>
+          <div style={{ fontSize: '18px', fontWeight: 600, color: '#111827', marginTop: '2px' }}>
+            {personName}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 12px', borderRadius: '999px', background: streak > 0 ? '#fff7ed' : '#f3f4f6', border: `1px solid ${streak > 0 ? '#fed7aa' : '#e5e7eb'}` }}>
+          <Flame size={16} style={{ color: streak > 0 ? '#ea580c' : '#9ca3af' }} />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: streak > 0 ? '#9a3412' : '#6b7280' }}>
+            {streak} day{streak === 1 ? '' : 's'} streak
+          </span>
+        </div>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'auto 1fr',
+        gap: '24px',
+        alignItems: 'center',
+        marginBottom: '18px'
+      }}>
+        <ProgressRing value={todayCount} goal={DAILY_GOAL} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                This Week
+              </span>
+              <span style={{ fontSize: '13px', color: '#111827', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                {thisWeekCount} <span style={{ color: '#6b7280', fontWeight: 500 }}>/ {WEEKLY_GOAL}</span>
+              </span>
+            </div>
+            <WeeklyBar value={thisWeekCount} goal={WEEKLY_GOAL} />
+          </div>
+          <Nudge todayCount={todayCount} streak={streak} thisWeekCount={thisWeekCount} bestDay={bestDay} />
+        </div>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '12px',
+        marginBottom: '16px'
+      }}>
+        <StatTile
+          icon={<Trophy size={14} />}
+          label="Personal best day"
+          value={bestDay.count || 0}
+          sub={bestDay.date ? formatShort(bestDay.date) : '—'}
+        />
+        <StatTile
+          icon={<TrendingUp size={14} />}
+          label="Personal best week"
+          value={bestWeek.count || 0}
+          sub={bestWeek.start ? `week of ${formatShort(bestWeek.start)}` : '—'}
+        />
+      </div>
+
+      <div>
+        <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+          Last 14 days
+        </div>
+        <Sparkline data={sparkline} />
+      </div>
+    </div>
+  )
+}
+
+function StatTile({ icon, label, value, sub }) {
+  return (
+    <div style={{
+      padding: '12px 14px',
+      border: '1px solid #e5e7eb',
+      borderRadius: '8px',
+      background: '#fafafa'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+        {icon}
+        {label}
+      </div>
+      <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </div>
+      <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>
+        {sub}
+      </div>
+    </div>
+  )
+}
+
 function OutreachAdmin() {
   const { toast } = useToast()
+  const { currentPerson, people } = useApp()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useSessionState('oa:expandedId', null)
   const [togglingId, setTogglingId] = useState(null)
+
+  // Lightweight stats across everyone for 90 days; drives dashboard + pills.
+  const [statsRows, setStatsRows] = useState([])
+  const [statsLoading, setStatsLoading] = useState(true)
 
   const [filters, setFilters] = useSessionState('oa:filters', {
     platform: '',
@@ -42,11 +338,25 @@ function OutreachAdmin() {
     logged_by: ''
   })
 
+  // Who the dashboard focuses on. Persisted separately so managers can
+  // inspect teammates without losing the table filter they had.
+  const [focusedPersonId, setFocusedPersonId] = useSessionState('oa:focusedPersonId', null)
+
   useEffect(() => {
-    loadData()
+    loadEntries()
   }, [filters])
 
-  async function loadData() {
+  useEffect(() => {
+    loadStats()
+  }, [])
+
+  useEffect(() => {
+    if (focusedPersonId == null && currentPerson?.id) {
+      setFocusedPersonId(String(currentPerson.id))
+    }
+  }, [currentPerson?.id])
+
+  async function loadEntries() {
     setLoading(true)
     try {
       const applied = {}
@@ -64,32 +374,59 @@ function OutreachAdmin() {
     }
   }
 
-  function toggleExpand(id) {
-    setExpandedId(prev => prev === id ? null : id)
-  }
-
-  function formatDate(dateStr) {
-    if (!dateStr) return '—'
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric'
-    })
-  }
-
-  // Team breakdown is always computed across everyone matching the server
-  // filters, so clicking a person card narrows the table without making the
-  // other people disappear from the panel.
-  const teamStats = (() => {
-    const byPerson = new Map()
-    for (const e of entries) {
-      const id = e.logged_by ?? 'unassigned'
-      const name = e.logged_by_person?.name || 'Unassigned'
-      if (!byPerson.has(id)) byPerson.set(id, { id, name, total: 0, replied: 0 })
-      const s = byPerson.get(id)
-      s.total += 1
-      if (e.status === 'replied') s.replied += 1
+  async function loadStats() {
+    setStatsLoading(true)
+    try {
+      const rows = await getOutreachStatsByPerson(90)
+      setStatsRows(rows)
+    } catch (err) {
+      console.error('Failed to load outreach stats:', err)
+    } finally {
+      setStatsLoading(false)
     }
-    return Array.from(byPerson.values()).sort((a, b) => b.total - a.total)
-  })()
+  }
+
+  // Build Map<personId, Map<date, count>> from the lightweight rows.
+  const dailyByPerson = useMemo(() => {
+    const out = new Map()
+    for (const r of statsRows) {
+      const pid = r.logged_by ?? 'unassigned'
+      if (!out.has(pid)) out.set(pid, new Map())
+      const m = out.get(pid)
+      m.set(r.outreach_date, (m.get(r.outreach_date) || 0) + 1)
+    }
+    return out
+  }, [statsRows])
+
+  const today = todayStr()
+
+  // People list for the switcher: anyone who has logged at least one
+  // outreach in the last 90 days, plus the current person even if they
+  // haven't yet (so they see a "0 today" card to kick things off).
+  const switcherPeople = useMemo(() => {
+    const ids = new Set(dailyByPerson.keys())
+    if (currentPerson?.id) ids.add(currentPerson.id)
+    const list = []
+    for (const id of ids) {
+      if (id === 'unassigned') continue
+      const person = people?.find(p => p.id === id)
+      const name = person?.name || `Person ${id}`
+      const todayCount = dailyByPerson.get(id)?.get(today) || 0
+      list.push({ id, name, todayCount })
+    }
+    return list.sort((a, b) => {
+      if (a.id === currentPerson?.id) return -1
+      if (b.id === currentPerson?.id) return 1
+      return b.todayCount - a.todayCount
+    })
+  }, [dailyByPerson, people, currentPerson?.id, today])
+
+  const focusedPerson = switcherPeople.find(p => String(p.id) === String(focusedPersonId))
+  const focusedMetrics = useMemo(() => {
+    if (!focusedPerson) return null
+    const buckets = dailyByPerson.get(focusedPerson.id) || new Map()
+    return computeMetrics(buckets)
+  }, [focusedPerson?.id, dailyByPerson])
 
   const visibleEntries = filters.logged_by
     ? entries.filter(e => String(e.logged_by ?? 'unassigned') === String(filters.logged_by))
@@ -114,6 +451,17 @@ function OutreachAdmin() {
     }
   }
 
+  function formatDate(dateStr) {
+    if (!dateStr) return '—'
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric'
+    })
+  }
+
+  function toggleExpand(id) {
+    setExpandedId(prev => prev === id ? null : id)
+  }
+
   return (
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -122,61 +470,58 @@ function OutreachAdmin() {
             <Target size={24} /> Outreach Log
           </h1>
           <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
-            All outreach activity across the team
+            Daily targets, streaks, and every outreach across the team
           </p>
         </div>
       </div>
 
-      {/* Summary Banner */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <div className="card" style={{ flex: '1', minWidth: '150px', padding: '16px', textAlign: 'center' }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: '#1d4ed8' }}>{totalCount}</div>
-          <div style={{ fontSize: '13px', color: '#6b7280' }}>Total Outreach</div>
-        </div>
-        <div className="card" style={{ flex: '1', minWidth: '150px', padding: '16px', textAlign: 'center' }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: '#15803d' }}>{withResponse}</div>
-          <div style={{ fontSize: '13px', color: '#6b7280' }}>Got Response</div>
-        </div>
-        <div className="card" style={{ flex: '1', minWidth: '150px', padding: '16px', textAlign: 'center' }}>
-          <div style={{ fontSize: '28px', fontWeight: '700', color: '#92400e' }}>
-            {totalCount > 0 ? Math.round((withResponse / totalCount) * 100) : 0}%
-          </div>
-          <div style={{ fontSize: '13px', color: '#6b7280' }}>Response Rate</div>
-        </div>
-      </div>
+      {/* Analyst dashboard */}
+      {!statsLoading && focusedPerson && focusedMetrics && (
+        <AnalystDashboard personName={focusedPerson.name} metrics={focusedMetrics} />
+      )}
 
-      {/* By Team Member */}
-      {!loading && teamStats.length > 0 && (
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-            By Team Member
+      {/* Team switcher — today-focused pills */}
+      {!statsLoading && switcherPeople.length > 0 && (
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+            Team today
           </div>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {teamStats.map(p => {
-              const rate = p.total > 0 ? Math.round((p.replied / p.total) * 100) : 0
-              const isActive = String(filters.logged_by) === String(p.id)
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {switcherPeople.map(p => {
+              const isActive = String(focusedPersonId) === String(p.id)
+              const hit = p.todayCount >= DAILY_GOAL
               return (
                 <button
                   key={p.id}
-                  onClick={() => setFilters(f => ({ ...f, logged_by: isActive ? '' : String(p.id) }))}
-                  className="card"
+                  onClick={() => setFocusedPersonId(String(p.id))}
                   style={{
-                    padding: '12px 16px',
-                    minWidth: '170px',
-                    textAlign: 'left',
+                    padding: '8px 14px',
+                    borderRadius: '999px',
+                    border: isActive ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
+                    background: isActive ? '#eff6ff' : 'white',
                     cursor: 'pointer',
-                    border: isActive ? '2px solid #1d4ed8' : '1px solid #e5e7eb',
-                    background: isActive ? '#eff6ff' : 'white'
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '13px',
+                    color: '#111827',
+                    fontWeight: 500,
+                    transition: 'border-color 0.12s, background 0.12s'
                   }}
                 >
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', marginBottom: '6px' }}>
-                    {p.name}
-                  </div>
-                  <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: '#6b7280' }}>
-                    <span><strong style={{ color: '#1d4ed8' }}>{p.total}</strong> sent</span>
-                    <span><strong style={{ color: '#15803d' }}>{p.replied}</strong> replied</span>
-                    <span><strong style={{ color: '#92400e' }}>{rate}%</strong></span>
-                  </div>
+                  <span>{p.name}</span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    background: hit ? '#dcfce7' : '#f3f4f6',
+                    color: hit ? '#15803d' : '#4b5563',
+                    fontVariantNumeric: 'tabular-nums'
+                  }}>
+                    {p.todayCount}/{DAILY_GOAL}
+                    {hit && ' ✓'}
+                  </span>
                 </button>
               )
             })}
@@ -196,7 +541,7 @@ function OutreachAdmin() {
             style={{ width: 'auto', fontSize: '13px' }}
           >
             <option value="">All Team Members</option>
-            {teamStats.map(p => (
+            {switcherPeople.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
@@ -236,6 +581,15 @@ function OutreachAdmin() {
             <option value="yes">Got response</option>
             <option value="no">No response</option>
           </select>
+
+          <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
+            <strong style={{ color: '#111827', fontWeight: 600 }}>{totalCount}</strong> shown
+            {totalCount > 0 && (
+              <> · <strong style={{ color: '#15803d', fontWeight: 600 }}>{withResponse}</strong> replied
+                ({Math.round((withResponse / totalCount) * 100)}%)
+              </>
+            )}
+          </div>
 
           {(filters.platform || filters.days_back || filters.has_response || filters.logged_by) && (
             <button

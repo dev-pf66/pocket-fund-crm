@@ -1670,6 +1670,23 @@ export async function getAllOutreachLogs(filters = {}) {
   return data || []
 }
 
+/**
+ * Lightweight per-person daily outreach records for the last N days.
+ * Used to compute today/streak/weekly/best-day dashboards without
+ * loading the full outreach rows. Returns: [{logged_by, outreach_date, status}]
+ */
+export async function getOutreachStatsByPerson(daysBack = 90) {
+  const since = new Date()
+  since.setDate(since.getDate() - daysBack)
+  const { data, error } = await supabase
+    .from('crm_outreach_log')
+    .select('logged_by, outreach_date, status')
+    .gte('outreach_date', since.toISOString().split('T')[0])
+
+  if (error) throw error
+  return data || []
+}
+
 // ============================================================================
 // GOALS SYSTEM
 // Structured goals (text + target_count + frequency) with per-period progress.
