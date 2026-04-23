@@ -5,6 +5,20 @@
 import { supabase } from './supabase'
 import { normalizeLinkedInUrl, nameFromLinkedInUrl } from './linkedin'
 
+// Fire-and-forget post to the server-side event dispatcher.
+// Never blocks the caller; errors are logged but swallowed.
+async function fireTTEvent(event_type, payload) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return
+    await fetch('/api/events/fire', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ event_type, payload })
+    })
+  } catch (e) { console.error('fireTTEvent failed', e) }
+}
+
 // ============================================================================
 // IN-MEMORY CACHE
 // ============================================================================
@@ -163,6 +177,13 @@ export async function updateLead(id, updates) {
  * Move lead to new stage
  */
 export async function moveLead(id, newStage, currentPersonId) {
+  const { data: prior } = await supabase
+    .from('crm_leads')
+    .select('stage')
+    .eq('id', id)
+    .single()
+  const oldStage = prior?.stage ?? null
+
   const { data, error } = await supabase
     .from('crm_leads')
     .update({ stage: newStage })
@@ -181,6 +202,9 @@ export async function moveLead(id, newStage, currentPersonId) {
 
   cacheClear('leads')
   cacheClear('dashboard')
+
+  fireTTEvent('lead_stage_changed', { lead: data, oldStage })
+
   return data
 }
 
@@ -1381,6 +1405,8 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
       console.error('Failed to log activity:', activityError)
     }
   }
+
+  fireTTEvent('outreach_logged', { outreach: data })
 
   return data
 }
