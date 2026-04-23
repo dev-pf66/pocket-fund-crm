@@ -22,6 +22,69 @@ const EMPTY_OUTREACH = {
   lead_source: ''
 }
 
+// RFC 4180-ish CSV parser: handles quoted fields, embedded commas, escaped
+// quotes ("") and both LF/CRLF line endings. BOM is stripped by the caller.
+function parseCsv(text) {
+  const rows = []
+  let row = []
+  let field = ''
+  let inQuotes = false
+  const pushRow = () => {
+    row.push(field)
+    field = ''
+    if (row.length > 1 || (row.length === 1 && row[0] !== '')) rows.push(row)
+    row = []
+  }
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++ }
+        else inQuotes = false
+      } else {
+        field += ch
+      }
+    } else if (ch === '"') {
+      inQuotes = true
+    } else if (ch === ',') {
+      row.push(field)
+      field = ''
+    } else if (ch === '\n' || ch === '\r') {
+      pushRow()
+      if (ch === '\r' && text[i + 1] === '\n') i++
+    } else {
+      field += ch
+    }
+  }
+  if (field !== '' || row.length > 0) pushRow()
+  return rows
+}
+
+const OUTREACH_TYPE_MAP = {
+  cold_email: 'cold_email', email: 'cold_email', cold: 'cold_email',
+  linkedin_message: 'linkedin_message', linkedin: 'linkedin_message',
+  linkedin_dm: 'linkedin_message', dm: 'linkedin_message',
+  phone_call: 'phone_call', phone: 'phone_call', call: 'phone_call',
+  other: 'other'
+}
+
+function normalizeOutreachType(value) {
+  const key = value.toLowerCase().trim().replace(/[-\s]+/g, '_')
+  return OUTREACH_TYPE_MAP[key] || 'other'
+}
+
+const STATUS_MAP = {
+  sent: 'sent',
+  replied: 'replied', reply: 'replied', responded: 'replied', response: 'replied',
+  no_response: 'no_response', no_reply: 'no_response', none: 'no_response',
+  bounced: 'bounced', bounce: 'bounced'
+}
+
+function normalizeStatus(value) {
+  const key = value.toLowerCase().trim().replace(/[-\s]+/g, '_')
+  return STATUS_MAP[key] || 'sent'
+}
+
 function OutreachTracker() {
   const { currentPerson } = useApp()
   const { toast } = useToast()
@@ -171,27 +234,37 @@ function OutreachTracker() {
 
     setCsvUploading(true)
     try {
-      const text = await csvFile.text()
-      const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()))
-      const headers = rows[0].map(h => h.toLowerCase())
+      const text = (await csvFile.text()).replace(/^\uFEFF/, '')
+      const rows = parseCsv(text)
+      if (rows.length < 2) {
+        toast.warn('CSV has no data rows')
+        return
+      }
+      const headers = rows[0].map(h => h.toLowerCase().trim())
 
       let imported = 0
+      const errors = []
       for (let i = 1; i < rows.length; i++) {
-        if (rows[i].length < 2 || !rows[i][0]) continue // Skip empty rows
+        if (rows[i].length < 2 || !rows[i][0]?.trim()) continue // Skip empty rows
 
         const outreach = {}
         headers.forEach((header, idx) => {
-          const value = rows[i][idx]
+          const raw = rows[i][idx]
+          if (raw == null) return
+          const value = raw.trim()
           if (!value) return
 
           // Map CSV columns to fields
           if (header.includes('lead') && header.includes('name')) outreach.lead_name = value
           else if (header.includes('firm') || header.includes('company')) outreach.firm_name = value
-          else if (header.includes('type')) outreach.outreach_type = value.toLowerCase().replace(' ', '_')
-          else if (header.includes('status')) outreach.status = value.toLowerCase()
+          else if (header.includes('type')) outreach.outreach_type = normalizeOutreachType(value)
+          else if (header.includes('status')) outreach.status = normalizeStatus(value)
           else if (header.includes('message') || header.includes('content')) outreach.message_content = value
           else if (header.includes('platform') || header.includes('where')) outreach.platform_details = value
-          else if (header.includes('fit') || header.includes('score')) outreach.fit_score = parseInt(value)
+          else if (header.includes('fit') || header.includes('score')) {
+            const parsed = parseInt(value, 10)
+            if (!Number.isNaN(parsed)) outreach.fit_score = parsed
+          }
           else if (header.includes('industry')) outreach.industry = value
           else if (header.includes('deal') && header.includes('size')) outreach.deal_size = value
           else if (header.includes('location')) outreach.location = value
@@ -204,11 +277,21 @@ function OutreachTracker() {
         if (!outreach.outreach_type) outreach.outreach_type = 'cold_email'
         if (!outreach.status) outreach.status = 'sent'
 
-        await logOutreach(outreach, currentPerson?.id, currentPerson?.name)
-        imported++
+        try {
+          await logOutreach(outreach, currentPerson?.id, currentPerson?.name)
+          imported++
+        } catch (rowError) {
+          errors.push(`Row ${i + 1}: ${rowError.message}`)
+        }
       }
 
-      toast.success(`Successfully imported ${imported} outreaches!`)
+      if (errors.length && imported === 0) {
+        toast.error(`CSV import failed. ${errors[0]}`)
+      } else if (errors.length) {
+        toast.warn(`Imported ${imported}; ${errors.length} row(s) failed. First error — ${errors[0]}`)
+      } else {
+        toast.success(`Successfully imported ${imported} outreaches!`)
+      }
       setCsvFile(null)
       setShowCsvUpload(false)
       await loadData()
