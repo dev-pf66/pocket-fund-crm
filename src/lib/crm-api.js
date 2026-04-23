@@ -1680,7 +1680,7 @@ export async function getOutreachStatsByPerson(daysBack = 90) {
   since.setDate(since.getDate() - daysBack)
   const { data, error } = await supabase
     .from('crm_outreach_log')
-    .select('logged_by, outreach_date, status')
+    .select('logged_by, outreach_date, status, outreach_type')
     .gte('outreach_date', since.toISOString().split('T')[0])
 
   if (error) throw error

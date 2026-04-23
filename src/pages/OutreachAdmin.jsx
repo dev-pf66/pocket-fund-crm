@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach } from '../lib/crm-api'
 import { useApp } from '../App'
-import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp } from 'lucide-react'
+import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2 } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 
@@ -88,14 +88,7 @@ function computeMetrics(dailyCounts) {
     if (count > bestWeek.count) bestWeek = { start, count }
   }
 
-  // 14-day sparkline (oldest first).
-  const sparkline = []
-  for (let i = 13; i >= 0; i -= 1) {
-    const date = addDays(today, -i)
-    sparkline.push({ date, count: dailyCounts.get(date) || 0 })
-  }
-
-  return { todayCount, streak, thisWeekCount, bestDay, bestWeek, sparkline, thisWeekStart }
+  return { todayCount, streak, thisWeekCount, bestDay, bestWeek, thisWeekStart }
 }
 
 function ProgressRing({ value, goal, size = 96, stroke = 8, color = '#2563eb' }) {
@@ -133,30 +126,186 @@ function ProgressRing({ value, goal, size = 96, stroke = 8, color = '#2563eb' })
   )
 }
 
-function Sparkline({ data, goal = DAILY_GOAL }) {
-  const max = Math.max(goal, ...data.map(d => d.count))
+// Daily bar chart with goal reference line, axis labels, hover values,
+// and an optional details panel showing per-platform breakdown.
+function DailyChart({ rows, days, goal = DAILY_GOAL, showDetails }) {
   const today = todayStr()
+  // Build per-day totals and platform breakdown from the raw rows so the
+  // chart can be reused for any time window without re-fetching.
+  const byDate = useMemo(() => {
+    const m = new Map()
+    for (const r of rows) {
+      if (!m.has(r.outreach_date)) m.set(r.outreach_date, { total: 0, replied: 0, types: {} })
+      const s = m.get(r.outreach_date)
+      s.total += 1
+      if (r.status === 'replied') s.replied += 1
+      const t = r.outreach_type || 'other'
+      s.types[t] = (s.types[t] || 0) + 1
+    }
+    return m
+  }, [rows])
+
+  const data = useMemo(() => {
+    const out = []
+    for (let i = days - 1; i >= 0; i -= 1) {
+      const date = addDays(today, -i)
+      const s = byDate.get(date) || { total: 0, replied: 0, types: {} }
+      out.push({ date, ...s })
+    }
+    return out
+  }, [byDate, days, today])
+
+  // Chart dims — responsive width via SVG viewBox; fixed pixel height.
+  const height = 180
+  const padTop = 12
+  const padBottom = 28
+  const chartH = height - padTop - padBottom
+  const max = Math.max(goal + 2, ...data.map(d => d.total))
+  const barGap = 6
+  const colWidth = 100 / data.length // pct
+  const barWidthPct = colWidth - (barGap / 6) // visual gap between bars
+
+  const goalY = padTop + chartH - (goal / max) * chartH
+
+  // Details breakdown across the full range.
+  const breakdown = useMemo(() => {
+    const summary = { total: 0, replied: 0, types: {} }
+    for (const d of data) {
+      summary.total += d.total
+      summary.replied += d.replied
+      for (const [t, c] of Object.entries(d.types)) {
+        summary.types[t] = (summary.types[t] || 0) + c
+      }
+    }
+    const nonEmptyDays = data.filter(d => d.total > 0).length
+    const avg = nonEmptyDays > 0 ? (summary.total / nonEmptyDays).toFixed(1) : '0'
+    const hitDays = data.filter(d => d.total >= goal).length
+    return { ...summary, avg, hitDays, rangeDays: data.length, nonEmptyDays }
+  }, [data, goal])
+
+  // Axis label density — show every day for <=14 days, every other otherwise.
+  const labelEvery = days <= 14 ? 1 : days <= 30 ? 3 : 7
+
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '60px' }}>
-      {data.map(d => {
-        const h = max > 0 ? Math.round((d.count / max) * 100) : 0
-        const hit = d.count >= goal
-        const isToday = d.date === today
-        return (
-          <div key={d.date} title={`${formatShort(d.date)}: ${d.count}`} style={{
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
-          }}>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
-              <div style={{
-                width: '100%',
-                height: `${Math.max(h, 2)}%`,
-                background: hit ? '#16a34a' : (d.count > 0 ? '#93c5fd' : '#e5e7eb'),
-                borderRadius: '3px 3px 0 0',
-                outline: isToday ? '2px solid #2563eb' : 'none',
-                outlineOffset: '1px',
-                transition: 'height 0.3s ease'
-              }} />
+    <div>
+      <svg width="100%" height={height} style={{ display: 'block', overflow: 'visible' }} viewBox={`0 0 100 ${height}`} preserveAspectRatio="none">
+        {/* Goal reference line */}
+        <line x1="0" x2="100" y1={goalY} y2={goalY} stroke="#d1d5db" strokeDasharray="2 2" strokeWidth="0.25" vectorEffect="non-scaling-stroke" />
+
+        {data.map((d, i) => {
+          const h = max > 0 ? (d.total / max) * chartH : 0
+          const y = padTop + chartH - h
+          const x = i * colWidth + barGap / 12
+          const hit = d.total >= goal
+          const isToday = d.date === today
+          const w = barWidthPct
+          return (
+            <g key={d.date}>
+              <rect
+                x={x}
+                y={y}
+                width={w}
+                height={Math.max(h, 0.5)}
+                fill={hit ? '#16a34a' : (d.total > 0 ? '#60a5fa' : '#e5e7eb')}
+                rx="0.6"
+                stroke={isToday ? '#1d4ed8' : 'none'}
+                strokeWidth={isToday ? '0.6' : '0'}
+                vectorEffect="non-scaling-stroke"
+              >
+                <title>{`${formatShort(d.date)}: ${d.total} sent, ${d.replied} replied`}</title>
+              </rect>
+            </g>
+          )
+        })}
+      </svg>
+
+      {/* HTML overlay for count labels + x-axis so text stays crisp */}
+      <div style={{ position: 'relative', marginTop: '-26px', height: '22px' }}>
+        <div style={{ display: 'flex', width: '100%' }}>
+          {data.map((d, i) => {
+            const show = (data.length - 1 - i) % labelEvery === 0 || i === data.length - 1
+            const isToday = d.date === today
+            return (
+              <div key={d.date} style={{
+                flex: 1, textAlign: 'center', fontSize: '10px',
+                color: isToday ? '#1d4ed8' : '#6b7280',
+                fontWeight: isToday ? 600 : 400,
+                fontVariantNumeric: 'tabular-nums',
+                visibility: show ? 'visible' : 'hidden'
+              }}>
+                {formatShort(d.date)}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {showDetails && (
+        <div style={{
+          marginTop: '14px', padding: '14px',
+          background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px'
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+            <BreakdownStat label="Sent in range" value={breakdown.total} />
+            <BreakdownStat
+              label="Replied"
+              value={breakdown.replied}
+              sub={breakdown.total > 0 ? `${Math.round((breakdown.replied / breakdown.total) * 100)}% response` : '—'}
+            />
+            <BreakdownStat label="Avg per active day" value={breakdown.avg} />
+            <BreakdownStat
+              label="Goal hits"
+              value={breakdown.hitDays}
+              sub={`of ${breakdown.rangeDays} days`}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+              Platform split
             </div>
+            <PlatformBars types={breakdown.types} total={breakdown.total} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BreakdownStat({ label, value, sub }) {
+  return (
+    <div>
+      <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: '#111827', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+          {sub}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PlatformBars({ types, total }) {
+  const platforms = ['cold_email', 'linkedin_message', 'phone_call', 'other']
+  const colors = { cold_email: '#3b82f6', linkedin_message: '#0ea5e9', phone_call: '#8b5cf6', other: '#9ca3af' }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {platforms.map(p => {
+        const count = types[p] || 0
+        const pct = total > 0 ? Math.round((count / total) * 100) : 0
+        return (
+          <div key={p} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 60px', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '12px', color: '#374151' }}>{PLATFORM_LABELS[p]}</span>
+            <div style={{ height: '8px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden' }}>
+              <div style={{ width: `${pct}%`, height: '100%', background: colors[p], transition: 'width 0.3s ease' }} />
+            </div>
+            <span style={{ fontSize: '12px', color: '#6b7280', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+              {count} <span style={{ color: '#9ca3af' }}>({pct}%)</span>
+            </span>
           </div>
         )
       })}
@@ -219,8 +368,8 @@ function Nudge({ todayCount, streak, thisWeekCount, bestDay }) {
   )
 }
 
-function AnalystDashboard({ personName, metrics }) {
-  const { todayCount, streak, thisWeekCount, bestDay, bestWeek, sparkline } = metrics
+function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartRangeChange, showChartDetails, onToggleChartDetails }) {
+  const { todayCount, streak, thisWeekCount, bestDay, bestWeek } = metrics
   return (
     <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
       <div style={{
@@ -288,10 +437,64 @@ function AnalystDashboard({ personName, metrics }) {
       </div>
 
       <div>
-        <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-          Last 14 days
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: '10px', flexWrap: 'wrap', gap: '8px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BarChart2 size={14} style={{ color: '#6b7280' }} />
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Daily outreach · last {chartRange} days
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              display: 'inline-flex',
+              border: '1px solid #e5e7eb',
+              borderRadius: '999px',
+              overflow: 'hidden',
+              background: 'white'
+            }}>
+              {[7, 14, 30].map(n => {
+                const active = chartRange === n
+                return (
+                  <button
+                    key={n}
+                    onClick={() => onChartRangeChange(n)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '12px',
+                      fontWeight: active ? 600 : 500,
+                      color: active ? '#1d4ed8' : '#6b7280',
+                      background: active ? '#eff6ff' : 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}
+                  >
+                    {n}d
+                  </button>
+                )
+              })}
+            </div>
+            <button
+              onClick={onToggleChartDetails}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: showChartDetails ? '#1d4ed8' : '#6b7280',
+                background: showChartDetails ? '#eff6ff' : 'white',
+                border: `1px solid ${showChartDetails ? '#bfdbfe' : '#e5e7eb'}`,
+                borderRadius: '999px',
+                cursor: 'pointer'
+              }}
+            >
+              {showChartDetails ? 'Hide details' : 'Show details'}
+            </button>
+          </div>
         </div>
-        <Sparkline data={sparkline} />
+        <DailyChart rows={chartRows} days={chartRange} showDetails={showChartDetails} />
       </div>
     </div>
   )
@@ -341,6 +544,9 @@ function OutreachAdmin() {
   // Who the dashboard focuses on. Persisted separately so managers can
   // inspect teammates without losing the table filter they had.
   const [focusedPersonId, setFocusedPersonId] = useSessionState('oa:focusedPersonId', null)
+
+  const [chartRange, setChartRange] = useSessionState('oa:chartRange', 14)
+  const [showChartDetails, setShowChartDetails] = useSessionState('oa:chartDetails', false)
 
   useEffect(() => {
     loadEntries()
@@ -428,6 +634,11 @@ function OutreachAdmin() {
     return computeMetrics(buckets)
   }, [focusedPerson?.id, dailyByPerson])
 
+  const focusedChartRows = useMemo(() => {
+    if (!focusedPerson) return []
+    return statsRows.filter(r => r.logged_by === focusedPerson.id)
+  }, [statsRows, focusedPerson?.id])
+
   const visibleEntries = filters.logged_by
     ? entries.filter(e => String(e.logged_by ?? 'unassigned') === String(filters.logged_by))
     : entries
@@ -477,7 +688,15 @@ function OutreachAdmin() {
 
       {/* Analyst dashboard */}
       {!statsLoading && focusedPerson && focusedMetrics && (
-        <AnalystDashboard personName={focusedPerson.name} metrics={focusedMetrics} />
+        <AnalystDashboard
+          personName={focusedPerson.name}
+          metrics={focusedMetrics}
+          chartRows={focusedChartRows}
+          chartRange={chartRange}
+          onChartRangeChange={setChartRange}
+          showChartDetails={showChartDetails}
+          onToggleChartDetails={() => setShowChartDetails(v => !v)}
+        />
       )}
 
       {/* Team switcher — today-focused pills */}
