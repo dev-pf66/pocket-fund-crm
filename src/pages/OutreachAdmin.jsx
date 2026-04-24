@@ -5,9 +5,7 @@ import { useApp } from '../App'
 import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2 } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
-import { useWindowWidth } from '../hooks/useWindowWidth'
-
-const MOBILE_BREAKPOINT = 1024
+import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 
 const DAILY_GOAL = 10
 const WEEKLY_GOAL = 50
@@ -653,8 +651,7 @@ function OutreachAdmin() {
   const { toast } = useToast()
   const { currentPerson, people } = useApp()
   const navigate = useNavigate()
-  const width = useWindowWidth()
-  const isMobile = width < MOBILE_BREAKPOINT
+  const isMobile = useIsMobileDevice()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useSessionState('oa:expandedId', null)
