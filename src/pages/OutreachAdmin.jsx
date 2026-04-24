@@ -7,7 +7,7 @@ import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useWindowWidth } from '../hooks/useWindowWidth'
 
-const MOBILE_BREAKPOINT = 640
+const MOBILE_BREAKPOINT = 1024
 
 const DAILY_GOAL = 10
 const WEEKLY_GOAL = 50
