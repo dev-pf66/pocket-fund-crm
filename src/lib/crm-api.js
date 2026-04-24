@@ -1547,6 +1547,57 @@ export async function getOutreachStreak() {
 }
 
 /**
+ * Per-person dashboard stats for the Outreach Tracker header. Legacy RPCs
+ * (get_todays_outreach_count / get_outreach_streak / get_daily_outreach_stats)
+ * are team-wide, so every user saw the same numbers — this replaces them
+ * with a single per-person query that computes the same three shapes
+ * client-side.
+ */
+export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGoal = 10, weekDays = 7 } = {}) {
+  if (!personId) return { todayCount: 0, streak: 0, dailyStats: [] }
+
+  const since = new Date()
+  since.setDate(since.getDate() - daysBack)
+  const { data, error } = await supabase
+    .from('crm_outreach_log')
+    .select('outreach_date')
+    .eq('logged_by', personId)
+    .gte('outreach_date', since.toISOString().split('T')[0])
+  if (error) throw error
+
+  const today = new Date().toISOString().split('T')[0]
+  const byDate = new Map()
+  for (const r of data || []) {
+    byDate.set(r.outreach_date, (byDate.get(r.outreach_date) || 0) + 1)
+  }
+
+  const todayCount = byDate.get(today) || 0
+
+  // Streak: consecutive days hitting the goal. Include today if hit;
+  // otherwise start from yesterday so a mid-day lull doesn't reset it.
+  const addDays = (dateStr, n) => {
+    const d = new Date(dateStr + 'T00:00:00')
+    d.setDate(d.getDate() + n)
+    return d.toISOString().split('T')[0]
+  }
+  let streak = 0
+  let cursor = todayCount >= dailyGoal ? today : addDays(today, -1)
+  while ((byDate.get(cursor) || 0) >= dailyGoal) {
+    streak += 1
+    cursor = addDays(cursor, -1)
+  }
+
+  const dailyStats = []
+  for (let i = 0; i < weekDays; i += 1) {
+    const date = addDays(today, -i)
+    const count = byDate.get(date) || 0
+    dailyStats.push({ date, total_outreaches: count, goal_met: count >= dailyGoal })
+  }
+
+  return { todayCount, streak, dailyStats }
+}
+
+/**
  * Get outreach summary for today
  */
 export async function getTodaysOutreachSummary() {

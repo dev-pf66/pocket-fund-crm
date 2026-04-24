@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getTodaysOutreachCount, getDailyOutreachStats, getOutreachStreak, getLeads, createLead, findLeadByLinkedInUrl } from '../lib/crm-api'
+import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Eye, Zap } from 'lucide-react'
@@ -54,21 +54,20 @@ function OutreachTracker() {
 
   useEffect(() => {
     loadData()
-  }, [filter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, currentPerson?.id])
 
   async function loadData() {
     setLoading(true)
     try {
-      const [count, streakData, stats, leadsData] = await Promise.all([
-        getTodaysOutreachCount(),
-        getOutreachStreak(),
-        getDailyOutreachStats(7),
+      const [dashStats, leadsData] = await Promise.all([
+        getPersonDashboardStats(currentPerson?.id, { weekDays: 7, daysBack: 30 }),
         getLeads({ stage: 'cold_outreach' })
       ])
 
-      setTodayCount(count)
-      setStreak(streakData)
-      setWeeklyStats(stats)
+      setTodayCount(dashStats.todayCount)
+      setStreak(dashStats.streak)
+      setWeeklyStats(dashStats.dailyStats)
       setLeads(leadsData)
 
       // Get outreaches based on filter
