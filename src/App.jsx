@@ -16,19 +16,42 @@ import LeadDetail from './pages/LeadDetail'
 import Investors from './pages/Investors'
 import InvestorDetail from './pages/InvestorDetail'
 
+// After a deploy, users with a cached index.html reference chunk filenames
+// that no longer exist on the CDN. Detect that failure mode and reload once
+// to pick up the fresh index.html + chunk hashes. The sessionStorage flag
+// prevents an infinite reload loop if the error is genuinely something else.
+function lazyWithRetry(importer) {
+  return lazy(async () => {
+    try {
+      const mod = await importer()
+      sessionStorage.removeItem('chunk-reload-attempted')
+      return mod
+    } catch (err) {
+      const msg = String(err?.message || err || '')
+      const isChunkLoadError = /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError/i.test(msg)
+      if (isChunkLoadError && !sessionStorage.getItem('chunk-reload-attempted')) {
+        sessionStorage.setItem('chunk-reload-attempted', '1')
+        window.location.reload()
+        return { default: () => null }
+      }
+      throw err
+    }
+  })
+}
+
 // Lazy-loaded — less frequently visited pages
-const EmailTemplates = lazy(() => import('./pages/EmailTemplates'))
-const SampleDeals = lazy(() => import('./pages/SampleDeals'))
-const ImportLeads = lazy(() => import('./pages/ImportLeads'))
-const Analytics = lazy(() => import('./pages/Analytics'))
-const OutreachTracker = lazy(() => import('./pages/OutreachTracker'))
-const OutreachAdmin = lazy(() => import('./pages/OutreachAdmin'))
-const OutreachQueue = lazy(() => import('./pages/OutreachQueue'))
-const MyGoals = lazy(() => import('./pages/MyGoals'))
-const Admin = lazy(() => import('./pages/Admin'))
-const Help = lazy(() => import('./pages/Help'))
-const HelpAdmin = lazy(() => import('./pages/HelpAdmin'))
-const ChatTerminal = lazy(() => import('./components/ChatTerminal'))
+const EmailTemplates = lazyWithRetry(() => import('./pages/EmailTemplates'))
+const SampleDeals = lazyWithRetry(() => import('./pages/SampleDeals'))
+const ImportLeads = lazyWithRetry(() => import('./pages/ImportLeads'))
+const Analytics = lazyWithRetry(() => import('./pages/Analytics'))
+const OutreachTracker = lazyWithRetry(() => import('./pages/OutreachTracker'))
+const OutreachAdmin = lazyWithRetry(() => import('./pages/OutreachAdmin'))
+const OutreachQueue = lazyWithRetry(() => import('./pages/OutreachQueue'))
+const MyGoals = lazyWithRetry(() => import('./pages/MyGoals'))
+const Admin = lazyWithRetry(() => import('./pages/Admin'))
+const Help = lazyWithRetry(() => import('./pages/Help'))
+const HelpAdmin = lazyWithRetry(() => import('./pages/HelpAdmin'))
+const ChatTerminal = lazyWithRetry(() => import('./components/ChatTerminal'))
 
 export const AppContext = createContext()
 
