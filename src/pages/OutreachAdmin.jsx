@@ -664,7 +664,7 @@ function StatTile({ icon, label, value, sub }) {
 
 function OutreachAdmin() {
   const { toast } = useToast()
-  const { currentPerson, people } = useApp()
+  const { currentPerson } = useApp()
   const navigate = useNavigate()
   const isMobile = useIsMobileDevice()
   const [entries, setEntries] = useState([])
@@ -684,35 +684,25 @@ function OutreachAdmin() {
   const [filters, setFilters] = useSessionState('oa:filters', {
     platform: '',
     days_back: '',
-    has_response: '',
-    logged_by: ''
+    has_response: ''
   })
-
-  // Who the dashboard focuses on. Persisted separately so managers can
-  // inspect teammates without losing the table filter they had.
-  const [focusedPersonId, setFocusedPersonId] = useSessionState('oa:focusedPersonId', null)
 
   const [chartRange, setChartRange] = useSessionState('oa:chartRange', 14)
   const [showChartDetails, setShowChartDetails] = useSessionState('oa:chartDetails', false)
 
   useEffect(() => {
     loadEntries()
-  }, [filters])
+  }, [filters, currentPerson?.id])
 
   useEffect(() => {
     loadStats()
-  }, [])
-
-  useEffect(() => {
-    if (focusedPersonId == null && currentPerson?.id) {
-      setFocusedPersonId(String(currentPerson.id))
-    }
   }, [currentPerson?.id])
 
   async function loadEntries() {
+    if (!currentPerson?.id) return
     setLoading(true)
     try {
-      const applied = {}
+      const applied = { logged_by: currentPerson.id }
       if (filters.platform) applied.platform = filters.platform
       if (filters.days_back) applied.days_back = parseInt(filters.days_back)
       if (filters.has_response === 'yes') applied.has_response = true
@@ -728,9 +718,10 @@ function OutreachAdmin() {
   }
 
   async function loadStats() {
+    if (!currentPerson?.id) return
     setStatsLoading(true)
     try {
-      const rows = await getOutreachStatsByPerson(90)
+      const rows = await getOutreachStatsByPerson(90, currentPerson.id)
       setStatsRows(rows)
     } catch (err) {
       console.error('Failed to load outreach stats:', err)
@@ -739,57 +730,22 @@ function OutreachAdmin() {
     }
   }
 
-  // Build Map<personId, Map<date, count>> from the lightweight rows.
-  const dailyByPerson = useMemo(() => {
-    const out = new Map()
+  // Per-user: stats rows only contain the current person's entries, so the
+  // dashboard metrics reflect them directly.
+  const dailyBuckets = useMemo(() => {
+    const m = new Map()
     for (const r of statsRows) {
-      const pid = r.logged_by ?? 'unassigned'
-      if (!out.has(pid)) out.set(pid, new Map())
-      const m = out.get(pid)
       m.set(r.outreach_date, (m.get(r.outreach_date) || 0) + 1)
     }
-    return out
+    return m
   }, [statsRows])
 
-  const today = todayStr()
-
-  // People list for the switcher: anyone who has logged at least one
-  // outreach in the last 90 days, plus the current person even if they
-  // haven't yet (so they see a "0 today" card to kick things off).
-  const switcherPeople = useMemo(() => {
-    const ids = new Set(dailyByPerson.keys())
-    if (currentPerson?.id) ids.add(currentPerson.id)
-    const list = []
-    for (const id of ids) {
-      if (id === 'unassigned') continue
-      const person = people?.find(p => p.id === id)
-      const name = person?.name || `Person ${id}`
-      const todayCount = dailyByPerson.get(id)?.get(today) || 0
-      list.push({ id, name, todayCount })
-    }
-    return list.sort((a, b) => {
-      if (a.id === currentPerson?.id) return -1
-      if (b.id === currentPerson?.id) return 1
-      return b.todayCount - a.todayCount
-    })
-  }, [dailyByPerson, people, currentPerson?.id, today])
-
-  const focusedPerson = switcherPeople.find(p => String(p.id) === String(focusedPersonId))
   const focusedMetrics = useMemo(() => {
-    if (!focusedPerson) return null
-    const buckets = dailyByPerson.get(focusedPerson.id) || new Map()
-    return computeMetrics(buckets)
-  }, [focusedPerson?.id, dailyByPerson])
+    if (!currentPerson?.id) return null
+    return computeMetrics(dailyBuckets)
+  }, [currentPerson?.id, dailyBuckets])
 
-  const focusedChartRows = useMemo(() => {
-    if (!focusedPerson) return []
-    return statsRows.filter(r => r.logged_by === focusedPerson.id)
-  }, [statsRows, focusedPerson?.id])
-
-  const visibleEntries = filters.logged_by
-    ? entries.filter(e => String(e.logged_by ?? 'unassigned') === String(filters.logged_by))
-    : entries
-
+  const visibleEntries = entries
   const totalCount = visibleEntries.length
   const withResponse = visibleEntries.filter(e => e.status === 'replied').length
 
@@ -854,17 +810,17 @@ function OutreachAdmin() {
             <Target size={24} /> Outreach Log
           </h1>
           <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
-            Daily targets, streaks, and every outreach across the team
+            Your daily targets, streaks, and outreach history
           </p>
         </div>
       </div>
 
-      {/* Analyst dashboard */}
-      {!statsLoading && focusedPerson && focusedMetrics && (
+      {/* Personal dashboard */}
+      {!statsLoading && currentPerson && focusedMetrics && (
         <AnalystDashboard
-          personName={focusedPerson.name}
+          personName={currentPerson.name}
           metrics={focusedMetrics}
-          chartRows={focusedChartRows}
+          chartRows={statsRows}
           chartRange={chartRange}
           onChartRangeChange={setChartRange}
           showChartDetails={showChartDetails}
@@ -872,71 +828,10 @@ function OutreachAdmin() {
         />
       )}
 
-      {/* Team switcher — today-focused pills */}
-      {!statsLoading && switcherPeople.length > 0 && (
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-            Team today
-          </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {switcherPeople.map(p => {
-              const isActive = String(focusedPersonId) === String(p.id)
-              const hit = p.todayCount >= DAILY_GOAL
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setFocusedPersonId(String(p.id))}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '999px',
-                    border: isActive ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
-                    background: isActive ? '#eff6ff' : 'white',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '13px',
-                    color: '#111827',
-                    fontWeight: 500,
-                    transition: 'border-color 0.12s, background 0.12s'
-                  }}
-                >
-                  <span>{p.name}</span>
-                  <span style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    padding: '2px 8px',
-                    borderRadius: '999px',
-                    background: hit ? '#dcfce7' : '#f3f4f6',
-                    color: hit ? '#15803d' : '#4b5563',
-                    fontVariantNumeric: 'tabular-nums'
-                  }}>
-                    {p.todayCount}/{DAILY_GOAL}
-                    {hit && ' ✓'}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="card" style={{ padding: '16px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <Filter size={16} style={{ color: '#6b7280' }} />
-
-          <select
-            value={filters.logged_by}
-            onChange={e => setFilters(f => ({ ...f, logged_by: e.target.value }))}
-            className="form-control"
-            style={{ width: 'auto', fontSize: '13px' }}
-          >
-            <option value="">All Team Members</option>
-            {switcherPeople.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
 
           <select
             value={filters.platform}
@@ -983,10 +878,10 @@ function OutreachAdmin() {
             )}
           </div>
 
-          {(filters.platform || filters.days_back || filters.has_response || filters.logged_by) && (
+          {(filters.platform || filters.days_back || filters.has_response) && (
             <button
               className="btn btn-sm"
-              onClick={() => setFilters({ platform: '', days_back: '', has_response: '', logged_by: '' })}
+              onClick={() => setFilters({ platform: '', days_back: '', has_response: '' })}
             >
               Clear filters
             </button>

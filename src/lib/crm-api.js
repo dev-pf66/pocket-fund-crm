@@ -59,10 +59,12 @@ export function cachePeek(key, ttlMs = 5 * 60 * 1000) {
 // ============================================================================
 
 /**
- * Get all leads with optional filters
+ * Get leads with optional filters. When personId is provided, restricts
+ * results to leads the person created OR is assigned to, so each user
+ * only sees their own book.
  */
-export async function getLeads(filters = {}) {
-  const cacheKey = 'leads:' + JSON.stringify(filters)
+export async function getLeads(filters = {}, personId = null) {
+  const cacheKey = 'leads:' + (personId ?? 'all') + ':' + JSON.stringify(filters)
   const cached = cacheGet(cacheKey, 15000) // 15s TTL
   if (cached) return cached
 
@@ -74,6 +76,7 @@ export async function getLeads(filters = {}) {
   if (filters.stage) query = query.eq('stage', filters.stage)
   if (filters.lead_type) query = query.eq('lead_type', filters.lead_type)
   if (filters.needs_sample_deals !== undefined) query = query.eq('needs_sample_deals', filters.needs_sample_deals)
+  if (personId) query = query.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
 
   const { data, error } = await query
   if (error) throw error
@@ -474,9 +477,9 @@ export async function updateCRMSettings(updates) {
 /**
  * Get stale leads (exceeded threshold since last activity)
  */
-export async function getStaleLeads() {
+export async function getStaleLeads(personId = null) {
   const settings = await getCRMSettings()
-  const leads = await getLeads()
+  const leads = await getLeads({}, personId)
 
   return leads.filter(lead => {
     if (!lead.last_activity_date) return false
@@ -503,14 +506,18 @@ export async function getStaleLeads() {
 /**
  * Get leads with follow-ups due today
  */
-export async function getFollowUpsDueToday() {
+export async function getFollowUpsDueToday(personId = null) {
   const today = new Date().toISOString().split('T')[0]
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('crm_leads')
     .select('*')
     .or(`next_follow_up_date.eq.${today},reach_out_later_date.eq.${today}`)
     .neq('stage', 'passed')
+
+  if (personId) query = query.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
+
+  const { data, error } = await query
 
   if (error) throw error
   return data || []
@@ -519,12 +526,16 @@ export async function getFollowUpsDueToday() {
 /**
  * Get leads needing sample deals
  */
-export async function getLeadsNeedingSamples() {
-  const { data, error } = await supabase
+export async function getLeadsNeedingSamples(personId = null) {
+  let query = supabase
     .from('crm_leads')
     .select('*')
     .eq('needs_sample_deals', true)
     .neq('stage', 'passed')
+
+  if (personId) query = query.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
+
+  const { data, error } = await query
 
   if (error) throw error
   return data || []
@@ -533,9 +544,9 @@ export async function getLeadsNeedingSamples() {
 /**
  * Get active conversations gone stale (CRITICAL)
  */
-export async function getActiveConversationsGoneStale() {
+export async function getActiveConversationsGoneStale(personId = null) {
   const settings = await getCRMSettings()
-  const leads = await getLeads({ stage: 'active_conversation' })
+  const leads = await getLeads({ stage: 'active_conversation' }, personId)
 
   return leads.filter(lead => {
     if (!lead.last_activity_date) return false
@@ -569,8 +580,8 @@ export async function getWeeklyCallCount() {
 /**
  * Get pipeline statistics
  */
-export async function getPipelineStats() {
-  const leads = await getLeads()
+export async function getPipelineStats(personId = null) {
+  const leads = await getLeads({}, personId)
 
   const stats = {
     new_lead: 0,
@@ -602,19 +613,22 @@ export async function getPipelineStats() {
 /**
  * Get weekly stats
  */
-export async function getWeeklyStats() {
+export async function getWeeklyStats(personId = null) {
   const weekAgo = new Date()
   weekAgo.setDate(weekAgo.getDate() - 7)
 
-  const [activities, leads] = await Promise.all([
-    supabase
-      .from('crm_lead_activities')
-      .select('activity_type')
-      .gte('activity_date', weekAgo.toISOString()),
-    supabase
-      .from('crm_leads')
-      .select('stage, created_at, updated_at')
-  ])
+  let activitiesQuery = supabase
+    .from('crm_lead_activities')
+    .select('activity_type')
+    .gte('activity_date', weekAgo.toISOString())
+  if (personId) activitiesQuery = activitiesQuery.eq('created_by', personId)
+
+  let leadsQuery = supabase
+    .from('crm_leads')
+    .select('stage, created_at, updated_at')
+  if (personId) leadsQuery = leadsQuery.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
+
+  const [activities, leads] = await Promise.all([activitiesQuery, leadsQuery])
 
   const stats = {
     discovery_calls: activities.data?.filter(a =>
@@ -662,8 +676,9 @@ export async function getConversionFunnelStats() {
 /**
  * Get complete CRM dashboard data
  */
-export async function getCRMDashboardData() {
-  const cached = cacheGet('dashboard', 15000)
+export async function getCRMDashboardData(personId = null) {
+  const cacheKey = 'dashboard:' + (personId ?? 'all')
+  const cached = cacheGet(cacheKey, 15000)
   if (cached) return cached
 
   const [
@@ -676,13 +691,13 @@ export async function getCRMDashboardData() {
     pipelineStats,
     settings
   ] = await Promise.all([
-    getLeads(),
-    getStaleLeads(),
-    getFollowUpsDueToday(),
-    getLeadsNeedingSamples(),
-    getActiveConversationsGoneStale(),
-    getWeeklyStats(),
-    getPipelineStats(),
+    getLeads({}, personId),
+    getStaleLeads(personId),
+    getFollowUpsDueToday(personId),
+    getLeadsNeedingSamples(personId),
+    getActiveConversationsGoneStale(personId),
+    getWeeklyStats(personId),
+    getPipelineStats(personId),
     getCRMSettings()
   ])
 
@@ -696,7 +711,7 @@ export async function getCRMDashboardData() {
     pipelineStats,
     settings
   }
-  cacheSet('dashboard', result)
+  cacheSet(cacheKey, result)
   return result
 }
 
@@ -1043,12 +1058,15 @@ export async function deleteEmailTemplate(id) {
 // Analytics
 // ============================================================================
 
-export async function getAnalytics() {
-  // Get all leads
-  const { data: leads, error } = await supabase
+export async function getAnalytics(personId = null) {
+  let query = supabase
     .from('crm_leads')
     .select('*')
     .order('created_at', { ascending: false })
+
+  if (personId) query = query.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
+
+  const { data: leads, error } = await query
 
   if (error) throw error
 
@@ -1354,7 +1372,7 @@ export async function previewLinkedInEnrichment(linkedinUrl, context = {}) {
 /**
  * Get outreach log entries
  */
-export async function getOutreachLog(filters = {}) {
+export async function getOutreachLog(filters = {}, personId = null) {
   let query = supabase
     .from('crm_outreach_log')
     .select(`
@@ -1382,6 +1400,8 @@ export async function getOutreachLog(filters = {}) {
     daysAgo.setDate(daysAgo.getDate() - filters.days_back)
     query = query.gte('outreach_date', daysAgo.toISOString().split('T')[0])
   }
+
+  if (personId) query = query.eq('logged_by', personId)
 
   const { data, error } = await query
 
@@ -1525,15 +1545,32 @@ export async function getTodaysOutreachCount() {
 }
 
 /**
- * Get daily outreach statistics
+ * Daily outreach statistics, scoped to a person when personId is provided.
+ * Legacy RPC `get_daily_outreach_stats` was team-wide, so every user saw
+ * everyone's numbers — this replaces it with a per-person client-side
+ * aggregation.
  */
-export async function getDailyOutreachStats(daysBack = 30) {
-  const { data, error } = await supabase.rpc('get_daily_outreach_stats', {
-    days_back: daysBack
-  })
-
+export async function getDailyOutreachStats(daysBack = 30, personId = null) {
+  const since = new Date()
+  since.setDate(since.getDate() - daysBack)
+  let q = supabase
+    .from('crm_outreach_log')
+    .select('outreach_date, status')
+    .gte('outreach_date', since.toISOString().split('T')[0])
+  if (personId) q = q.eq('logged_by', personId)
+  const { data, error } = await q
   if (error) throw error
-  return data || []
+
+  const byDate = new Map()
+  for (const row of data || []) {
+    if (!byDate.has(row.outreach_date)) {
+      byDate.set(row.outreach_date, { outreach_date: row.outreach_date, total_outreaches: 0, replies: 0 })
+    }
+    const b = byDate.get(row.outreach_date)
+    b.total_outreaches += 1
+    if (row.status === 'replied') b.replies += 1
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.outreach_date.localeCompare(b.outreach_date))
 }
 
 /**
@@ -1792,6 +1829,8 @@ export async function getAllOutreachLogs(filters = {}) {
     query = query.gte('outreach_date', since.toISOString().split('T')[0])
   }
 
+  if (filters.logged_by) query = query.eq('logged_by', filters.logged_by)
+
   const { data, error } = await query
   if (error) throw error
   return data || []
@@ -1802,13 +1841,16 @@ export async function getAllOutreachLogs(filters = {}) {
  * Used to compute today/streak/weekly/best-day dashboards without
  * loading the full outreach rows. Returns: [{logged_by, outreach_date, status}]
  */
-export async function getOutreachStatsByPerson(daysBack = 90) {
+export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
   const since = new Date()
   since.setDate(since.getDate() - daysBack)
-  const { data, error } = await supabase
+  let q = supabase
     .from('crm_outreach_log')
     .select('logged_by, outreach_date, status, outreach_type')
     .gte('outreach_date', since.toISOString().split('T')[0])
+  if (personId) q = q.eq('logged_by', personId)
+
+  const { data, error } = await q
 
   if (error) throw error
   return data || []

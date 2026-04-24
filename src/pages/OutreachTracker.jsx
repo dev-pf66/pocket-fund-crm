@@ -58,11 +58,12 @@ function OutreachTracker() {
   }, [filter, currentPerson?.id])
 
   async function loadData() {
+    if (!currentPerson?.id) return
     setLoading(true)
     try {
       const [dashStats, leadsData] = await Promise.all([
-        getPersonDashboardStats(currentPerson?.id, { weekDays: 7, daysBack: 30 }),
-        getLeads({ stage: 'cold_outreach' })
+        getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30 }),
+        getLeads({ stage: 'cold_outreach' }, currentPerson.id)
       ])
 
       setTodayCount(dashStats.todayCount)
@@ -88,7 +89,7 @@ function OutreachTracker() {
         filters.status = filter.status
       }
 
-      const outreachData = await getOutreachLog(filters)
+      const outreachData = await getOutreachLog(filters, currentPerson.id)
       setOutreaches(outreachData)
     } catch (error) {
       console.error('Failed to load outreach data:', error)

@@ -22,22 +22,24 @@ function daysSince(dateStr) {
 function Dashboard() {
   const { currentPerson } = useApp()
   // Seed from cache so sidebar nav back to Dashboard renders instantly
-  // (stale-while-revalidate — we still refetch below).
-  const [data, setData] = useState(() => cachePeek('dashboard') || null)
+  // (stale-while-revalidate — we still refetch below). Cache is per-user
+  // so a new person's dashboard doesn't flash with the prior user's data.
+  const cacheKey = 'dashboard:' + (currentPerson?.id ?? 'all')
+  const [data, setData] = useState(() => cachePeek(cacheKey) || null)
   const [myLeads, setMyLeads] = useState([])
-  const [loading, setLoading] = useState(() => !cachePeek('dashboard'))
+  const [loading, setLoading] = useState(() => !cachePeek(cacheKey))
 
   useEffect(() => {
     loadData()
   }, [currentPerson?.id])
 
   async function loadData() {
+    if (!currentPerson?.id) return
     try {
-      const promises = [getCRMDashboardData()]
-      if (currentPerson?.id) {
-        promises.push(getAssignedLeads(currentPerson.id).catch(() => []))
-      }
-      const [dashboardData, assigned] = await Promise.all(promises)
+      const [dashboardData, assigned] = await Promise.all([
+        getCRMDashboardData(currentPerson.id),
+        getAssignedLeads(currentPerson.id).catch(() => [])
+      ])
       setData(dashboardData)
       setMyLeads(assigned || [])
     } catch (error) {

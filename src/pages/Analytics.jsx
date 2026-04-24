@@ -1,25 +1,28 @@
 import { useState, useEffect } from 'react'
 import { getAnalytics, getDailyOutreachStats } from '../lib/crm-api'
+import { useApp } from '../App'
 import { TrendingUp, Clock, Target, Award, Send } from 'lucide-react'
 
 function Analytics() {
+  const { currentPerson } = useApp()
   const [data, setData] = useState(null)
   const [outreachStats, setOutreachStats] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadAnalytics()
-  }, [])
+  }, [currentPerson?.id])
 
   async function loadAnalytics() {
+    if (!currentPerson?.id) return
     setLoading(true)
     try {
-      const analytics = await getAnalytics()
+      const analytics = await getAnalytics(currentPerson.id)
       setData(analytics)
 
       // Try to load outreach stats, but don't fail if table doesn't exist yet
       try {
-        const outreach = await getDailyOutreachStats(7)
+        const outreach = await getDailyOutreachStats(7, currentPerson.id)
         setOutreachStats(outreach)
       } catch (outreachError) {
         console.log('Outreach stats not available yet (table may not exist)')

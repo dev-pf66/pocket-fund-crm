@@ -108,18 +108,19 @@ function LeadsBoard() {
   useEffect(() => {
     loadLeads()
     getCRMSettings().then(setSettings).catch(console.error)
-  }, [])
+  }, [currentPerson?.id])
 
   const loadLeads = useCallback(async function loadLeads() {
+    if (!currentPerson?.id) return
     try {
-      const data = await getLeads()
+      const data = await getLeads({}, currentPerson.id)
       setLeads(data)
     } catch (error) {
       console.error('Failed to load leads:', error)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [currentPerson?.id])
 
   const handleDragStart = useCallback(function handleDragStart(e, lead) {
     setDraggedLead(lead)
