@@ -91,13 +91,14 @@ function LeadForm({ onClose, onSave, lead = null }) {
 
     setLoading(true)
     try {
+      let saved
       if (lead?.id) {
-        await updateLead(lead.id, formData)
+        saved = await updateLead(lead.id, formData)
       } else {
-        await createLead(formData, currentPerson.id)
+        saved = await createLead(formData, currentPerson.id)
       }
       clearFormData()
-      onSave()
+      onSave(saved)
     } catch (error) {
       console.error('Failed to save lead:', error)
       toast.error(`Failed to ${lead?.id ? 'update' : 'create'} lead: ${error.message}`)

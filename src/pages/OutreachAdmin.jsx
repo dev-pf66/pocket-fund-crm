@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, promoteOutreachToLead } from '../lib/crm-api'
 import { useApp } from '../App'
-import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2 } from 'lucide-react'
+import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2, Plus } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
+import LeadForm from './LeadForm'
 
 const DAILY_GOAL = 10
 const WEEKLY_GOAL = 50
@@ -502,7 +503,7 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
 }
 
 function MobileEntryCard({
-  entry, expanded, onToggleExpand, onOpenContact, onToggleResponded,
+  entry, expanded, onToggleExpand, onOpenContact, onAddContact, onToggleResponded,
   promoting, toggling, formatDate
 }) {
   const hasLead = !!entry.lead
@@ -548,7 +549,17 @@ function MobileEntryCard({
             {entry.lead_name}
           </button>
         ) : (
-          <span style={{ color: '#9ca3af' }}>—</span>
+          <button
+            onClick={onAddContact}
+            style={{
+              background: 'none', border: '1px dashed #d1d5db', borderRadius: '6px',
+              padding: '4px 10px', textAlign: 'left',
+              color: '#6b7280', fontWeight: 500, fontSize: '13px',
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px'
+            }}
+          >
+            <Plus size={12} /> Add contact
+          </button>
         )}
         {(entry.firm_name || entry.lead?.firm_name) && (
           <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
@@ -657,6 +668,7 @@ function OutreachAdmin() {
   const [expandedId, setExpandedId] = useSessionState('oa:expandedId', null)
   const [togglingId, setTogglingId] = useState(null)
   const [promotingId, setPromotingId] = useState(null)
+  const [addContactFor, setAddContactFor] = useState(null)
 
   // Lightweight stats across everyone for 90 days; drives dashboard + pills.
   const [statsRows, setStatsRows] = useState([])
@@ -975,6 +987,34 @@ function OutreachAdmin() {
         </div>
       </div>
 
+      {addContactFor && (
+        <LeadForm
+          onClose={() => setAddContactFor(null)}
+          onSave={async (saved) => {
+            const target = addContactFor
+            setAddContactFor(null)
+            if (!saved?.id || !target) return
+            try {
+              await updateOutreach(target.id, { lead_id: saved.id })
+            } catch (err) {
+              console.error('Failed to link lead to outreach:', err)
+              toast.error('Contact created, but failed to link to outreach entry')
+            }
+            setEntries(prev => prev.map(x => x.id === target.id
+              ? {
+                  ...x,
+                  lead_id: saved.id,
+                  lead_name: saved.name,
+                  firm_name: x.firm_name || saved.firm_name,
+                  lead: { id: saved.id, name: saved.name, firm_name: saved.firm_name, stage: saved.stage }
+                }
+              : x))
+            toast.success('Contact card created')
+            navigate(`/leads/${saved.id}`)
+          }}
+        />
+      )}
+
       {/* Table (desktop) / card list (mobile) */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
@@ -995,6 +1035,7 @@ function OutreachAdmin() {
                 expanded={expandedId === entry.id}
                 onToggleExpand={() => toggleExpand(entry.id)}
                 onOpenContact={(ev) => openContact(entry, ev)}
+                onAddContact={(ev) => { ev.stopPropagation(); setAddContactFor(entry) }}
                 onToggleResponded={(ev) => toggleResponded(entry, ev)}
                 promoting={promotingId === entry.id}
                 toggling={togglingId === entry.id}
@@ -1064,7 +1105,25 @@ function OutreachAdmin() {
                           )}
                         </button>
                       ) : (
-                        <span style={{ color: '#9ca3af' }}>—</span>
+                        <button
+                          onClick={(ev) => { ev.stopPropagation(); setAddContactFor(entry) }}
+                          title="Create a contact card for this outreach entry"
+                          style={{
+                            background: 'none',
+                            border: '1px dashed #d1d5db',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            color: '#6b7280',
+                            fontWeight: 500,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Plus size={12} /> Add contact
+                        </button>
                       )}
                     </td>
                     <td style={tdStyle}>
