@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, promoteOutreachToLead } from '../lib/crm-api'
+import { useNavigate } from 'react-router-dom'
+import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, promoteOutreachToLead, getLeadById } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2, Plus } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -528,13 +528,17 @@ function MobileEntryCard({
 
       <div style={{ marginBottom: '8px' }}>
         {hasLead ? (
-          <Link
-            to={`/leads/${entry.lead.id}`}
-            onClick={e => e.stopPropagation()}
-            style={{ color: '#1d4ed8', textDecoration: 'none', fontWeight: 600, fontSize: '15px' }}
+          <button
+            onClick={onOpenContact}
+            disabled={promoting}
+            style={{
+              background: 'none', border: 'none', padding: 0, textAlign: 'left',
+              color: '#1d4ed8', fontWeight: 600, fontSize: '15px',
+              cursor: promoting ? 'wait' : 'pointer', opacity: promoting ? 0.6 : 1
+            }}
           >
             {entry.lead_name || entry.lead.name}
-          </Link>
+          </button>
         ) : entry.lead_name ? (
           <button
             onClick={onOpenContact}
@@ -669,6 +673,9 @@ function OutreachAdmin() {
   const [togglingId, setTogglingId] = useState(null)
   const [promotingId, setPromotingId] = useState(null)
   const [addContactFor, setAddContactFor] = useState(null)
+  // { outreachId, lead } — shown in a LeadForm modal so the user can fill in
+  // email/phone/LinkedIn without leaving the outreach log.
+  const [editingLead, setEditingLead] = useState(null)
 
   // Lightweight stats across everyone for 90 days; drives dashboard + pills.
   const [statsRows, setStatsRows] = useState([])
@@ -788,24 +795,24 @@ function OutreachAdmin() {
 
   async function openContact(entry, e) {
     e.stopPropagation()
-    if (entry.lead?.id) {
-      navigate(`/leads/${entry.lead.id}`)
-      return
-    }
-    if (!entry.lead_name) {
-      toast.warn('No contact info on this entry yet.')
-      return
-    }
     setPromotingId(entry.id)
     try {
-      const lead = await promoteOutreachToLead(entry, currentPerson?.id)
-      setEntries(prev => prev.map(x => x.id === entry.id
-        ? { ...x, lead_id: lead.id, lead: { id: lead.id, name: lead.name, firm_name: lead.firm_name, stage: lead.stage } }
-        : x))
-      toast.success('Contact card created')
-      navigate(`/leads/${lead.id}`)
+      let leadId = entry.lead?.id
+      if (!leadId) {
+        if (!entry.lead_name) {
+          toast.warn('No contact info on this entry yet.')
+          return
+        }
+        const promoted = await promoteOutreachToLead(entry, currentPerson?.id)
+        leadId = promoted.id
+        setEntries(prev => prev.map(x => x.id === entry.id
+          ? { ...x, lead_id: promoted.id, lead: { id: promoted.id, name: promoted.name, firm_name: promoted.firm_name, stage: promoted.stage } }
+          : x))
+      }
+      const fullLead = await getLeadById(leadId)
+      setEditingLead({ outreachId: entry.id, lead: fullLead })
     } catch (err) {
-      console.error('Failed to promote outreach to lead:', err)
+      console.error('Failed to open contact:', err)
       toast.error('Could not open contact')
     } finally {
       setPromotingId(null)
@@ -987,6 +994,27 @@ function OutreachAdmin() {
         </div>
       </div>
 
+      {editingLead && (
+        <LeadForm
+          lead={editingLead.lead}
+          onClose={() => setEditingLead(null)}
+          onSave={(saved) => {
+            const outreachId = editingLead.outreachId
+            setEditingLead(null)
+            if (!saved?.id) return
+            setEntries(prev => prev.map(x => x.id === outreachId
+              ? {
+                  ...x,
+                  lead_name: saved.name,
+                  firm_name: x.firm_name || saved.firm_name,
+                  lead: { id: saved.id, name: saved.name, firm_name: saved.firm_name, stage: saved.stage }
+                }
+              : x))
+            toast.success('Contact updated')
+          }}
+        />
+      )}
+
       {addContactFor && (
         <LeadForm
           onClose={() => setAddContactFor(null)}
@@ -1068,10 +1096,20 @@ function OutreachAdmin() {
                     <td style={tdStyle}>{formatDate(entry.outreach_date)}</td>
                     <td style={tdStyle}>
                       {entry.lead ? (
-                        <Link
-                          to={`/leads/${entry.lead.id}`}
-                          onClick={e => e.stopPropagation()}
-                          style={{ color: '#1d4ed8', textDecoration: 'none', fontWeight: '500' }}
+                        <button
+                          onClick={(ev) => openContact(entry, ev)}
+                          disabled={promotingId === entry.id}
+                          title="Open contact card to see/edit info"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            textAlign: 'left',
+                            color: '#1d4ed8',
+                            fontWeight: 500,
+                            cursor: promotingId === entry.id ? 'wait' : 'pointer',
+                            opacity: promotingId === entry.id ? 0.6 : 1
+                          }}
                         >
                           {entry.lead_name || entry.lead.name}
                           {(entry.firm_name || entry.lead.firm_name) && (
@@ -1079,7 +1117,7 @@ function OutreachAdmin() {
                               {entry.firm_name || entry.lead.firm_name}
                             </span>
                           )}
-                        </Link>
+                        </button>
                       ) : entry.lead_name ? (
                         <button
                           onClick={(ev) => openContact(entry, ev)}
