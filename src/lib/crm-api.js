@@ -103,6 +103,30 @@ export async function getLeadById(id) {
  * Find a CRM lead whose linkedin_url matches the given URL after normalization.
  * Returns null if none found.
  */
+/**
+ * Look up a CRM lead by email (case-insensitive) or by a name+firm pair.
+ * Used to avoid creating duplicate contacts when promoting outreach entries.
+ */
+export async function findLeadByEmailOrNameFirm({ email, name, firm_name }) {
+  if (email) {
+    const { data, error } = await supabase
+      .from('crm_leads')
+      .select('*')
+      .ilike('email', email)
+      .limit(1)
+    if (error) throw error
+    if (data?.length) return data[0]
+  }
+  if (name) {
+    let q = supabase.from('crm_leads').select('*').ilike('name', name).limit(1)
+    if (firm_name) q = q.ilike('firm_name', firm_name)
+    const { data, error } = await q
+    if (error) throw error
+    if (data?.length) return data[0]
+  }
+  return null
+}
+
 export async function findLeadByLinkedInUrl(linkedinUrl) {
   if (!linkedinUrl) return null
   const normalized = normalizeLinkedInUrl(linkedinUrl)
@@ -1456,7 +1480,18 @@ export async function promoteOutreachToLead(outreach, currentPersonId) {
   if (outreach.deal_size) criteriaParts.push(outreach.deal_size)
   if (criteriaParts.length > 0) leadData.deal_criteria = criteriaParts.join(', ')
 
-  const lead = await createLead(leadData, currentPersonId)
+  // Dedup: prefer linking to an existing lead over creating a duplicate.
+  let lead = null
+  try {
+    lead = await findLeadByEmailOrNameFirm({
+      email: leadData.email,
+      name: leadData.name,
+      firm_name: leadData.firm_name
+    })
+  } catch (e) {
+    console.error('promoteOutreachToLead: dedup lookup failed, falling through to create', e)
+  }
+  if (!lead) lead = await createLead(leadData, currentPersonId)
 
   try {
     await updateOutreach(outreach.id, { lead_id: lead.id })

@@ -5,6 +5,53 @@ import { useApp } from '../App'
 import { Upload, X, Check, AlertCircle } from 'lucide-react'
 import { useToast } from '../components/Toast'
 
+// Mirrors VARCHAR limits in supabase-crm-schema.sql so we fail soft on long
+// inputs instead of letting Postgres reject the row with a cryptic error.
+const FIELD_LIMITS = {
+  name: 200,
+  firm_name: 200,
+  email: 255,
+  phone: 50,
+  lead_type: 50
+}
+
+// RFC-4180-ish CSV parser: handles quoted fields, embedded commas, escaped
+// double quotes ("") and CRLF. The naive split(',') version shifted columns
+// whenever a field contained a comma, causing the wrong data to land in
+// short-width columns like phone.
+function parseCSVText(text) {
+  const rows = []
+  let row = []
+  let field = ''
+  let inQuotes = false
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i]
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 1 } else { inQuotes = false }
+      } else {
+        field += c
+      }
+    } else if (c === '"') {
+      inQuotes = true
+    } else if (c === ',') {
+      row.push(field); field = ''
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i += 1
+      row.push(field); field = ''
+      if (row.some(v => v.length > 0)) rows.push(row)
+      row = []
+    } else {
+      field += c
+    }
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field)
+    if (row.some(v => v.length > 0)) rows.push(row)
+  }
+  return rows
+}
+
 function ImportLeads() {
   const navigate = useNavigate()
   const { currentPerson } = useApp()
@@ -46,18 +93,17 @@ function ImportLeads() {
     const reader = new FileReader()
     reader.onload = (e) => {
       const text = e.target.result
-      const lines = text.split('\n').filter(line => line.trim())
+      const parsed = parseCSVText(text)
 
-      if (lines.length === 0) {
+      if (parsed.length === 0) {
         toast.warn('CSV file is empty')
         return
       }
 
-      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
-      const rows = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''))
+      const headers = parsed[0].map(h => h.trim())
+      const rows = parsed.slice(1).map(values => {
         return headers.reduce((obj, header, index) => {
-          obj[header] = values[index] || ''
+          obj[header] = (values[index] || '').trim()
           return obj
         }, {})
       })
@@ -104,9 +150,11 @@ function ImportLeads() {
       const lead = { stage: 'new_lead', created_by: currentPerson?.id }
 
       Object.entries(mapping).forEach(([csvHeader, fieldName]) => {
-        if (fieldName && row[csvHeader]) {
-          lead[fieldName] = row[csvHeader]
-        }
+        if (!fieldName) return
+        const raw = row[csvHeader]
+        if (!raw) return
+        const limit = FIELD_LIMITS[fieldName]
+        lead[fieldName] = limit ? String(raw).slice(0, limit) : raw
       })
 
       return lead

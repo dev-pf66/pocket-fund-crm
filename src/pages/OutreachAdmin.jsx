@@ -5,6 +5,9 @@ import { useApp } from '../App'
 import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2 } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
+import { useWindowWidth } from '../hooks/useWindowWidth'
+
+const MOBILE_BREAKPOINT = 768
 
 const DAILY_GOAL = 10
 const WEEKLY_GOAL = 50
@@ -500,6 +503,130 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
   )
 }
 
+function MobileEntryCard({
+  entry, expanded, onToggleExpand, onOpenContact, onToggleResponded,
+  promoting, toggling, formatDate
+}) {
+  const hasLead = !!entry.lead
+  return (
+    <div
+      onClick={onToggleExpand}
+      style={{
+        padding: '14px 16px',
+        borderBottom: '1px solid #f3f4f6',
+        cursor: 'pointer',
+        background: expanded ? '#fafafa' : 'white'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
+        <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
+          {formatDate(entry.outreach_date)}
+        </div>
+        <span className="badge badge-secondary" style={{ fontSize: '10px' }}>
+          {PLATFORM_LABELS[entry.outreach_type] || entry.outreach_type || '—'}
+        </span>
+      </div>
+
+      <div style={{ marginBottom: '8px' }}>
+        {hasLead ? (
+          <Link
+            to={`/leads/${entry.lead.id}`}
+            onClick={e => e.stopPropagation()}
+            style={{ color: '#1d4ed8', textDecoration: 'none', fontWeight: 600, fontSize: '15px' }}
+          >
+            {entry.lead_name || entry.lead.name}
+          </Link>
+        ) : entry.lead_name ? (
+          <button
+            onClick={onOpenContact}
+            disabled={promoting}
+            style={{
+              background: 'none', border: 'none', padding: 0, textAlign: 'left',
+              color: '#1d4ed8', fontWeight: 600, fontSize: '15px',
+              borderBottom: '1px dashed #93c5fd',
+              cursor: promoting ? 'wait' : 'pointer', opacity: promoting ? 0.6 : 1
+            }}
+          >
+            {entry.lead_name}
+          </button>
+        ) : (
+          <span style={{ color: '#9ca3af' }}>—</span>
+        )}
+        {(entry.firm_name || entry.lead?.firm_name) && (
+          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+            {entry.firm_name || entry.lead.firm_name}
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        fontSize: '13px', color: '#4b5563', marginBottom: '10px',
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+        overflow: 'hidden'
+      }}>
+        {entry.message_content || entry.notes || <em style={{ color: '#9ca3af' }}>No message</em>}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+        <div style={{ fontSize: '12px', color: '#6b7280' }}>
+          {entry.logged_by_person?.name || '—'}
+          {entry.fit_score && <> · <FitStars score={entry.fit_score} /></>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={onToggleResponded}
+            disabled={toggling}
+            style={{
+              background: 'none',
+              border: entry.status === 'replied' ? '1px solid #bbf7d0' : '1px dashed #e5e7eb',
+              borderRadius: '999px',
+              padding: '4px 10px',
+              fontSize: '11px',
+              fontWeight: entry.status === 'replied' ? 600 : 400,
+              color: entry.status === 'replied' ? '#15803d' : '#9ca3af',
+              cursor: toggling ? 'wait' : 'pointer'
+            }}
+          >
+            {entry.status === 'replied' ? <><Check size={11} /> Responded</> : 'Mark responded'}
+          </button>
+          {expanded ? <ChevronUp size={16} color="#6b7280" /> : <ChevronDown size={16} color="#6b7280" />}
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {entry.message_content && (
+            <div>
+              <div style={metaLabelStyle}>Message</div>
+              <div style={{ ...metaValueStyle, whiteSpace: 'pre-wrap', maxHeight: '200px', overflowY: 'auto' }}>
+                {entry.message_content}
+              </div>
+            </div>
+          )}
+          {entry.platform_details && (
+            <div><div style={metaLabelStyle}>Platform Details</div><div style={metaValueStyle}>{entry.platform_details}</div></div>
+          )}
+          {entry.industry && (
+            <div><div style={metaLabelStyle}>Industry</div><div style={metaValueStyle}>{entry.industry}</div></div>
+          )}
+          {entry.deal_size && (
+            <div><div style={metaLabelStyle}>Deal Size</div><div style={metaValueStyle}>{entry.deal_size}</div></div>
+          )}
+          {entry.location && (
+            <div><div style={metaLabelStyle}>Location</div><div style={metaValueStyle}>{entry.location}</div></div>
+          )}
+          {entry.lead_source && (
+            <div><div style={metaLabelStyle}>Lead Source</div><div style={metaValueStyle}>{entry.lead_source}</div></div>
+          )}
+          {entry.notes && (
+            <div><div style={metaLabelStyle}>Notes</div><div style={metaValueStyle}>{entry.notes}</div></div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function StatTile({ icon, label, value, sub }) {
   return (
     <div style={{
@@ -526,6 +653,8 @@ function OutreachAdmin() {
   const { toast } = useToast()
   const { currentPerson, people } = useApp()
   const navigate = useNavigate()
+  const width = useWindowWidth()
+  const isMobile = width < MOBILE_BREAKPOINT
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useSessionState('oa:expandedId', null)
@@ -849,7 +978,7 @@ function OutreachAdmin() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table (desktop) / card list (mobile) */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
@@ -859,6 +988,22 @@ function OutreachAdmin() {
         ) : visibleEntries.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
             No outreach entries found.
+          </div>
+        ) : isMobile ? (
+          <div>
+            {visibleEntries.map(entry => (
+              <MobileEntryCard
+                key={entry.id}
+                entry={entry}
+                expanded={expandedId === entry.id}
+                onToggleExpand={() => toggleExpand(entry.id)}
+                onOpenContact={(ev) => openContact(entry, ev)}
+                onToggleResponded={(ev) => toggleResponded(entry, ev)}
+                promoting={promotingId === entry.id}
+                toggling={togglingId === entry.id}
+                formatDate={formatDate}
+              />
+            ))}
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
