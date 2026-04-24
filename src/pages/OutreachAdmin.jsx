@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach } from '../lib/crm-api'
+import { Link, useNavigate } from 'react-router-dom'
+import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, promoteOutreachToLead } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2 } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -525,10 +525,12 @@ function StatTile({ icon, label, value, sub }) {
 function OutreachAdmin() {
   const { toast } = useToast()
   const { currentPerson, people } = useApp()
+  const navigate = useNavigate()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useSessionState('oa:expandedId', null)
   const [togglingId, setTogglingId] = useState(null)
+  const [promotingId, setPromotingId] = useState(null)
 
   // Lightweight stats across everyone for 90 days; drives dashboard + pills.
   const [statsRows, setStatsRows] = useState([])
@@ -645,6 +647,32 @@ function OutreachAdmin() {
 
   const totalCount = visibleEntries.length
   const withResponse = visibleEntries.filter(e => e.status === 'replied').length
+
+  async function openContact(entry, e) {
+    e.stopPropagation()
+    if (entry.lead?.id) {
+      navigate(`/leads/${entry.lead.id}`)
+      return
+    }
+    if (!entry.lead_name) {
+      toast.warn('No contact info on this entry yet.')
+      return
+    }
+    setPromotingId(entry.id)
+    try {
+      const lead = await promoteOutreachToLead(entry, currentPerson?.id)
+      setEntries(prev => prev.map(x => x.id === entry.id
+        ? { ...x, lead_id: lead.id, lead: { id: lead.id, name: lead.name, firm_name: lead.firm_name, stage: lead.stage } }
+        : x))
+      toast.success('Contact card created')
+      navigate(`/leads/${lead.id}`)
+    } catch (err) {
+      console.error('Failed to promote outreach to lead:', err)
+      toast.error('Could not open contact')
+    } finally {
+      setPromotingId(null)
+    }
+  }
 
   async function toggleResponded(entry, e) {
     e.stopPropagation()
@@ -869,15 +897,32 @@ function OutreachAdmin() {
                             </span>
                           )}
                         </Link>
-                      ) : (
-                        <span>
+                      ) : entry.lead_name ? (
+                        <button
+                          onClick={(ev) => openContact(entry, ev)}
+                          disabled={promotingId === entry.id}
+                          title="Open contact card (creates one if it doesn't exist yet)"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            textAlign: 'left',
+                            color: '#1d4ed8',
+                            fontWeight: 500,
+                            cursor: promotingId === entry.id ? 'wait' : 'pointer',
+                            borderBottom: '1px dashed #93c5fd',
+                            opacity: promotingId === entry.id ? 0.6 : 1
+                          }}
+                        >
                           {entry.lead_name}
                           {entry.firm_name && (
-                            <span style={{ display: 'block', fontSize: '12px', color: '#6b7280' }}>
+                            <span style={{ display: 'block', fontSize: '12px', color: '#6b7280', fontWeight: 400, borderBottom: 'none' }}>
                               {entry.firm_name}
                             </span>
                           )}
-                        </span>
+                        </button>
+                      ) : (
+                        <span style={{ color: '#9ca3af' }}>—</span>
                       )}
                     </td>
                     <td style={tdStyle}>

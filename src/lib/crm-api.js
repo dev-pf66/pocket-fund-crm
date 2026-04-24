@@ -1427,6 +1427,47 @@ export async function updateOutreach(id, updates) {
 }
 
 /**
+ * Turn an orphan outreach entry (no lead_id, just lead_name/firm_name) into a
+ * real CRM lead so it can be viewed and edited in LeadDetail. Backfills the
+ * outreach row's lead_id so future renders link straight through.
+ */
+export async function promoteOutreachToLead(outreach, currentPersonId) {
+  if (!outreach?.lead_name) throw new Error('Outreach entry has no lead_name to promote')
+
+  const name = String(outreach.lead_name).trim()
+  const leadData = {
+    name,
+    firm_name: outreach.firm_name || null,
+    lead_source: outreach.lead_source || null,
+    stage: 'new_lead'
+  }
+
+  // If the name field actually holds an email (common for CSV-imported rows),
+  // capture the email and fall back to the local-part as a readable name.
+  if (/@/.test(name) && /\./.test(name.split('@')[1] || '')) {
+    leadData.email = name
+    const local = name.split('@')[0].replace(/[._-]+/g, ' ').trim()
+    if (local) leadData.name = local.replace(/\b\w/g, c => c.toUpperCase())
+  }
+
+  // Roll optional context fields into deal_criteria so they aren't lost.
+  const criteriaParts = []
+  if (outreach.industry) criteriaParts.push(outreach.industry)
+  if (outreach.deal_size) criteriaParts.push(outreach.deal_size)
+  if (criteriaParts.length > 0) leadData.deal_criteria = criteriaParts.join(', ')
+
+  const lead = await createLead(leadData, currentPersonId)
+
+  try {
+    await updateOutreach(outreach.id, { lead_id: lead.id })
+  } catch (e) {
+    console.error('promoteOutreachToLead: failed to backfill lead_id', e)
+  }
+
+  return lead
+}
+
+/**
  * Delete outreach entry
  */
 export async function deleteOutreach(id) {
