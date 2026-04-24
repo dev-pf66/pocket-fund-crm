@@ -5,6 +5,7 @@ import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Eye, Zap } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
+import { parseCSVText, parseDateCell } from '../lib/csv'
 
 const EMPTY_OUTREACH = {
   lead_id: null,
@@ -172,33 +173,47 @@ function OutreachTracker() {
     setCsvUploading(true)
     try {
       const text = await csvFile.text()
-      const rows = text.split('\n').map(row => row.split(',').map(cell => cell.trim()))
-      const headers = rows[0].map(h => h.toLowerCase())
+      const rows = parseCSVText(text)
+      if (rows.length < 2) {
+        toast.warn('CSV has no data rows')
+        return
+      }
+      const headers = rows[0].map(h => h.trim().toLowerCase())
 
       let imported = 0
+      let skipped = 0
       for (let i = 1; i < rows.length; i++) {
-        if (rows[i].length < 2 || !rows[i][0]) continue // Skip empty rows
-
         const outreach = {}
         headers.forEach((header, idx) => {
-          const value = rows[i][idx]
+          const raw = rows[i][idx]
+          if (raw === undefined) return
+          const value = String(raw).trim()
           if (!value) return
 
-          // Map CSV columns to fields
+          // Map CSV columns to fields. Order matters — check for more
+          // specific headers (deal + size, lead + name) before generic ones.
           if (header.includes('lead') && header.includes('name')) outreach.lead_name = value
           else if (header.includes('firm') || header.includes('company')) outreach.firm_name = value
-          else if (header.includes('type')) outreach.outreach_type = value.toLowerCase().replace(' ', '_')
+          else if (header.includes('type')) outreach.outreach_type = value.toLowerCase().replace(/\s+/g, '_')
           else if (header.includes('status')) outreach.status = value.toLowerCase()
           else if (header.includes('message') || header.includes('content')) outreach.message_content = value
           else if (header.includes('platform') || header.includes('where')) outreach.platform_details = value
-          else if (header.includes('fit') || header.includes('score')) outreach.fit_score = parseInt(value)
+          else if (header.includes('fit') || header.includes('score')) {
+            const n = parseInt(value, 10)
+            if (Number.isFinite(n)) outreach.fit_score = n
+          }
           else if (header.includes('industry')) outreach.industry = value
           else if (header.includes('deal') && header.includes('size')) outreach.deal_size = value
           else if (header.includes('location')) outreach.location = value
           else if (header.includes('source')) outreach.lead_source = value
           else if (header.includes('note')) outreach.notes = value
-          else if (header.includes('date')) outreach.outreach_date = value
+          else if (header.includes('date')) {
+            const d = parseDateCell(value)
+            if (d) outreach.outreach_date = d
+          }
         })
+
+        if (!outreach.lead_name) { skipped += 1; continue }
 
         // Set defaults
         if (!outreach.outreach_type) outreach.outreach_type = 'cold_email'
@@ -208,7 +223,9 @@ function OutreachTracker() {
         imported++
       }
 
-      toast.success(`Successfully imported ${imported} outreaches!`)
+      toast.success(skipped > 0
+        ? `Imported ${imported} · skipped ${skipped} row${skipped === 1 ? '' : 's'} without a lead name`
+        : `Successfully imported ${imported} outreaches!`)
       setCsvFile(null)
       setShowCsvUpload(false)
       await loadData()

@@ -4,6 +4,7 @@ import { createLead } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Upload, X, Check, AlertCircle } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { parseCSVText } from '../lib/csv'
 
 // Mirrors VARCHAR limits in supabase-crm-schema.sql so we fail soft on long
 // inputs instead of letting Postgres reject the row with a cryptic error.
@@ -13,43 +14,6 @@ const FIELD_LIMITS = {
   email: 255,
   phone: 50,
   lead_type: 50
-}
-
-// RFC-4180-ish CSV parser: handles quoted fields, embedded commas, escaped
-// double quotes ("") and CRLF. The naive split(',') version shifted columns
-// whenever a field contained a comma, causing the wrong data to land in
-// short-width columns like phone.
-function parseCSVText(text) {
-  const rows = []
-  let row = []
-  let field = ''
-  let inQuotes = false
-  for (let i = 0; i < text.length; i += 1) {
-    const c = text[i]
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i += 1 } else { inQuotes = false }
-      } else {
-        field += c
-      }
-    } else if (c === '"') {
-      inQuotes = true
-    } else if (c === ',') {
-      row.push(field); field = ''
-    } else if (c === '\n' || c === '\r') {
-      if (c === '\r' && text[i + 1] === '\n') i += 1
-      row.push(field); field = ''
-      if (row.some(v => v.length > 0)) rows.push(row)
-      row = []
-    } else {
-      field += c
-    }
-  }
-  if (field.length > 0 || row.length > 0) {
-    row.push(field)
-    if (row.some(v => v.length > 0)) rows.push(row)
-  }
-  return rows
 }
 
 function ImportLeads() {
