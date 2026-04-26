@@ -27,42 +27,132 @@ const CATEGORIES = [
 
 const CATEGORY_BY_KEY = Object.fromEntries(CATEGORIES.map(c => [c.key, c]))
 
+// Normalize a free-text category name to a stable key (lowercased, spaces
+// and other separators collapsed to underscores).
+function categoryKeyFromLabel(raw) {
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 50)
+}
+
+// Title-case a category key for display.
+function labelForCategory(key) {
+  if (CATEGORY_BY_KEY[key]) return CATEGORY_BY_KEY[key].label
+  return String(key || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+}
+
+// Stable color from a string so custom categories get a consistent hue.
+function colorForCategory(key) {
+  if (CATEGORY_BY_KEY[key]) return CATEGORY_BY_KEY[key].color
+  let h = 0
+  for (let i = 0; i < (key || '').length; i += 1) {
+    h = (h * 31 + key.charCodeAt(i)) >>> 0
+  }
+  return `hsl(${h % 360}, 55%, 48%)`
+}
+
 // Multi-select chip group. Click a chip to toggle whether the partner
-// belongs to that category. Used in both the LinkedIn quick-add bar and
-// the full Add/Edit Partner modal.
-function CategoryChips({ value, onChange, disabled = false }) {
+// belongs to that category. The "+ Add" chip lets the user add a custom
+// category — handed to onAddCustom so the parent can persist it across
+// chips and the filter dropdown.
+function CategoryChips({ value, onChange, available, onAddCustom, disabled = false }) {
   const arr = Array.isArray(value) ? value : []
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState('')
+
   function toggle(key) {
     if (disabled) return
     if (arr.includes(key)) onChange(arr.filter(k => k !== key))
     else onChange([...arr, key])
   }
+
+  function commitDraft() {
+    const key = categoryKeyFromLabel(draft)
+    if (!key) {
+      setAdding(false)
+      setDraft('')
+      return
+    }
+    if (onAddCustom) onAddCustom(key)
+    if (!arr.includes(key)) onChange([...arr, key])
+    setAdding(false)
+    setDraft('')
+  }
+
   return (
-    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-      {CATEGORIES.map(c => {
-        const selected = arr.includes(c.key)
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+      {available.map(key => {
+        const selected = arr.includes(key)
+        const color = colorForCategory(key)
         return (
           <button
-            key={c.key}
+            key={key}
             type="button"
-            onClick={() => toggle(c.key)}
+            onClick={() => toggle(key)}
             disabled={disabled}
             style={{
               padding: '4px 10px',
               borderRadius: '999px',
-              border: selected ? `1.5px solid ${c.color}` : '1px solid #e5e7eb',
-              background: selected ? c.color + '22' : 'white',
-              color: selected ? c.color : '#6b7280',
+              border: selected ? `1.5px solid ${color}` : '1px solid #e5e7eb',
+              background: selected ? color + '22' : 'white',
+              color: selected ? color : '#6b7280',
               fontSize: '12px',
               fontWeight: selected ? 600 : 500,
               cursor: disabled ? 'not-allowed' : 'pointer',
               opacity: disabled ? 0.6 : 1
             }}
           >
-            {c.label}
+            {labelForCategory(key)}
           </button>
         )
       })}
+      {adding ? (
+        <input
+          type="text"
+          autoFocus
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commitDraft}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commitDraft() }
+            if (e.key === 'Escape') { setAdding(false); setDraft('') }
+          }}
+          placeholder="New category"
+          maxLength={50}
+          style={{
+            padding: '4px 10px',
+            borderRadius: '999px',
+            border: '1px dashed #9ca3af',
+            background: 'white',
+            fontSize: '12px',
+            outline: 'none',
+            minWidth: '120px'
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          disabled={disabled}
+          style={{
+            padding: '4px 10px',
+            borderRadius: '999px',
+            border: '1px dashed #9ca3af',
+            background: 'white',
+            color: '#6b7280',
+            fontSize: '12px',
+            fontWeight: 500,
+            cursor: disabled ? 'not-allowed' : 'pointer'
+          }}
+        >
+          + Add
+        </button>
+      )}
     </div>
   )
 }
@@ -84,6 +174,31 @@ function PartnersBoard() {
   const [quickUrl, setQuickUrl] = useState('')
   const [quickCategories, setQuickCategories] = useSessionState('pb:quickCategories', ['creator'])
   const [quickAdding, setQuickAdding] = useState(false)
+
+  // Custom categories the user added in this browser. Persisted to session
+  // so they survive page reloads even before they're attached to a partner.
+  // The full chip list = built-in + categories actually in use on partners
+  // + recently-added customs.
+  const [customCategories, setCustomCategories] = useSessionState('pb:customCategories', [])
+
+  function registerCustomCategory(key) {
+    if (!key || CATEGORY_BY_KEY[key]) return
+    setCustomCategories(prev => prev.includes(key) ? prev : [...prev, key])
+  }
+
+  const availableCategories = useMemo(() => {
+    const seen = new Set(CATEGORIES.map(c => c.key))
+    const out = CATEGORIES.map(c => c.key)
+    for (const p of partners) {
+      for (const k of (p.categories || [])) {
+        if (!seen.has(k)) { seen.add(k); out.push(k) }
+      }
+    }
+    for (const k of customCategories) {
+      if (!seen.has(k)) { seen.add(k); out.push(k) }
+    }
+    return out
+  }, [partners, customCategories])
 
   useEffect(() => {
     loadPartners()
@@ -248,7 +363,13 @@ function PartnersBoard() {
           <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Categories
           </span>
-          <CategoryChips value={quickCategories} onChange={setQuickCategories} disabled={quickAdding} />
+          <CategoryChips
+            value={quickCategories}
+            onChange={setQuickCategories}
+            available={availableCategories}
+            onAddCustom={registerCustomCategory}
+            disabled={quickAdding}
+          />
         </div>
       </form>
 
@@ -272,8 +393,8 @@ function PartnersBoard() {
           style={{ width: 'auto', fontSize: '13px' }}
         >
           <option value="all">All Categories</option>
-          {CATEGORIES.map(c => (
-            <option key={c.key} value={c.key}>{c.label}</option>
+          {availableCategories.map(key => (
+            <option key={key} value={key}>{labelForCategory(key)}</option>
           ))}
         </select>
 
@@ -335,6 +456,8 @@ function PartnersBoard() {
       {(showAddForm || editingPartner) && (
         <PartnerForm
           partner={editingPartner}
+          availableCategories={availableCategories}
+          onAddCustomCategory={registerCustomCategory}
           onClose={() => { setShowAddForm(false); setEditingPartner(null) }}
           onSave={async (formData) => {
             try {
@@ -360,7 +483,11 @@ function PartnersBoard() {
 }
 
 function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
-  const cats = (partner.categories || []).map(k => CATEGORY_BY_KEY[k]).filter(Boolean)
+  const cats = (partner.categories || []).map(k => ({
+    key: k,
+    label: labelForCategory(k),
+    color: colorForCategory(k)
+  }))
   return (
     <div
       draggable
@@ -428,7 +555,7 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
   )
 }
 
-function PartnerForm({ partner, onClose, onSave }) {
+function PartnerForm({ partner, onClose, onSave, availableCategories, onAddCustomCategory }) {
   const [form, setForm] = useState({
     name: partner?.name || '',
     categories: Array.isArray(partner?.categories) && partner.categories.length
@@ -497,6 +624,8 @@ function PartnerForm({ partner, onClose, onSave }) {
             <CategoryChips
               value={form.categories}
               onChange={(next) => update('categories', next)}
+              available={availableCategories}
+              onAddCustom={onAddCustomCategory}
               disabled={saving}
             />
           </div>
