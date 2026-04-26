@@ -13,8 +13,9 @@ CREATE TABLE IF NOT EXISTS crm_partners (
   id SERIAL PRIMARY KEY,
 
   name VARCHAR(200) NOT NULL,
-  -- creator | community | investor | fund | podcast | media | competitor | adjacent_industry
-  category VARCHAR(50) NOT NULL,
+  -- Any of: creator, community, investor, fund, podcast, media, competitor,
+  -- adjacent_industry. A partner can belong to several at once.
+  categories TEXT[] NOT NULL DEFAULT '{}',
   -- potential | reached_out | in_conversation | active_partner | passed
   stage VARCHAR(50) NOT NULL DEFAULT 'potential',
 
@@ -34,7 +35,7 @@ CREATE TABLE IF NOT EXISTS crm_partners (
 
 CREATE INDEX IF NOT EXISTS idx_crm_partners_created_by ON crm_partners(created_by);
 CREATE INDEX IF NOT EXISTS idx_crm_partners_stage ON crm_partners(stage);
-CREATE INDEX IF NOT EXISTS idx_crm_partners_category ON crm_partners(category);
+CREATE INDEX IF NOT EXISTS idx_crm_partners_categories ON crm_partners USING GIN (categories);
 
 -- updated_at trigger
 CREATE OR REPLACE FUNCTION trigger_set_partners_updated_at()

@@ -27,6 +27,46 @@ const CATEGORIES = [
 
 const CATEGORY_BY_KEY = Object.fromEntries(CATEGORIES.map(c => [c.key, c]))
 
+// Multi-select chip group. Click a chip to toggle whether the partner
+// belongs to that category. Used in both the LinkedIn quick-add bar and
+// the full Add/Edit Partner modal.
+function CategoryChips({ value, onChange, disabled = false }) {
+  const arr = Array.isArray(value) ? value : []
+  function toggle(key) {
+    if (disabled) return
+    if (arr.includes(key)) onChange(arr.filter(k => k !== key))
+    else onChange([...arr, key])
+  }
+  return (
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+      {CATEGORIES.map(c => {
+        const selected = arr.includes(c.key)
+        return (
+          <button
+            key={c.key}
+            type="button"
+            onClick={() => toggle(c.key)}
+            disabled={disabled}
+            style={{
+              padding: '4px 10px',
+              borderRadius: '999px',
+              border: selected ? `1.5px solid ${c.color}` : '1px solid #e5e7eb',
+              background: selected ? c.color + '22' : 'white',
+              color: selected ? c.color : '#6b7280',
+              fontSize: '12px',
+              fontWeight: selected ? 600 : 500,
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.6 : 1
+            }}
+          >
+            {c.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function PartnersBoard() {
   const { currentPerson } = useApp()
   const { toast } = useToast()
@@ -39,9 +79,10 @@ function PartnersBoard() {
   const [searchQuery, setSearchQuery] = useSessionState('pb:searchQuery', '')
   const [categoryFilter, setCategoryFilter] = useSessionState('pb:categoryFilter', 'all')
 
-  // LinkedIn quick-add: paste a profile URL, pick a category, hit Add.
+  // LinkedIn quick-add: paste a profile URL, toggle one or more categories,
+  // hit Add. Multi-select so a contact can be both e.g. Creator + Podcast.
   const [quickUrl, setQuickUrl] = useState('')
-  const [quickCategory, setQuickCategory] = useSessionState('pb:quickCategory', 'creator')
+  const [quickCategories, setQuickCategories] = useSessionState('pb:quickCategories', ['creator'])
   const [quickAdding, setQuickAdding] = useState(false)
 
   useEffect(() => {
@@ -65,7 +106,7 @@ function PartnersBoard() {
   const filteredPartners = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return partners.filter(p => {
-      if (categoryFilter !== 'all' && p.category !== categoryFilter) return false
+      if (categoryFilter !== 'all' && !(p.categories || []).includes(categoryFilter)) return false
       if (!q) return true
       return (
         (p.name || '').toLowerCase().includes(q) ||
@@ -115,6 +156,10 @@ function PartnersBoard() {
       toast.warn('That doesn\'t look like a LinkedIn URL')
       return
     }
+    if (!quickCategories.length) {
+      toast.warn('Pick at least one category')
+      return
+    }
     if (!currentPerson?.id) {
       toast.error('Please wait — loading user info')
       return
@@ -124,7 +169,7 @@ function PartnersBoard() {
       const name = nameFromLinkedInUrl(url) || 'New Partner'
       const created = await createPartner({
         name,
-        category: quickCategory,
+        categories: quickCategories,
         stage: 'potential',
         url
       }, currentPerson.id)
@@ -168,33 +213,33 @@ function PartnersBoard() {
       <form
         onSubmit={handleQuickAdd}
         className="card"
-        style={{ padding: '12px 16px', marginBottom: '12px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}
+        style={{ padding: '12px 16px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}
       >
-        <Linkedin size={16} style={{ color: '#0a66c2' }} />
-        <input
-          type="url"
-          placeholder="Paste LinkedIn URL to quick-add..."
-          value={quickUrl}
-          onChange={e => setQuickUrl(e.target.value)}
-          className="form-control"
-          style={{ flex: '1 1 240px', minWidth: '200px', fontSize: '13px' }}
-          disabled={quickAdding}
-        />
-        <select
-          value={quickCategory}
-          onChange={e => setQuickCategory(e.target.value)}
-          className="form-control"
-          style={{ width: 'auto', fontSize: '13px' }}
-          disabled={quickAdding}
-          title="Category for quick-add"
-        >
-          {CATEGORIES.map(c => (
-            <option key={c.key} value={c.key}>{c.label}</option>
-          ))}
-        </select>
-        <button type="submit" className="btn btn-primary btn-sm" disabled={quickAdding || !quickUrl.trim()}>
-          {quickAdding ? 'Adding...' : 'Add'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <Linkedin size={16} style={{ color: '#0a66c2', flexShrink: 0 }} />
+          <input
+            type="url"
+            placeholder="Paste LinkedIn URL to quick-add..."
+            value={quickUrl}
+            onChange={e => setQuickUrl(e.target.value)}
+            className="form-control"
+            style={{ flex: 1, fontSize: '13px' }}
+            disabled={quickAdding}
+          />
+          <button
+            type="submit"
+            className="btn btn-primary btn-sm"
+            disabled={quickAdding || !quickUrl.trim() || !quickCategories.length}
+          >
+            {quickAdding ? 'Adding...' : 'Add'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Categories
+          </span>
+          <CategoryChips value={quickCategories} onChange={setQuickCategories} disabled={quickAdding} />
+        </div>
       </form>
 
       <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -305,7 +350,7 @@ function PartnersBoard() {
 }
 
 function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
-  const cat = CATEGORY_BY_KEY[partner.category]
+  const cats = (partner.categories || []).map(k => CATEGORY_BY_KEY[k]).filter(Boolean)
   return (
     <div
       draggable
@@ -337,21 +382,24 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
         <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>{partner.handle}</div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-        {cat && (
-          <span style={{
-            fontSize: '10px',
-            fontWeight: 600,
-            padding: '2px 6px',
-            borderRadius: '999px',
-            background: cat.color + '22',
-            color: cat.color
-          }}>
-            {cat.label}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+        {cats.map(c => (
+          <span
+            key={c.key}
+            style={{
+              fontSize: '10px',
+              fontWeight: 600,
+              padding: '2px 6px',
+              borderRadius: '999px',
+              background: c.color + '22',
+              color: c.color
+            }}
+          >
+            {c.label}
           </span>
-        )}
+        ))}
         {partner.audience_size && (
-          <span style={{ fontSize: '10px', color: '#6b7280' }}>{partner.audience_size}</span>
+          <span style={{ fontSize: '10px', color: '#6b7280', marginLeft: '2px' }}>{partner.audience_size}</span>
         )}
         {partner.url && (
           <a
@@ -373,7 +421,9 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
 function PartnerForm({ partner, onClose, onSave }) {
   const [form, setForm] = useState({
     name: partner?.name || '',
-    category: partner?.category || 'creator',
+    categories: Array.isArray(partner?.categories) && partner.categories.length
+      ? partner.categories
+      : ['creator'],
     stage: partner?.stage || 'potential',
     handle: partner?.handle || '',
     url: partner?.url || '',
@@ -392,6 +442,7 @@ function PartnerForm({ partner, onClose, onSave }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.name.trim()) return
+    if (!form.categories.length) return
     setSaving(true)
     try {
       const payload = { ...form }
@@ -431,23 +482,22 @@ function PartnerForm({ partner, onClose, onSave }) {
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Category</label>
-              <select value={form.category} onChange={e => update('category', e.target.value)}>
-                {CATEGORIES.map(c => (
-                  <option key={c.key} value={c.key}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Stage</label>
-              <select value={form.stage} onChange={e => update('stage', e.target.value)}>
-                {STAGES.map(s => (
-                  <option key={s.key} value={s.key}>{s.label}</option>
-                ))}
-              </select>
-            </div>
+          <div className="form-group">
+            <label>Categories *</label>
+            <CategoryChips
+              value={form.categories}
+              onChange={(next) => update('categories', next)}
+              disabled={saving}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Stage</label>
+            <select value={form.stage} onChange={e => update('stage', e.target.value)}>
+              {STAGES.map(s => (
+                <option key={s.key} value={s.key}>{s.label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="form-row">
@@ -512,7 +562,11 @@ function PartnerForm({ partner, onClose, onSave }) {
 
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={saving || !form.name.trim()}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={saving || !form.name.trim() || !form.categories.length}
+            >
               {saving ? 'Saving...' : partner ? 'Update' : 'Add Partner'}
             </button>
           </div>
