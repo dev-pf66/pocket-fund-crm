@@ -3,7 +3,8 @@ import { getPartners, createPartner, updatePartner, movePartner, deletePartner }
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
-import { Plus, Search, Trash2, ExternalLink } from 'lucide-react'
+import { Plus, Search, Trash2, ExternalLink, Linkedin } from 'lucide-react'
+import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 
 const STAGES = [
   { key: 'potential', label: 'Potential', color: '#a78bfa' },
@@ -37,6 +38,11 @@ function PartnersBoard() {
 
   const [searchQuery, setSearchQuery] = useSessionState('pb:searchQuery', '')
   const [categoryFilter, setCategoryFilter] = useSessionState('pb:categoryFilter', 'all')
+
+  // LinkedIn quick-add: paste a profile URL, pick a category, hit Add.
+  const [quickUrl, setQuickUrl] = useState('')
+  const [quickCategory, setQuickCategory] = useSessionState('pb:quickCategory', 'creator')
+  const [quickAdding, setQuickAdding] = useState(false)
 
   useEffect(() => {
     loadPartners()
@@ -101,6 +107,38 @@ function PartnersBoard() {
     }
   }
 
+  async function handleQuickAdd(e) {
+    e.preventDefault()
+    const url = quickUrl.trim()
+    if (!url || quickAdding) return
+    if (!isLinkedInUrl(url)) {
+      toast.warn('That doesn\'t look like a LinkedIn URL')
+      return
+    }
+    if (!currentPerson?.id) {
+      toast.error('Please wait — loading user info')
+      return
+    }
+    setQuickAdding(true)
+    try {
+      const name = nameFromLinkedInUrl(url) || 'New Partner'
+      const created = await createPartner({
+        name,
+        category: quickCategory,
+        stage: 'potential',
+        url
+      }, currentPerson.id)
+      setPartners(prev => [created, ...prev])
+      setQuickUrl('')
+      toast.success(`Added ${name}`)
+    } catch (err) {
+      console.error('Failed to quick-add partner:', err)
+      toast.error('Failed to add: ' + err.message)
+    } finally {
+      setQuickAdding(false)
+    }
+  }
+
   async function handleDelete(id) {
     if (!confirm('Delete this partner?')) return
     const prev = partners
@@ -126,6 +164,38 @@ function PartnersBoard() {
           <Plus size={16} /> Add Partner
         </button>
       </div>
+
+      <form
+        onSubmit={handleQuickAdd}
+        className="card"
+        style={{ padding: '12px 16px', marginBottom: '12px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}
+      >
+        <Linkedin size={16} style={{ color: '#0a66c2' }} />
+        <input
+          type="url"
+          placeholder="Paste LinkedIn URL to quick-add..."
+          value={quickUrl}
+          onChange={e => setQuickUrl(e.target.value)}
+          className="form-control"
+          style={{ flex: '1 1 240px', minWidth: '200px', fontSize: '13px' }}
+          disabled={quickAdding}
+        />
+        <select
+          value={quickCategory}
+          onChange={e => setQuickCategory(e.target.value)}
+          className="form-control"
+          style={{ width: 'auto', fontSize: '13px' }}
+          disabled={quickAdding}
+          title="Category for quick-add"
+        >
+          {CATEGORIES.map(c => (
+            <option key={c.key} value={c.key}>{c.label}</option>
+          ))}
+        </select>
+        <button type="submit" className="btn btn-primary btn-sm" disabled={quickAdding || !quickUrl.trim()}>
+          {quickAdding ? 'Adding...' : 'Add'}
+        </button>
+      </form>
 
       <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
