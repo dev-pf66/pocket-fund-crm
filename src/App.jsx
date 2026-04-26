@@ -57,7 +57,7 @@ const PartnersBoard = lazyWithRetry(() => import('./pages/PartnersBoard'))
 // Email of the only person who can see the Potential Partners tab.
 // Personal pipeline — RLS already isolates the data, but the route + nav
 // link are gated so it never appears for other users.
-export const PARTNERS_OWNER_EMAIL = 'sanayammehta@gmail.com'
+export const PARTNERS_OWNER_EMAIL = 'dev@pocket-fund.com'
 
 export const AppContext = createContext()
 
