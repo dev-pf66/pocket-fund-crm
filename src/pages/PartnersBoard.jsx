@@ -166,16 +166,26 @@ function PartnersBoard() {
     }
     setQuickAdding(true)
     try {
-      const name = nameFromLinkedInUrl(url) || 'New Partner'
+      const guessed = nameFromLinkedInUrl(url) || ''
+      // A single-word slug like "finneganstewart" can't be cleanly split
+      // into first + last, so leave the name blank and surface the edit
+      // modal — easier than letting the user fix an ugly name later.
+      const looksUseful = guessed.trim().split(/\s+/).length >= 2
+      const name = looksUseful ? guessed : ''
       const created = await createPartner({
-        name,
+        name: name || 'New Partner',
         categories: quickCategories,
         stage: 'potential',
         url
       }, currentPerson.id)
       setPartners(prev => [created, ...prev])
       setQuickUrl('')
-      toast.success(`Added ${name}`)
+      if (looksUseful) {
+        toast.success(`Added ${name}`)
+      } else {
+        toast.info('Added — fill in the name')
+        setEditingPartner(created)
+      }
     } catch (err) {
       console.error('Failed to quick-add partner:', err)
       toast.error('Failed to add: ' + err.message)
