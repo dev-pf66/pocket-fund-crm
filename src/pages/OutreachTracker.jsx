@@ -2,10 +2,33 @@ import { useState, useEffect } from 'react'
 import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
-import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Eye, Zap } from 'lucide-react'
+import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { parseCSVText, parseDateCell } from '../lib/csv'
+
+// Map free-text CSV values into the canonical dropdown keys the table uses.
+// Without this, a row that says "Cold Email" or "LinkedIn" would import as
+// the literal string and not match the filter / status dropdowns.
+function normalizeOutreachType(raw) {
+  const v = String(raw || '').toLowerCase().trim()
+  if (!v) return null
+  if (['cold_email', 'linkedin_message', 'phone_call', 'other'].includes(v)) return v
+  if (v.includes('linkedin') || v === 'li' || v === 'li msg' || v === 'in mail' || v === 'inmail') return 'linkedin_message'
+  if (v.includes('email') || v === 'mail' || v === 'cold') return 'cold_email'
+  if (v.includes('phone') || v.includes('call')) return 'phone_call'
+  return 'other'
+}
+
+function normalizeOutreachStatus(raw) {
+  const v = String(raw || '').toLowerCase().trim()
+  if (!v) return null
+  if (['sent', 'replied', 'no_response', 'bounced'].includes(v)) return v
+  if (v.includes('repli') || v.includes('respond') || v === 'yes' || v === 'got reply') return 'replied'
+  if (v.includes('bounce')) return 'bounced'
+  if (v.includes('no response') || v === 'no') return 'no_response'
+  return 'sent'
+}
 
 const EMPTY_OUTREACH = {
   lead_id: null,
@@ -43,6 +66,10 @@ function OutreachTracker() {
   const [csvUploading, setCsvUploading] = useState(false)
   const [selectedOutreach, setSelectedOutreach] = useState(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
+  // Pending edits inside the details modal — only fields the user actually
+  // changed are sent on save, so unrelated columns aren't clobbered.
+  const [editedFields, setEditedFields] = useState({})
+  const [savingEdits, setSavingEdits] = useState(false)
 
   const [quickLogging, setQuickLogging] = useState(false)
 
@@ -194,8 +221,14 @@ function OutreachTracker() {
           // specific headers (deal + size, lead + name) before generic ones.
           if (header.includes('lead') && header.includes('name')) outreach.lead_name = value
           else if (header.includes('firm') || header.includes('company')) outreach.firm_name = value
-          else if (header.includes('type')) outreach.outreach_type = value.toLowerCase().replace(/\s+/g, '_')
-          else if (header.includes('status')) outreach.status = value.toLowerCase()
+          else if (header.includes('type') || header.includes('channel')) {
+            const t = normalizeOutreachType(value)
+            if (t) outreach.outreach_type = t
+          }
+          else if (header.includes('status') || header === 'response' || header === 'replied') {
+            const s = normalizeOutreachStatus(value)
+            if (s) outreach.status = s
+          }
           else if (header.includes('message') || header.includes('content')) outreach.message_content = value
           else if (header.includes('platform') || header.includes('where')) outreach.platform_details = value
           else if (header.includes('fit') || header.includes('score')) {
@@ -244,6 +277,38 @@ function OutreachTracker() {
     } catch (error) {
       console.error('Failed to update status:', error)
       toast.error('Failed to update status')
+    }
+  }
+
+  async function handleSaveEdits() {
+    if (!selectedOutreach) return
+    const dirtyKeys = Object.keys(editedFields)
+    if (dirtyKeys.length === 0) {
+      setShowDetailsModal(false)
+      return
+    }
+    setSavingEdits(true)
+    try {
+      const updates = {}
+      for (const k of dirtyKeys) {
+        let v = editedFields[k]
+        if (k === 'fit_score') {
+          v = (v === null || v === '') ? null : Number(v)
+          if (v !== null && (!Number.isFinite(v) || v < 1 || v > 5)) v = null
+        }
+        if (k === 'outreach_date' && !v) v = null
+        updates[k] = v
+      }
+      await updateOutreach(selectedOutreach.id, updates)
+      setOutreaches(prev => prev.map(o => o.id === selectedOutreach.id ? { ...o, ...updates } : o))
+      toast.success('Outreach updated')
+      setShowDetailsModal(false)
+      setEditedFields({})
+    } catch (err) {
+      console.error('Failed to update outreach:', err)
+      toast.error('Failed to update: ' + err.message)
+    } finally {
+      setSavingEdits(false)
     }
   }
 
@@ -776,11 +841,12 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                           className="icon-btn"
                           onClick={() => {
                             setSelectedOutreach(outreach)
+                            setEditedFields({})
                             setShowDetailsModal(true)
                           }}
-                          title="View Details"
+                          title="View / Edit"
                         >
-                          <Eye size={16} />
+                          <Edit2 size={16} />
                         </button>
                         <button
                           className="icon-btn"
@@ -828,130 +894,176 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0 }}>Outreach Details</h2>
+              <h2 style={{ margin: 0 }}>Edit Outreach</h2>
               <button
                 className="icon-btn"
-                onClick={() => setShowDetailsModal(false)}
+                onClick={() => { setShowDetailsModal(false); setEditedFields({}) }}
                 style={{ fontSize: '24px' }}
               >
                 ×
               </button>
             </div>
 
-            <div className="info-grid">
-              <div className="info-item">
-                <label>Lead</label>
-                <div style={{ fontWeight: '600' }}>{selectedOutreach.lead_name || selectedOutreach.lead?.name}</div>
-              </div>
+            {(() => {
+              const fv = (field) => editedFields[field] !== undefined ? editedFields[field] : (selectedOutreach[field] ?? '')
+              const setField = (field, value) => setEditedFields(prev => ({ ...prev, [field]: value }))
+              return (
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Lead</label>
+                    <input
+                      type="text"
+                      value={fv('lead_name')}
+                      onChange={(e) => setField('lead_name', e.target.value)}
+                      placeholder="Lead name"
+                    />
+                  </div>
 
-              <div className="info-item">
-                <label>Firm</label>
-                <div>{selectedOutreach.firm_name || selectedOutreach.lead?.firm_name || '-'}</div>
-              </div>
+                  <div className="info-item">
+                    <label>Firm</label>
+                    <input
+                      type="text"
+                      value={fv('firm_name')}
+                      onChange={(e) => setField('firm_name', e.target.value)}
+                      placeholder="Firm / company"
+                    />
+                  </div>
 
-              <div className="info-item">
-                <label>Industry</label>
-                <div>{selectedOutreach.industry || '-'}</div>
-              </div>
+                  <div className="info-item">
+                    <label>Industry</label>
+                    <input
+                      type="text"
+                      value={fv('industry')}
+                      onChange={(e) => setField('industry', e.target.value)}
+                      placeholder="e.g., SaaS"
+                    />
+                  </div>
 
-              <div className="info-item">
-                <label>Fit Score</label>
-                <div>
-                  {selectedOutreach.fit_score ? (
-                    <span style={{
-                      padding: '4px 12px',
-                      borderRadius: '12px',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      background:
-                        selectedOutreach.fit_score >= 4 ? '#d1fae5' :
-                        selectedOutreach.fit_score >= 3 ? '#fef3c7' : '#fee2e2',
-                      color:
-                        selectedOutreach.fit_score >= 4 ? '#065f46' :
-                        selectedOutreach.fit_score >= 3 ? '#92400e' : '#991b1b'
-                    }}>
-                      {selectedOutreach.fit_score}/5
-                      {selectedOutreach.fit_score >= 4 && ' 🎯'}
-                      {selectedOutreach.fit_score === 3 && ' 👌'}
-                      {selectedOutreach.fit_score <= 2 && ' ⚠️'}
-                    </span>
-                  ) : '-'}
-                </div>
-              </div>
+                  <div className="info-item">
+                    <label>Fit Score (1-5)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={fv('fit_score') || ''}
+                      onChange={(e) => setField('fit_score', e.target.value === '' ? null : parseInt(e.target.value, 10))}
+                      placeholder="1-5"
+                    />
+                  </div>
 
-              <div className="info-item">
-                <label>Deal Size</label>
-                <div>{selectedOutreach.deal_size || '-'}</div>
-              </div>
+                  <div className="info-item">
+                    <label>Deal Size</label>
+                    <input
+                      type="text"
+                      value={fv('deal_size')}
+                      onChange={(e) => setField('deal_size', e.target.value)}
+                      placeholder="e.g., $1M-$5M"
+                    />
+                  </div>
 
-              <div className="info-item">
-                <label>Location</label>
-                <div>{selectedOutreach.location || '-'}</div>
-              </div>
+                  <div className="info-item">
+                    <label>Location</label>
+                    <input
+                      type="text"
+                      value={fv('location')}
+                      onChange={(e) => setField('location', e.target.value)}
+                      placeholder="e.g., New York"
+                    />
+                  </div>
 
-              <div className="info-item">
-                <label>Lead Source</label>
-                <div>{selectedOutreach.lead_source || '-'}</div>
-              </div>
+                  <div className="info-item">
+                    <label>Lead Source</label>
+                    <input
+                      type="text"
+                      value={fv('lead_source')}
+                      onChange={(e) => setField('lead_source', e.target.value)}
+                      placeholder="e.g., LinkedIn"
+                    />
+                  </div>
 
-              <div className="info-item">
-                <label>Date</label>
-                <div>{new Date(selectedOutreach.outreach_date).toLocaleDateString()}</div>
-              </div>
+                  <div className="info-item">
+                    <label>Date</label>
+                    <input
+                      type="date"
+                      value={fv('outreach_date') ? String(fv('outreach_date')).slice(0, 10) : ''}
+                      onChange={(e) => setField('outreach_date', e.target.value)}
+                    />
+                  </div>
 
-              <div className="info-item">
-                <label>Type</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {outreachTypeIcons[selectedOutreach.outreach_type]}
-                  <span style={{ textTransform: 'capitalize' }}>
-                    {selectedOutreach.outreach_type.replace(/_/g, ' ')}
-                  </span>
-                </div>
-              </div>
+                  <div className="info-item">
+                    <label>Type</label>
+                    <select
+                      value={fv('outreach_type') || 'cold_email'}
+                      onChange={(e) => setField('outreach_type', e.target.value)}
+                    >
+                      <option value="cold_email">Cold Email</option>
+                      <option value="linkedin_message">LinkedIn Message</option>
+                      <option value="phone_call">Phone Call</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
 
-              <div className="info-item">
-                <label>Status</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {statusIcons[selectedOutreach.status]}
-                  <span style={{ textTransform: 'capitalize' }}>
-                    {selectedOutreach.status.replace(/_/g, ' ')}
-                  </span>
-                </div>
-              </div>
+                  <div className="info-item">
+                    <label>Status</label>
+                    <select
+                      value={fv('status') || 'sent'}
+                      onChange={(e) => setField('status', e.target.value)}
+                    >
+                      <option value="sent">Sent</option>
+                      <option value="replied">Replied</option>
+                      <option value="no_response">No Response</option>
+                      <option value="bounced">Bounced</option>
+                    </select>
+                  </div>
 
-              {selectedOutreach.platform_details && (
-                <div className="info-item full-width">
-                  <label>Platform / Where Contacted</label>
-                  <div>{selectedOutreach.platform_details}</div>
-                </div>
-              )}
+                  <div className="info-item full-width">
+                    <label>Platform / Where Contacted</label>
+                    <input
+                      type="text"
+                      value={fv('platform_details')}
+                      onChange={(e) => setField('platform_details', e.target.value)}
+                      placeholder="e.g., LinkedIn DM, john@acme.com"
+                    />
+                  </div>
 
-              {selectedOutreach.message_content && (
-                <div className="info-item full-width">
-                  <label>Message Sent</label>
-                  <div style={{
-                    background: 'var(--gray-50)',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    whiteSpace: 'pre-wrap',
-                    fontFamily: 'system-ui',
-                    fontSize: '14px',
-                    lineHeight: '1.6',
-                    border: '1px solid var(--gray-200)'
-                  }}>
-                    {selectedOutreach.message_content}
+                  <div className="info-item full-width">
+                    <label>Message Sent</label>
+                    <textarea
+                      value={fv('message_content')}
+                      onChange={(e) => setField('message_content', e.target.value)}
+                      rows={5}
+                      placeholder="The actual message you sent..."
+                    />
+                  </div>
+
+                  <div className="info-item full-width">
+                    <label>Additional Notes</label>
+                    <textarea
+                      value={fv('notes')}
+                      onChange={(e) => setField('notes', e.target.value)}
+                      rows={3}
+                      placeholder="Any other notes..."
+                    />
                   </div>
                 </div>
-              )}
+              )
+            })()}
 
-              {selectedOutreach.notes && (
-                <div className="info-item full-width">
-                  <label>Additional Notes</label>
-                  <div style={{ whiteSpace: 'pre-wrap', color: 'var(--gray-600)' }}>
-                    {selectedOutreach.notes}
-                  </div>
-                </div>
-              )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--gray-200)' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => { setShowDetailsModal(false); setEditedFields({}) }}
+                disabled={savingEdits}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveEdits}
+                disabled={savingEdits || Object.keys(editedFields).length === 0}
+              >
+                {savingEdits ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </div>
         </div>
