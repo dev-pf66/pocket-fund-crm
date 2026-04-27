@@ -3,8 +3,33 @@ import { getPartners, createPartner, updatePartner, movePartner, deletePartner }
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
-import { Plus, Search, Trash2, ExternalLink, Linkedin } from 'lucide-react'
+import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
+import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0]
+}
+
+// Days until / since a YYYY-MM-DD date relative to today. Negative = overdue.
+function daysUntil(dateStr) {
+  if (!dateStr) return null
+  const today = new Date(todayStr() + 'T00:00:00')
+  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00')
+  if (Number.isNaN(d.getTime())) return null
+  return Math.round((d - today) / (1000 * 60 * 60 * 24))
+}
+
+// Bucket a partner's follow-up date for badges + the due-list at the top.
+// Returns null if there's no follow-up scheduled or it's still far out.
+function followUpStatus(dateStr) {
+  const days = daysUntil(dateStr)
+  if (days === null) return null
+  if (days < 0) return { kind: 'overdue', label: `${-days}d overdue`, color: '#dc2626' }
+  if (days === 0) return { kind: 'today', label: 'Due today', color: '#d97706' }
+  if (days <= 3) return { kind: 'soon', label: `In ${days}d`, color: '#ca8a04' }
+  return null
+}
 
 const STAGES = [
   { key: 'potential', label: 'Potential', color: '#a78bfa' },
@@ -160,11 +185,16 @@ function CategoryChips({ value, onChange, available, onAddCustom, disabled = fal
 function PartnersBoard() {
   const { currentPerson } = useApp()
   const { toast } = useToast()
+  const isMobile = useIsMobileDevice()
   const [partners, setPartners] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingPartner, setEditingPartner] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [draggedPartner, setDraggedPartner] = useState(null)
+  // When the user clicks a "follow-ups due" partner from the alert banner,
+  // the page filters to just that set so they can work through them.
+  const [showOnlyDue, setShowOnlyDue] = useSessionState('pb:showOnlyDue', false)
+  const [dueExpanded, setDueExpanded] = useSessionState('pb:dueExpanded', false)
 
   const [searchQuery, setSearchQuery] = useSessionState('pb:searchQuery', '')
   const [categoryFilter, setCategoryFilter] = useSessionState('pb:categoryFilter', 'all')
@@ -218,9 +248,23 @@ function PartnersBoard() {
     }
   }
 
+  // Partners whose follow-up date is today or earlier, sorted oldest first
+  // so the most-overdue surface at the top of the alert banner.
+  const dueFollowUps = useMemo(() => {
+    return partners
+      .filter(p => {
+        if (p.stage === 'passed' || p.stage === 'active_partner') return false
+        const days = daysUntil(p.next_follow_up_date)
+        return days !== null && days <= 0
+      })
+      .sort((a, b) => String(a.next_follow_up_date).localeCompare(String(b.next_follow_up_date)))
+  }, [partners])
+
   const filteredPartners = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
+    const dueIds = new Set(dueFollowUps.map(p => p.id))
     return partners.filter(p => {
+      if (showOnlyDue && !dueIds.has(p.id)) return false
       if (categoryFilter !== 'all' && !(p.categories || []).includes(categoryFilter)) return false
       if (!q) return true
       return (
@@ -229,7 +273,7 @@ function PartnersBoard() {
         (p.notes || '').toLowerCase().includes(q)
       )
     })
-  }, [partners, searchQuery, categoryFilter])
+  }, [partners, searchQuery, categoryFilter, showOnlyDue, dueFollowUps])
 
   function partnersInStage(stage) {
     return filteredPartners.filter(p => p.stage === stage)
@@ -403,11 +447,110 @@ function PartnersBoard() {
         </div>
       </div>
 
+      {dueFollowUps.length > 0 && (
+        <div
+          style={{
+            background: '#fff7ed',
+            border: '1px solid #fed7aa',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            marginBottom: '16px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <AlertCircle size={16} style={{ color: '#c2410c' }} />
+            <strong style={{ color: '#9a3412', fontSize: '13px' }}>
+              {dueFollowUps.length} follow-up{dueFollowUps.length === 1 ? '' : 's'} due
+            </strong>
+            <button
+              onClick={() => setShowOnlyDue(v => !v)}
+              style={{
+                background: showOnlyDue ? '#c2410c' : 'white',
+                color: showOnlyDue ? 'white' : '#c2410c',
+                border: '1px solid #c2410c',
+                borderRadius: '999px',
+                padding: '3px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              {showOnlyDue ? 'Show all' : 'Show only due'}
+            </button>
+            <button
+              onClick={() => setDueExpanded(v => !v)}
+              style={{
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                color: '#9a3412',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              {dueExpanded ? 'Collapse' : 'Expand'}
+              {dueExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </div>
+          {dueExpanded && (
+            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {dueFollowUps.map(p => {
+                const status = followUpStatus(p.next_follow_up_date)
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setEditingPartner(p)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '6px 10px', textAlign: 'left',
+                      background: 'white', border: '1px solid #fed7aa',
+                      borderRadius: '6px', cursor: 'pointer'
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#111827' }}>{p.name}</span>
+                    {status && (
+                      <span style={{
+                        fontSize: '10px', fontWeight: 600,
+                        padding: '2px 6px', borderRadius: '999px',
+                        background: status.color + '22', color: status.color
+                      }}>
+                        {status.label}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
           <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
           Loading partners…
         </div>
+      ) : isMobile ? (
+        <MobilePartnerList
+          stages={STAGES}
+          partnersInStage={partnersInStage}
+          onEdit={setEditingPartner}
+          onDelete={handleDelete}
+          onMove={async (partner, newStage) => {
+            const prev = partners
+            setPartners(prev.map(p => p.id === partner.id ? { ...p, stage: newStage } : p))
+            try {
+              await movePartner(partner.id, newStage)
+            } catch (err) {
+              console.error('Failed to move partner:', err)
+              toast.error('Failed to move')
+              setPartners(prev)
+            }
+          }}
+        />
       ) : (
         <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
           {STAGES.map(stage => {
@@ -488,6 +631,7 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
     label: labelForCategory(k),
     color: colorForCategory(k)
   }))
+  const followUp = followUpStatus(partner.next_follow_up_date)
   return (
     <div
       draggable
@@ -519,6 +663,17 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
         <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>{partner.handle}</div>
       )}
 
+      {followUp && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px',
+          fontSize: '10px', fontWeight: 600,
+          padding: '2px 6px', borderRadius: '999px',
+          background: followUp.color + '22', color: followUp.color
+        }}>
+          <Calendar size={10} />
+          {followUp.label}
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
         {cats.map(c => (
           <span
@@ -548,6 +703,136 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
             title={partner.url}
           >
             <ExternalLink size={11} />
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Mobile layout: stacked stage sections instead of a horizontal kanban,
+// since side-scrolling 5 columns on a phone is unusable. Drag-to-move is
+// replaced with a Stage select on each card so touch users can advance
+// partners through the pipeline.
+function MobilePartnerList({ stages, partnersInStage, onEdit, onDelete, onMove }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {stages.map(stage => {
+        const items = partnersInStage(stage.key)
+        if (items.length === 0) return null
+        return (
+          <div key={stage.key}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '0 4px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }} />
+              <strong style={{ fontSize: '13px', color: '#111827' }}>{stage.label}</strong>
+              <span style={{ fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {items.map(p => (
+                <MobilePartnerCard
+                  key={p.id}
+                  partner={p}
+                  stages={stages}
+                  onEdit={() => onEdit(p)}
+                  onDelete={() => onDelete(p.id)}
+                  onMove={(newStage) => onMove(p, newStage)}
+                />
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function MobilePartnerCard({ partner, stages, onEdit, onDelete, onMove }) {
+  const cats = (partner.categories || []).map(k => ({
+    key: k,
+    label: labelForCategory(k),
+    color: colorForCategory(k)
+  }))
+  const followUp = followUpStatus(partner.next_follow_up_date)
+  return (
+    <div
+      onClick={onEdit}
+      style={{
+        background: 'white',
+        border: '1px solid #e5e7eb',
+        borderRadius: '8px',
+        padding: '12px 14px',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '6px' }}>
+        <div style={{ fontWeight: 600, fontSize: '15px', color: '#111827', lineHeight: 1.3 }}>
+          {partner.name}
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          title="Delete"
+          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {partner.handle && (
+        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>{partner.handle}</div>
+      )}
+
+      {followUp && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '8px',
+          fontSize: '11px', fontWeight: 600,
+          padding: '3px 8px', borderRadius: '999px',
+          background: followUp.color + '22', color: followUp.color
+        }}>
+          <Calendar size={11} />
+          {followUp.label}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginBottom: '10px' }}>
+        {cats.map(c => (
+          <span
+            key={c.key}
+            style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: '999px',
+              background: c.color + '22',
+              color: c.color
+            }}
+          >
+            {c.label}
+          </span>
+        ))}
+        {partner.audience_size && (
+          <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '4px' }}>{partner.audience_size}</span>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
+        <select
+          value={partner.stage}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => { e.stopPropagation(); onMove(e.target.value) }}
+          style={{ flex: 1, fontSize: '12px', padding: '6px 8px' }}
+        >
+          {stages.map(s => (
+            <option key={s.key} value={s.key}>Move to: {s.label}</option>
+          ))}
+        </select>
+        {partner.url && (
+          <a
+            href={partner.url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            style={{ color: '#6b7280', padding: '6px' }}
+          >
+            <ExternalLink size={14} />
           </a>
         )}
       </div>
