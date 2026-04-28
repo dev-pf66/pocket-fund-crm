@@ -662,11 +662,20 @@ function StatTile({ icon, label, value, sub }) {
   )
 }
 
+// Admins can view team-wide outreach + drill into any teammate. Non-admins
+// stay scoped to themselves. Mirrors the isAdminUser helper in Layout.jsx.
+const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
+function isAdminUser(person) {
+  if (!person) return false
+  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
+
 function OutreachAdmin() {
   const { toast } = useToast()
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const navigate = useNavigate()
   const isMobile = useIsMobileDevice()
+  const isAdmin = isAdminUser(currentPerson)
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useSessionState('oa:expandedId', null)
@@ -687,22 +696,35 @@ function OutreachAdmin() {
     has_response: ''
   })
 
+  // Admin-only viewing state. 'me' = just my entries (default), 'all' = the
+  // whole team, otherwise a specific person.id. Non-admins ignore this.
+  const [viewing, setViewing] = useSessionState('oa:viewing', 'me')
+
+  const viewingPersonId = !isAdmin
+    ? currentPerson?.id ?? null
+    : viewing === 'me'
+      ? currentPerson?.id ?? null
+      : viewing === 'all'
+        ? null
+        : viewing
+
   const [chartRange, setChartRange] = useSessionState('oa:chartRange', 14)
   const [showChartDetails, setShowChartDetails] = useSessionState('oa:chartDetails', false)
 
   useEffect(() => {
     loadEntries()
-  }, [filters, currentPerson?.id])
+  }, [filters, currentPerson?.id, viewing, isAdmin])
 
   useEffect(() => {
     loadStats()
-  }, [currentPerson?.id])
+  }, [currentPerson?.id, viewing, isAdmin])
 
   async function loadEntries() {
     if (!currentPerson?.id) return
     setLoading(true)
     try {
-      const applied = { logged_by: currentPerson.id }
+      const applied = {}
+      if (viewingPersonId) applied.logged_by = viewingPersonId
       if (filters.platform) applied.platform = filters.platform
       if (filters.days_back) applied.days_back = parseInt(filters.days_back)
       if (filters.has_response === 'yes') applied.has_response = true
@@ -721,7 +743,7 @@ function OutreachAdmin() {
     if (!currentPerson?.id) return
     setStatsLoading(true)
     try {
-      const rows = await getOutreachStatsByPerson(90, currentPerson.id)
+      const rows = await getOutreachStatsByPerson(90, viewingPersonId)
       setStatsRows(rows)
     } catch (err) {
       console.error('Failed to load outreach stats:', err)
@@ -730,8 +752,8 @@ function OutreachAdmin() {
     }
   }
 
-  // Per-user: stats rows only contain the current person's entries, so the
-  // dashboard metrics reflect them directly.
+  // Stats rows match the current viewing scope (one person, or everyone),
+  // so the dashboard metrics reflect that view directly.
   const dailyBuckets = useMemo(() => {
     const m = new Map()
     for (const r of statsRows) {
@@ -744,6 +766,13 @@ function OutreachAdmin() {
     if (!currentPerson?.id) return null
     return computeMetrics(dailyBuckets)
   }, [currentPerson?.id, dailyBuckets])
+
+  // Header label that matches whose data is on screen.
+  const viewingLabel = !isAdmin || viewing === 'me'
+    ? (currentPerson?.name || 'You')
+    : viewing === 'all'
+      ? 'Everyone (team)'
+      : (people?.find(p => String(p.id) === String(viewing))?.name || 'Teammate')
 
   const visibleEntries = entries
   const totalCount = visibleEntries.length
@@ -810,15 +839,41 @@ function OutreachAdmin() {
             <Target size={24} /> Outreach Log
           </h1>
           <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
-            Your daily targets, streaks, and outreach history
+            {isAdmin
+              ? 'Daily targets, streaks, and outreach history (admin can view any teammate)'
+              : 'Your daily targets, streaks, and outreach history'}
           </p>
         </div>
       </div>
 
-      {/* Personal dashboard */}
+      {/* Admin-only team switcher */}
+      {isAdmin && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+            Viewing
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <ViewPill active={viewing === 'me'} onClick={() => setViewing('me')}>Me</ViewPill>
+            <ViewPill active={viewing === 'all'} onClick={() => setViewing('all')}>Everyone</ViewPill>
+            {(people || [])
+              .filter(p => p.id !== currentPerson?.id)
+              .map(p => (
+                <ViewPill
+                  key={p.id}
+                  active={String(viewing) === String(p.id)}
+                  onClick={() => setViewing(p.id)}
+                >
+                  {p.name}
+                </ViewPill>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Personal / team dashboard */}
       {!statsLoading && currentPerson && focusedMetrics && (
         <AnalystDashboard
-          personName={currentPerson.name}
+          personName={viewingLabel}
           metrics={focusedMetrics}
           chartRows={statsRows}
           chartRange={chartRange}
@@ -1176,6 +1231,27 @@ function OutreachAdmin() {
         )}
       </div>
     </div>
+  )
+}
+
+function ViewPill({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '6px 14px',
+        borderRadius: '999px',
+        border: active ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
+        background: active ? '#eff6ff' : 'white',
+        color: active ? '#1d4ed8' : '#111827',
+        fontSize: '13px',
+        fontWeight: active ? 600 : 500,
+        cursor: 'pointer',
+        transition: 'border-color 0.12s, background 0.12s'
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
