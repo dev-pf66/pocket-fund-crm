@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { useLeadTypes } from '../hooks/useLeadTypes'
+import { useFieldOptions } from '../hooks/useFieldOptions'
 import LeadForm from './LeadForm'
 
 const DAILY_GOAL = 10
@@ -505,7 +506,8 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
 
 function MobileEntryCard({
   entry, expanded, onToggleExpand, onOpenContact, onAddContact, onToggleResponded,
-  onLeadSaved, promoting, toggling, formatDate
+  onLeadSaved, promoting, toggling, formatDate,
+  onSaveField, industryOptions = [], dealSizeOptions = [], locationOptions = [], leadSourceOptions = []
 }) {
   const hasLead = !!entry.lead
   return (
@@ -620,18 +622,30 @@ function MobileEntryCard({
           {entry.platform_details && (
             <div><div style={metaLabelStyle}>Platform Details</div><div style={metaValueStyle}>{entry.platform_details}</div></div>
           )}
-          {entry.industry && (
-            <div><div style={metaLabelStyle}>Industry</div><div style={metaValueStyle}>{entry.industry}</div></div>
-          )}
-          {entry.deal_size && (
-            <div><div style={metaLabelStyle}>Deal Size</div><div style={metaValueStyle}>{entry.deal_size}</div></div>
-          )}
-          {entry.location && (
-            <div><div style={metaLabelStyle}>Location</div><div style={metaValueStyle}>{entry.location}</div></div>
-          )}
-          {entry.lead_source && (
-            <div><div style={metaLabelStyle}>Lead Source</div><div style={metaValueStyle}>{entry.lead_source}</div></div>
-          )}
+          <div><div style={metaLabelStyle}>Industry</div>
+            <select style={{ ...metaValueStyle, width: '100%', cursor: 'pointer' }} value={entry.industry || ''} onChange={e => onSaveField('industry', e.target.value)}>
+              <option value="">—</option>
+              {industryOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+            </select>
+          </div>
+          <div><div style={metaLabelStyle}>Deal Size</div>
+            <select style={{ ...metaValueStyle, width: '100%', cursor: 'pointer' }} value={entry.deal_size || ''} onChange={e => onSaveField('deal_size', e.target.value)}>
+              <option value="">—</option>
+              {dealSizeOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+            </select>
+          </div>
+          <div><div style={metaLabelStyle}>Location</div>
+            <select style={{ ...metaValueStyle, width: '100%', cursor: 'pointer' }} value={entry.location || ''} onChange={e => onSaveField('location', e.target.value)}>
+              <option value="">—</option>
+              {locationOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+            </select>
+          </div>
+          <div><div style={metaLabelStyle}>Lead Source</div>
+            <select style={{ ...metaValueStyle, width: '100%', cursor: 'pointer' }} value={entry.lead_source || ''} onChange={e => onSaveField('lead_source', e.target.value)}>
+              <option value="">—</option>
+              {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+            </select>
+          </div>
           {entry.notes && (
             <div><div style={metaLabelStyle}>Notes</div><div style={metaValueStyle}>{entry.notes}</div></div>
           )}
@@ -818,6 +832,10 @@ function OutreachAdmin() {
   const { toast } = useToast()
   const { currentPerson, people } = useApp()
   const navigate = useNavigate()
+  const industryOptions = useFieldOptions('industry')
+  const dealSizeOptions = useFieldOptions('deal_size')
+  const locationOptions = useFieldOptions('location')
+  const leadSourceOptions = useFieldOptions('lead_source')
   const isMobile = useIsMobileDevice()
   const isAdmin = isAdminUser(currentPerson)
   const [entries, setEntries] = useState([])
@@ -973,6 +991,16 @@ function OutreachAdmin() {
 
   function toggleExpand(id) {
     setExpandedId(prev => prev === id ? null : id)
+  }
+
+  async function saveEntryField(entryId, field, value) {
+    try {
+      await updateOutreach(entryId, { [field]: value || null })
+      setEntries(prev => prev.map(e => e.id === entryId ? { ...e, [field]: value } : e))
+    } catch (err) {
+      console.error('Failed to update entry:', err)
+      toast.error('Failed to save: ' + err.message)
+    }
   }
 
   return (
@@ -1172,6 +1200,11 @@ function OutreachAdmin() {
                 promoting={promotingId === entry.id}
                 toggling={togglingId === entry.id}
                 formatDate={formatDate}
+                onSaveField={(field, value) => saveEntryField(entry.id, field, value)}
+                industryOptions={industryOptions}
+                dealSizeOptions={dealSizeOptions}
+                locationOptions={locationOptions}
+                leadSourceOptions={leadSourceOptions}
               />
             ))}
           </div>
@@ -1343,30 +1376,34 @@ function OutreachAdmin() {
                                 <div style={metaValueStyle}>{entry.platform_details}</div>
                               </div>
                             )}
-                            {entry.industry && (
-                              <div>
-                                <div style={metaLabelStyle}>Industry</div>
-                                <div style={metaValueStyle}>{entry.industry}</div>
-                              </div>
-                            )}
-                            {entry.deal_size && (
-                              <div>
-                                <div style={metaLabelStyle}>Deal Size</div>
-                                <div style={metaValueStyle}>{entry.deal_size}</div>
-                              </div>
-                            )}
-                            {entry.location && (
-                              <div>
-                                <div style={metaLabelStyle}>Location</div>
-                                <div style={metaValueStyle}>{entry.location}</div>
-                              </div>
-                            )}
-                            {entry.lead_source && (
-                              <div>
-                                <div style={metaLabelStyle}>Lead Source</div>
-                                <div style={metaValueStyle}>{entry.lead_source}</div>
-                              </div>
-                            )}
+                            <div>
+                              <div style={metaLabelStyle}>Industry</div>
+                              <select style={{ ...metaValueStyle, width: '100%', cursor: 'pointer' }} value={entry.industry || ''} onChange={e => saveEntryField(entry.id, 'industry', e.target.value)}>
+                                <option value="">—</option>
+                                {industryOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <div style={metaLabelStyle}>Deal Size</div>
+                              <select style={{ ...metaValueStyle, width: '100%', cursor: 'pointer' }} value={entry.deal_size || ''} onChange={e => saveEntryField(entry.id, 'deal_size', e.target.value)}>
+                                <option value="">—</option>
+                                {dealSizeOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <div style={metaLabelStyle}>Location</div>
+                              <select style={{ ...metaValueStyle, width: '100%', cursor: 'pointer' }} value={entry.location || ''} onChange={e => saveEntryField(entry.id, 'location', e.target.value)}>
+                                <option value="">—</option>
+                                {locationOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <div style={metaLabelStyle}>Lead Source</div>
+                              <select style={{ ...metaValueStyle, width: '100%', cursor: 'pointer' }} value={entry.lead_source || ''} onChange={e => saveEntryField(entry.id, 'lead_source', e.target.value)}>
+                                <option value="">—</option>
+                                {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                              </select>
+                            </div>
                             {entry.notes && (
                               <div>
                                 <div style={metaLabelStyle}>Notes</div>
