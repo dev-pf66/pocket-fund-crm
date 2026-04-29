@@ -804,6 +804,16 @@ function LeadEditCard({ leadId, onSaved }) {
           </select>
         </div>
         <div>
+          <div style={metaLabelStyle}>Lead Stage</div>
+          <select style={inputStyle} value={fv('outreach_stage') || ''} onChange={e => setField('outreach_stage', e.target.value)}>
+            <option value="">—</option>
+            <option value="cold">Cold</option>
+            <option value="messaged">Messaged</option>
+            <option value="replied">Replied</option>
+            <option value="meeting">Meeting</option>
+          </select>
+        </div>
+        <div>
           <div style={metaLabelStyle}>Lead Source</div>
           <input style={inputStyle} value={fv('lead_source')} onChange={e => setField('lead_source', e.target.value)} />
         </div>
