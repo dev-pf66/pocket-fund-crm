@@ -681,6 +681,7 @@ function isAdminUser(person) {
 // name/firm without a full refetch.
 function LeadEditCard({ leadId, onSaved }) {
   const { toast } = useToast()
+  const leadTypes = useLeadTypes()
   const [lead, setLead] = useState(null)
   const [loading, setLoading] = useState(true)
   const [edits, setEdits] = useState({})
@@ -816,7 +817,6 @@ function LeadEditCard({ leadId, onSaved }) {
 function OutreachAdmin() {
   const { toast } = useToast()
   const { currentPerson, people } = useApp()
-  const leadTypes = useLeadTypes()
   const navigate = useNavigate()
   const isMobile = useIsMobileDevice()
   const isAdmin = isAdminUser(currentPerson)
