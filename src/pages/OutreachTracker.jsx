@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl } from '../lib/crm-api'
+import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
@@ -969,6 +969,34 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                       {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                     </select>
                   </div>
+
+                  {selectedOutreach?.lead?.id && (
+                    <div className="info-item">
+                      <label>Lead Stage</label>
+                      <select
+                        defaultValue={selectedOutreach.lead?.outreach_stage || ''}
+                        onChange={async (e) => {
+                          const val = e.target.value
+                          try {
+                            await updateLead(selectedOutreach.lead.id, { outreach_stage: val || null })
+                            setOutreaches(prev => prev.map(o =>
+                              o.id === selectedOutreach.id
+                                ? { ...o, lead: { ...o.lead, outreach_stage: val } }
+                                : o
+                            ))
+                          } catch (err) {
+                            toast.error('Failed to save lead stage: ' + err.message)
+                          }
+                        }}
+                      >
+                        <option value="">—</option>
+                        <option value="cold">Cold</option>
+                        <option value="messaged">Messaged</option>
+                        <option value="replied">Replied</option>
+                        <option value="meeting">Meeting</option>
+                      </select>
+                    </div>
+                  )}
 
                   <div className="info-item">
                     <label>Date</label>
