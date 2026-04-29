@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, promoteOutreachToLead, getLeadById } from '../lib/crm-api'
+import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, promoteOutreachToLead, getLeadById, updateLead } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2, Plus } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -504,7 +504,7 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
 
 function MobileEntryCard({
   entry, expanded, onToggleExpand, onOpenContact, onAddContact, onToggleResponded,
-  promoting, toggling, formatDate
+  onLeadSaved, promoting, toggling, formatDate
 }) {
   const hasLead = !!entry.lead
   return (
@@ -634,6 +634,9 @@ function MobileEntryCard({
           {entry.notes && (
             <div><div style={metaLabelStyle}>Notes</div><div style={metaValueStyle}>{entry.notes}</div></div>
           )}
+          {entry.lead?.id && (
+            <LeadEditCard leadId={entry.lead.id} onSaved={onLeadSaved} />
+          )}
         </div>
       )}
     </div>
@@ -668,6 +671,146 @@ const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
 function isAdminUser(person) {
   if (!person) return false
   return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
+
+// Inline editor for the lead linked to an outreach entry. Mounts when the
+// row expands, fetches the full lead, and saves only the fields the user
+// touched so untouched columns aren't clobbered. onSaved bubbles the
+// updated lead up so the parent table cell can re-render with the new
+// name/firm without a full refetch.
+function LeadEditCard({ leadId, onSaved }) {
+  const { toast } = useToast()
+  const [lead, setLead] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [edits, setEdits] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    getLeadById(leadId)
+      .then(d => { if (alive) { setLead(d); setEdits({}) } })
+      .catch(err => {
+        console.error('Failed to load lead:', err)
+        if (alive) toast.error('Failed to load lead')
+      })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [leadId])
+
+  const fv = (k) => edits[k] !== undefined ? edits[k] : (lead?.[k] ?? '')
+  const setField = (k, v) => setEdits(prev => ({ ...prev, [k]: v }))
+  const dirty = Object.keys(edits).length > 0
+
+  async function handleSave() {
+    if (!dirty) return
+    setSaving(true)
+    try {
+      const updated = await updateLead(leadId, edits)
+      setLead(updated)
+      setEdits({})
+      toast.success('Lead updated')
+      if (onSaved) onSaved(updated)
+    } catch (err) {
+      console.error('Failed to update lead:', err)
+      toast.error('Failed to update lead: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: '14px', color: '#6b7280', fontSize: '13px' }}>Loading lead…</div>
+    )
+  }
+  if (!lead) return null
+
+  const inputStyle = {
+    width: '100%',
+    padding: '6px 10px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '4px',
+    fontSize: '13px',
+    background: 'white'
+  }
+
+  return (
+    <div style={{
+      marginTop: '12px',
+      background: 'white',
+      border: '1px solid #e5e7eb',
+      borderRadius: '8px',
+      padding: '14px'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Lead info
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={!dirty || saving}
+          className="btn btn-primary btn-sm"
+          style={{ opacity: !dirty || saving ? 0.6 : 1 }}
+        >
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <div>
+          <div style={metaLabelStyle}>Name</div>
+          <input style={inputStyle} value={fv('name')} onChange={e => setField('name', e.target.value)} />
+        </div>
+        <div>
+          <div style={metaLabelStyle}>Firm</div>
+          <input style={inputStyle} value={fv('firm_name')} onChange={e => setField('firm_name', e.target.value)} />
+        </div>
+        <div>
+          <div style={metaLabelStyle}>Email</div>
+          <input style={inputStyle} type="email" value={fv('email')} onChange={e => setField('email', e.target.value)} />
+        </div>
+        <div>
+          <div style={metaLabelStyle}>Phone</div>
+          <input style={inputStyle} type="tel" value={fv('phone')} onChange={e => setField('phone', e.target.value)} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div style={metaLabelStyle}>LinkedIn URL</div>
+          <input style={inputStyle} type="url" value={fv('linkedin_url')} onChange={e => setField('linkedin_url', e.target.value)} />
+        </div>
+        <div>
+          <div style={metaLabelStyle}>Lead Type</div>
+          <select style={inputStyle} value={fv('lead_type')} onChange={e => setField('lead_type', e.target.value)}>
+            <option value="">—</option>
+            <option value="Independent Sponsor">Independent Sponsor</option>
+            <option value="PE Firm">PE Firm</option>
+            <option value="Family Office">Family Office</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <div style={metaLabelStyle}>Lead Source</div>
+          <input style={inputStyle} value={fv('lead_source')} onChange={e => setField('lead_source', e.target.value)} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div style={metaLabelStyle}>Deal Criteria</div>
+          <textarea
+            style={{ ...inputStyle, minHeight: '52px', fontFamily: 'inherit' }}
+            value={fv('deal_criteria')}
+            onChange={e => setField('deal_criteria', e.target.value)}
+          />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div style={metaLabelStyle}>Notes</div>
+          <textarea
+            style={{ ...inputStyle, minHeight: '60px', fontFamily: 'inherit' }}
+            value={fv('notes')}
+            onChange={e => setField('notes', e.target.value)}
+          />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function OutreachAdmin() {
@@ -1015,6 +1158,16 @@ function OutreachAdmin() {
                 onOpenContact={(ev) => openContact(entry, ev)}
                 onAddContact={(ev) => { ev.stopPropagation(); setAddContactFor(entry) }}
                 onToggleResponded={(ev) => toggleResponded(entry, ev)}
+                onLeadSaved={(updated) => {
+                  setEntries(prev => prev.map(x => x.id === entry.id
+                    ? {
+                        ...x,
+                        lead_name: updated.name,
+                        firm_name: x.firm_name || updated.firm_name,
+                        lead: { id: updated.id, name: updated.name, firm_name: updated.firm_name, stage: updated.stage }
+                      }
+                    : x))
+                }}
                 promoting={promotingId === entry.id}
                 toggling={togglingId === entry.id}
                 formatDate={formatDate}
@@ -1221,6 +1374,22 @@ function OutreachAdmin() {
                             )}
                           </div>
                         </div>
+
+                        {entry.lead?.id && (
+                          <LeadEditCard
+                            leadId={entry.lead.id}
+                            onSaved={(updated) => {
+                              setEntries(prev => prev.map(x => x.id === entry.id
+                                ? {
+                                    ...x,
+                                    lead_name: updated.name,
+                                    firm_name: x.firm_name || updated.firm_name,
+                                    lead: { id: updated.id, name: updated.name, firm_name: updated.firm_name, stage: updated.stage }
+                                  }
+                                : x))
+                            }}
+                          />
+                        )}
                       </td>
                     </tr>
                   )}
