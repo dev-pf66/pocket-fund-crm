@@ -615,7 +615,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
             </div>
 
             <div className="form-group">
-              <label>Industry</label>
+              <label>Industry <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— the lead's sector (e.g. SaaS, F&B, Healthcare)</span></label>
               <input
                 type="text"
                 value={newOutreach.industry}
@@ -625,7 +625,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
             </div>
 
             <div className="form-group">
-              <label>Deal Size</label>
+              <label>Deal Size <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— target deal value (e.g. $1M–$5M)</span></label>
               <input
                 type="text"
                 value={newOutreach.deal_size}
@@ -635,7 +635,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
             </div>
 
             <div className="form-group">
-              <label>Location</label>
+              <label>Location <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— where the lead is based (e.g. New York, India)</span></label>
               <input
                 type="text"
                 value={newOutreach.location}
@@ -645,7 +645,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
             </div>
 
             <div className="form-group">
-              <label>Lead Source</label>
+              <label>Lead Source <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— how you found them (e.g. LinkedIn search, Referral)</span></label>
               <input
                 type="text"
                 value={newOutreach.lead_source}
@@ -930,12 +930,12 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                   </div>
 
                   <div className="info-item">
-                    <label>Industry</label>
+                    <label>Industry <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— lead's sector</span></label>
                     <input
                       type="text"
                       value={fv('industry')}
                       onChange={(e) => setField('industry', e.target.value)}
-                      placeholder="e.g., SaaS"
+                      placeholder="e.g., SaaS, F&B, Healthcare"
                     />
                   </div>
 
@@ -952,7 +952,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                   </div>
 
                   <div className="info-item">
-                    <label>Deal Size</label>
+                    <label>Deal Size <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— target value (e.g. $1M–$5M)</span></label>
                     <input
                       type="text"
                       value={fv('deal_size')}
@@ -962,22 +962,22 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                   </div>
 
                   <div className="info-item">
-                    <label>Location</label>
+                    <label>Location <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— where lead is based</span></label>
                     <input
                       type="text"
                       value={fv('location')}
                       onChange={(e) => setField('location', e.target.value)}
-                      placeholder="e.g., New York"
+                      placeholder="e.g., New York, India"
                     />
                   </div>
 
                   <div className="info-item">
-                    <label>Lead Source</label>
+                    <label>Lead Source <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— how you found them</span></label>
                     <input
                       type="text"
                       value={fv('lead_source')}
                       onChange={(e) => setField('lead_source', e.target.value)}
-                      placeholder="e.g., LinkedIn"
+                      placeholder="e.g., LinkedIn search, Referral"
                     />
                   </div>
 
