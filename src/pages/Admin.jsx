@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
 import { getPeople, setUserAdmin, deleteUser } from '../lib/supabase'
-import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption } from '../lib/crm-api'
+import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
-import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus } from 'lucide-react'
+import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List } from 'lucide-react'
 
 // Fallback bootstrap admin — used until the is_admin column is populated.
 // Once the migration seeds is_admin=true for this email, this is moot.
@@ -13,6 +13,96 @@ const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
 function isAdminUser(person) {
   if (!person) return false
   return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
+
+function FieldOptionsSection({ title, fieldName, hint }) {
+  const { toast } = useToast()
+  const [options, setOptions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [newValue, setNewValue] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getFieldOptions(fieldName)
+      .then(data => { if (!cancelled) setOptions(data) })
+      .catch(err => console.error(`Failed to load ${fieldName} options:`, err))
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [fieldName])
+
+  async function handleAdd(e) {
+    e.preventDefault()
+    const val = newValue.trim()
+    if (!val) return
+    if (options.some(o => o.value.toLowerCase() === val.toLowerCase())) {
+      toast.warn('That option already exists')
+      return
+    }
+    setAdding(true)
+    try {
+      const created = await addFieldOption(fieldName, val)
+      setOptions(prev => [...prev, created])
+      setNewValue('')
+      toast.success(`"${val}" added`)
+    } catch (err) {
+      toast.error(`Failed to add: ${err.message}`)
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function handleDelete(opt) {
+    if (!confirm(`Remove "${opt.value}"?`)) return
+    setDeletingId(opt.id)
+    try {
+      await deleteFieldOption(opt.id, fieldName)
+      setOptions(prev => prev.filter(o => o.id !== opt.id))
+      toast.success(`"${opt.value}" removed`)
+    } catch (err) {
+      toast.error(`Failed to remove: ${err.message}`)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="card" style={{ padding: '20px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: '600' }}>
+          <List size={18} /> {title}
+        </h3>
+        <span style={{ fontSize: '13px', color: '#6b7280' }}>{loading ? '' : `${options.length} options`}</span>
+      </div>
+      {hint && <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#9ca3af' }}>{hint}</p>}
+
+      {loading ? (
+        <div style={{ padding: '12px 0', color: '#6b7280', fontSize: '13px' }}>Loading…</div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+            {options.map(opt => (
+              <div key={opt.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 10px', background: '#f3f4f6', borderRadius: '20px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+                {opt.value}
+                <button onClick={() => handleDelete(opt)} disabled={deletingId === opt.id} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center', color: '#9ca3af' }}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+            {options.length === 0 && <span style={{ fontSize: '13px', color: '#9ca3af' }}>No options yet.</span>}
+          </div>
+          <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', maxWidth: '400px' }}>
+            <input type="text" value={newValue} onChange={e => setNewValue(e.target.value)} placeholder="Add new option…" maxLength={80}
+              style={{ flex: 1, padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }} />
+            <button type="submit" className="btn btn-primary btn-sm" disabled={adding || !newValue.trim()} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Plus size={14} /> {adding ? 'Adding…' : 'Add'}
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+  )
 }
 
 function Admin() {
@@ -217,6 +307,11 @@ function Admin() {
           </>
         )}
       </div>
+
+      <FieldOptionsSection title="Industry Options" fieldName="industry" hint="Shown in the outreach log — the lead's sector." />
+      <FieldOptionsSection title="Deal Size Options" fieldName="deal_size" hint="Shown in the outreach log — target deal value." />
+      <FieldOptionsSection title="Location Options" fieldName="location" hint="Shown in the outreach log — where the lead is based." />
+      <FieldOptionsSection title="Lead Source Options" fieldName="lead_source" hint="Shown in the outreach log — how you found the lead." />
 
       {/* Users */}
       <div className="card" style={{ padding: '20px' }}>

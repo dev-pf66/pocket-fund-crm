@@ -3,6 +3,7 @@ import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getPersonD
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
+import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { parseCSVText, parseDateCell } from '../lib/csv'
@@ -49,6 +50,10 @@ const EMPTY_OUTREACH = {
 function OutreachTracker() {
   const { currentPerson } = useApp()
   const { toast } = useToast()
+  const industryOptions = useFieldOptions('industry')
+  const dealSizeOptions = useFieldOptions('deal_size')
+  const locationOptions = useFieldOptions('location')
+  const leadSourceOptions = useFieldOptions('lead_source')
   const [outreaches, setOutreaches] = useState([])
   const [todayCount, setTodayCount] = useState(0)
   const [streak, setStreak] = useState(0)
@@ -615,43 +620,35 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
             </div>
 
             <div className="form-group">
-              <label>Industry <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— the lead's sector (e.g. SaaS, F&B, Healthcare)</span></label>
-              <input
-                type="text"
-                value={newOutreach.industry}
-                onChange={(e) => setNewOutreach({ ...newOutreach, industry: e.target.value })}
-                placeholder="e.g., SaaS, E-commerce"
-              />
+              <label>Industry</label>
+              <select value={newOutreach.industry} onChange={(e) => setNewOutreach({ ...newOutreach, industry: e.target.value })}>
+                <option value="">Select industry…</option>
+                {industryOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+              </select>
             </div>
 
             <div className="form-group">
-              <label>Deal Size <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— target deal value (e.g. $1M–$5M)</span></label>
-              <input
-                type="text"
-                value={newOutreach.deal_size}
-                onChange={(e) => setNewOutreach({ ...newOutreach, deal_size: e.target.value })}
-                placeholder="e.g., $1M-$5M"
-              />
+              <label>Deal Size</label>
+              <select value={newOutreach.deal_size} onChange={(e) => setNewOutreach({ ...newOutreach, deal_size: e.target.value })}>
+                <option value="">Select deal size…</option>
+                {dealSizeOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+              </select>
             </div>
 
             <div className="form-group">
-              <label>Location <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— where the lead is based (e.g. New York, India)</span></label>
-              <input
-                type="text"
-                value={newOutreach.location}
-                onChange={(e) => setNewOutreach({ ...newOutreach, location: e.target.value })}
-                placeholder="e.g., New York, Remote"
-              />
+              <label>Location</label>
+              <select value={newOutreach.location} onChange={(e) => setNewOutreach({ ...newOutreach, location: e.target.value })}>
+                <option value="">Select location…</option>
+                {locationOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+              </select>
             </div>
 
             <div className="form-group">
-              <label>Lead Source <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— how you found them (e.g. LinkedIn search, Referral)</span></label>
-              <input
-                type="text"
-                value={newOutreach.lead_source}
-                onChange={(e) => setNewOutreach({ ...newOutreach, lead_source: e.target.value })}
-                placeholder="e.g., LinkedIn, Referral, Conference"
-              />
+              <label>Lead Source</label>
+              <select value={newOutreach.lead_source} onChange={(e) => setNewOutreach({ ...newOutreach, lead_source: e.target.value })}>
+                <option value="">Select source…</option>
+                {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+              </select>
             </div>
 
             <div className="form-group full-width">
@@ -930,13 +927,11 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                   </div>
 
                   <div className="info-item">
-                    <label>Industry <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— lead's sector</span></label>
-                    <input
-                      type="text"
-                      value={fv('industry')}
-                      onChange={(e) => setField('industry', e.target.value)}
-                      placeholder="e.g., SaaS, F&B, Healthcare"
-                    />
+                    <label>Industry</label>
+                    <select value={fv('industry')} onChange={(e) => setField('industry', e.target.value)}>
+                      <option value="">Select industry…</option>
+                      {industryOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                    </select>
                   </div>
 
                   <div className="info-item">
@@ -952,33 +947,27 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                   </div>
 
                   <div className="info-item">
-                    <label>Deal Size <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— target value (e.g. $1M–$5M)</span></label>
-                    <input
-                      type="text"
-                      value={fv('deal_size')}
-                      onChange={(e) => setField('deal_size', e.target.value)}
-                      placeholder="e.g., $1M-$5M"
-                    />
+                    <label>Deal Size</label>
+                    <select value={fv('deal_size')} onChange={(e) => setField('deal_size', e.target.value)}>
+                      <option value="">Select deal size…</option>
+                      {dealSizeOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                    </select>
                   </div>
 
                   <div className="info-item">
-                    <label>Location <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— where lead is based</span></label>
-                    <input
-                      type="text"
-                      value={fv('location')}
-                      onChange={(e) => setField('location', e.target.value)}
-                      placeholder="e.g., New York, India"
-                    />
+                    <label>Location</label>
+                    <select value={fv('location')} onChange={(e) => setField('location', e.target.value)}>
+                      <option value="">Select location…</option>
+                      {locationOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                    </select>
                   </div>
 
                   <div className="info-item">
-                    <label>Lead Source <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: '12px' }}>— how you found them</span></label>
-                    <input
-                      type="text"
-                      value={fv('lead_source')}
-                      onChange={(e) => setField('lead_source', e.target.value)}
-                      placeholder="e.g., LinkedIn search, Referral"
-                    />
+                    <label>Lead Source</label>
+                    <select value={fv('lead_source')} onChange={(e) => setField('lead_source', e.target.value)}>
+                      <option value="">Select source…</option>
+                      {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                    </select>
                   </div>
 
                   <div className="info-item">

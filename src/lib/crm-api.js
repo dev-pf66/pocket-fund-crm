@@ -2178,6 +2178,45 @@ export async function getOutreachQueue(currentPersonId) {
 }
 
 // ============================================================================
+// GENERIC FIELD OPTIONS (industry, deal_size, location, lead_source)
+// ============================================================================
+
+export async function getFieldOptions(fieldName) {
+  const cacheKey = `field_options:${fieldName}`
+  const cached = cacheGet(cacheKey, 60000)
+  if (cached) return cached
+  const { data, error } = await supabase
+    .from('crm_field_options')
+    .select('*')
+    .eq('field_name', fieldName)
+    .order('sort_order', { ascending: true })
+    .order('value', { ascending: true })
+  if (error) throw error
+  cacheSet(cacheKey, data)
+  return data
+}
+
+export async function addFieldOption(fieldName, value) {
+  const { data, error } = await supabase
+    .from('crm_field_options')
+    .insert([{ field_name: fieldName, value: value.trim(), sort_order: 999 }])
+    .select()
+    .single()
+  if (error) throw error
+  cacheClear(`field_options:${fieldName}`)
+  return data
+}
+
+export async function deleteFieldOption(id, fieldName) {
+  const { error } = await supabase
+    .from('crm_field_options')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+  cacheClear(`field_options:${fieldName}`)
+}
+
+// ============================================================================
 // LEAD TYPE OPTIONS
 // ============================================================================
 
