@@ -2064,8 +2064,12 @@ export async function incrementGoalProgress(goalId, delta = 1) {
 // Bulk-create leads from a list of LinkedIn URLs. Dedupes against existing
 // leads (by normalized URL) and within the input itself. All new rows share
 // the same import_batch_id so the queue UI can group them.
+//
+// `assigneeIds` is an optional array of person ids the leads should be
+// assigned to (round-robin distribution). When omitted, the uploader keeps
+// every lead in their own queue.
 // Returns { added, skipped, batchId, batchLabel, leads }.
-export async function bulkCreateLeads(urls, batchLabel, currentPersonId) {
+export async function bulkCreateLeads(urls, batchLabel, currentPersonId, assigneeIds = null) {
   const cleaned = (urls || [])
     .map(u => (u || '').trim())
     .filter(u => u && normalizeLinkedInUrl(u))
@@ -2105,12 +2109,18 @@ export async function bulkCreateLeads(urls, batchLabel, currentPersonId) {
   const label = (batchLabel || '').trim() || null
   const now = new Date().toISOString()
 
-  const rows = toInsert.map(url => ({
+  // Round-robin across assignees so a 30-row paste split between Aabhas and
+  // Gaurav lands as 15 each. Falls back to the uploader if no assignees set.
+  const validAssignees = (assigneeIds || []).filter(Boolean)
+  const pool = validAssignees.length > 0 ? validAssignees : [currentPersonId]
+
+  const rows = toInsert.map((url, i) => ({
     name: nameFromLinkedInUrl(url) || 'Unknown',
     linkedin_url: url,
     stage: 'new_lead',
     lead_source: 'Bulk Import',
     created_by: currentPersonId,
+    assigned_to: pool[i % pool.length],
     last_activity_date: now,
     last_activity_type: 'created',
     import_batch_id: batchId,
@@ -2137,18 +2147,20 @@ export async function getOutreachQueue(currentPersonId) {
   const { data: queue, error } = await supabase
     .from('crm_leads')
     .select('*')
-    .eq('created_by', currentPersonId)
+    .eq('assigned_to', currentPersonId)
     .eq('stage', 'new_lead')
     .order('created_at', { ascending: false })
   if (error) throw error
 
+  // Batch progress counts only this analyst's slice — if the same batch was
+  // split between two people, each sees their own contacted/total.
   const batchIds = [...new Set((queue || []).map(l => l.import_batch_id).filter(Boolean))]
   const batchStats = {}
   if (batchIds.length > 0) {
     const { data: batchLeads, error: statsError } = await supabase
       .from('crm_leads')
       .select('import_batch_id, stage')
-      .eq('created_by', currentPersonId)
+      .eq('assigned_to', currentPersonId)
       .in('import_batch_id', batchIds)
     if (statsError) throw statsError
     for (const row of batchLeads || []) {

@@ -24,8 +24,16 @@ import {
 
 const UNBATCHED_KEY = '__unbatched__'
 
+// Mirrors the helper in Layout.jsx — admins can split queue assignments
+// across the team; non-admins only see / add to their own queue.
+const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
+function isAdminUser(person) {
+  if (!person) return false
+  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
+
 function OutreachQueue() {
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const { toast } = useToast()
   const [leads, setLeads] = useState([])
   const [batchStats, setBatchStats] = useState({})
@@ -215,6 +223,8 @@ function OutreachQueue() {
       {showAddModal && (
         <BulkAddModal
           personId={currentPerson?.id}
+          isAdmin={isAdminUser(currentPerson)}
+          people={people}
           onClose={() => setShowAddModal(false)}
           onDone={handleBulkAddResult}
         />
@@ -346,16 +356,27 @@ function QueueRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
   )
 }
 
-function BulkAddModal({ personId, onClose, onDone }) {
+function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
   const { toast } = useToast()
   // Persist paste buffer + label across modal close and page navigation so
   // a half-entered list isn't lost when the user clicks away.
   const [label, setLabel, clearLabel] = useSessionState('oq:modal:label', defaultBatchLabel())
   const [text, setText, clearText] = useSessionState('oq:modal:text', '')
+  // Admins can pick one or more analysts to receive the leads (round-robin
+  // distribution). Non-admins ignore this and assign to themselves.
+  const [assigneeIds, setAssigneeIds] = useSessionState(
+    'oq:modal:assigneeIds',
+    personId ? [String(personId)] : []
+  )
   const [submitting, setSubmitting] = useState(false)
   const fileRef = useRef(null)
 
   const urls = useMemo(() => extractLinkedInUrls(text), [text])
+
+  function toggleAssignee(id) {
+    const key = String(id)
+    setAssigneeIds(prev => prev.includes(key) ? prev.filter(p => p !== key) : [...prev, key])
+  }
 
   async function handleFile(e) {
     const file = e.target.files?.[0]
@@ -372,9 +393,14 @@ function BulkAddModal({ personId, onClose, onDone }) {
 
   async function handleSubmit() {
     if (urls.length === 0) return
+    if (isAdmin && assigneeIds.length === 0) {
+      toast.warn('Pick at least one analyst to receive the leads')
+      return
+    }
     setSubmitting(true)
     try {
-      const result = await bulkCreateLeads(urls, label, personId)
+      const ids = isAdmin ? assigneeIds.map(s => Number(s)) : [personId]
+      const result = await bulkCreateLeads(urls, label, personId, ids)
       clearText()
       clearLabel()
       onDone(result)
@@ -405,6 +431,43 @@ function BulkAddModal({ personId, onClose, onDone }) {
             placeholder="e.g. Apr 20 — PE firms"
           />
         </div>
+
+        {isAdmin && (people || []).length > 0 && (
+          <div className="form-group">
+            <label>Assign to {assigneeIds.length > 1 ? `(round-robin across ${assigneeIds.length})` : ''}</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {(people || []).map(p => {
+                const selected = assigneeIds.includes(String(p.id))
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => toggleAssignee(p.id)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '999px',
+                      border: selected ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
+                      background: selected ? '#eff6ff' : 'white',
+                      color: selected ? '#1d4ed8' : '#374151',
+                      fontSize: '12px',
+                      fontWeight: selected ? 600 : 500,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {p.name}{p.id === personId ? ' (me)' : ''}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
+              {assigneeIds.length === 0
+                ? 'Pick at least one analyst.'
+                : assigneeIds.length === 1
+                  ? 'All leads will go to this analyst\'s queue.'
+                  : `Leads will be split evenly across ${assigneeIds.length} analysts.`}
+            </div>
+          </div>
+        )}
 
         <div className="form-group">
           <label>LinkedIn URLs</label>
