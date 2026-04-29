@@ -4,11 +4,13 @@ import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
+import { useLeadTypes } from '../hooks/useLeadTypes'
 import { Sparkles } from 'lucide-react'
 
 function LeadForm({ onClose, onSave, lead = null }) {
   const { currentPerson } = useApp()
   const { toast } = useToast()
+  const leadTypes = useLeadTypes()
   const [loading, setLoading] = useState(false)
   const [autoFilling, setAutoFilling] = useState(false)
   // Only persist the new-lead draft across navigation; edit mode is seeded
@@ -20,6 +22,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
     phone: lead?.phone || '',
     linkedin_url: lead?.linkedin_url || '',
     lead_type: lead?.lead_type || '',
+    outreach_stage: lead?.outreach_stage || '',
     deal_criteria: lead?.deal_criteria || '',
     stage: lead?.stage || 'new_lead',
     lead_source: lead?.lead_source || '',
@@ -193,10 +196,9 @@ function LeadForm({ onClose, onSave, lead = null }) {
               <label>Lead Type</label>
               <select name="lead_type" value={formData.lead_type} onChange={handleChange}>
                 <option value="">Select type...</option>
-                <option value="Independent Sponsor">Independent Sponsor</option>
-                <option value="PE Firm">PE Firm</option>
-                <option value="Family Office">Family Office</option>
-                <option value="Other">Other</option>
+                {leadTypes.map(t => (
+                  <option key={t.id} value={t.name}>{t.name}</option>
+                ))}
               </select>
             </div>
 
@@ -224,16 +226,29 @@ function LeadForm({ onClose, onSave, lead = null }) {
             />
           </div>
 
-          <div className="form-group">
-            <label>Stage</label>
-            <select name="stage" value={formData.stage} onChange={handleChange}>
-              <option value="new_lead">New Lead</option>
-              <option value="cold_outreach">Cold Outreach</option>
-              <option value="responded">Responded</option>
-              <option value="warm_lead">Warm Lead</option>
-              <option value="active_conversation">Active Conversation</option>
-              <option value="client">Client</option>
-            </select>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Stage</label>
+              <select name="stage" value={formData.stage} onChange={handleChange}>
+                <option value="new_lead">New Lead</option>
+                <option value="cold_outreach">Cold Outreach</option>
+                <option value="responded">Responded</option>
+                <option value="warm_lead">Warm Lead</option>
+                <option value="active_conversation">Active Conversation</option>
+                <option value="client">Client</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Outreach Stage</label>
+              <select name="outreach_stage" value={formData.outreach_stage} onChange={handleChange}>
+                <option value="">Not set</option>
+                <option value="cold">Cold</option>
+                <option value="messaged">Messaged</option>
+                <option value="replied">Replied</option>
+                <option value="meeting">Meeting</option>
+              </select>
+            </div>
           </div>
 
           <div className="form-group">

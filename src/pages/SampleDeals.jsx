@@ -4,6 +4,7 @@ import { useApp } from '../App'
 import { Plus, Edit2, Trash2, ExternalLink } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
+import { useLeadTypes } from '../hooks/useLeadTypes'
 
 const EMPTY_DEAL = {
   title: '',
@@ -20,6 +21,7 @@ const EMPTY_DEAL = {
 function SampleDeals() {
   const { currentPerson } = useApp()
   const { toast } = useToast()
+  const leadTypes = useLeadTypes()
   const [deals, setDeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingDeal, setEditingDeal, clearEditingDeal] = useSessionState('sd:editingDeal', null)
@@ -147,9 +149,9 @@ function SampleDeals() {
                 onChange={(e) => setFormData({ ...formData, client_type: e.target.value })}
               >
                 <option value="">Select type</option>
-                <option value="PE Firm">PE Firm</option>
-                <option value="Family Office">Family Office</option>
-                <option value="Independent Sponsor">Independent Sponsor</option>
+                {leadTypes.map(t => (
+                  <option key={t.id} value={t.name}>{t.name}</option>
+                ))}
                 <option value="Strategic Buyer">Strategic Buyer</option>
               </select>
             </div>

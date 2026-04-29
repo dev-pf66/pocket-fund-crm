@@ -5,6 +5,7 @@ import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
+import { useLeadTypes } from '../hooks/useLeadTypes'
 
 const today = () => new Date().toISOString().split('T')[0]
 const emptyActivity = () => ({ activity_type: 'call', notes: '', transcript: '', activity_date: today() })
@@ -117,14 +118,6 @@ function InlineField({ value, onSave, type = 'text', options = null, placeholder
   )
 }
 
-const LEAD_TYPE_OPTIONS = [
-  { value: '', label: 'Select type...' },
-  { value: 'PE Firm', label: 'PE Firm' },
-  { value: 'Family Office', label: 'Family Office' },
-  { value: 'Independent Sponsor', label: 'Independent Sponsor' },
-  { value: 'Other', label: 'Other' }
-]
-
 const STAGE_OPTIONS = [
   { value: 'new_lead', label: 'New Lead' },
   { value: 'cold_outreach', label: 'Cold Outreach' },
@@ -155,6 +148,12 @@ function LeadDetail() {
   const [enriching, setEnriching] = useState(false)
   const [calculating, setCalculating] = useState(false)
   const [analysingTranscriptId, setAnalysingTranscriptId] = useState(null)
+
+  const rawLeadTypes = useLeadTypes()
+  const leadTypeOptions = [
+    { value: '', label: 'Select type...' },
+    ...rawLeadTypes.map(t => ({ value: t.name, label: t.name }))
+  ]
 
   useEffect(() => {
     loadData()
@@ -500,10 +499,9 @@ function LeadDetail() {
                   onChange={(e) => setEditedLead({ ...editedLead, lead_type: e.target.value })}
                 >
                   <option value="">Select type</option>
-                  <option value="PE Firm">PE Firm</option>
-                  <option value="Family Office">Family Office</option>
-                  <option value="Independent Sponsor">Independent Sponsor</option>
-                  <option value="Other">Other</option>
+                  {rawLeadTypes.map(t => (
+                    <option key={t.id} value={t.name}>{t.name}</option>
+                  ))}
                 </select>
               </div>
 
@@ -537,6 +535,20 @@ function LeadDetail() {
                   <option value="active_conversation">Active Conversation</option>
                   <option value="client">Client</option>
                   <option value="passed">Passed</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Outreach Stage</label>
+                <select
+                  value={editedLead.outreach_stage || ''}
+                  onChange={(e) => setEditedLead({ ...editedLead, outreach_stage: e.target.value })}
+                >
+                  <option value="">Not set</option>
+                  <option value="cold">Cold</option>
+                  <option value="messaged">Messaged</option>
+                  <option value="replied">Replied</option>
+                  <option value="meeting">Meeting</option>
                 </select>
               </div>
 
@@ -848,7 +860,7 @@ function LeadDetail() {
                   value={lead.lead_type || ''}
                   onSave={(v) => saveField('lead_type', v)}
                   type="select"
-                  options={LEAD_TYPE_OPTIONS}
+                  options={leadTypeOptions}
                   placeholder="Click to set type"
                   renderValue={(v) => <span className="lead-type-badge">{v}</span>}
                 />
@@ -862,6 +874,24 @@ function LeadDetail() {
                   type="select"
                   options={STAGE_OPTIONS}
                   renderValue={(v) => v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                />
+              </div>
+
+              <div className="info-item">
+                <label>Outreach Stage</label>
+                <InlineField
+                  value={lead.outreach_stage || ''}
+                  onSave={(v) => saveField('outreach_stage', v)}
+                  type="select"
+                  options={[
+                    { value: '',         label: 'Not set' },
+                    { value: 'cold',     label: 'Cold' },
+                    { value: 'messaged', label: 'Messaged' },
+                    { value: 'replied',  label: 'Replied' },
+                    { value: 'meeting',  label: 'Meeting' },
+                  ]}
+                  placeholder="Click to set"
+                  renderValue={(v) => <span className="stage-badge">{v.charAt(0).toUpperCase() + v.slice(1)}</span>}
                 />
               </div>
 

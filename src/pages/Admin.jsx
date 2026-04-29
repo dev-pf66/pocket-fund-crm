@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
 import { getPeople, setUserAdmin, deleteUser } from '../lib/supabase'
+import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
-import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff } from 'lucide-react'
+import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus } from 'lucide-react'
 
 // Fallback bootstrap admin — used until the is_admin column is populated.
 // Once the migration seeds is_admin=true for this email, this is moot.
@@ -22,6 +23,13 @@ function Admin() {
   const [error, setError] = useState(null)
   const [actingId, setActingId] = useState(null)
 
+  // Lead type state
+  const [leadTypes, setLeadTypes] = useState([])
+  const [leadTypesLoading, setLeadTypesLoading] = useState(true)
+  const [newTypeName, setNewTypeName] = useState('')
+  const [addingType, setAddingType] = useState(false)
+  const [deletingTypeId, setDeletingTypeId] = useState(null)
+
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -37,6 +45,15 @@ function Admin() {
       }
     }
     load()
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    getLeadTypeOptions()
+      .then(data => { if (!cancelled) setLeadTypes(data) })
+      .catch(err => { console.error('Failed to load lead types:', err) })
+      .finally(() => { if (!cancelled) setLeadTypesLoading(false) })
     return () => { cancelled = true }
   }, [])
 
@@ -82,6 +99,43 @@ function Admin() {
     }
   }
 
+  async function handleAddLeadType(e) {
+    e.preventDefault()
+    const name = newTypeName.trim()
+    if (!name) return
+    if (leadTypes.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+      toast.warn('That lead type already exists')
+      return
+    }
+    setAddingType(true)
+    try {
+      const created = await addLeadTypeOption(name)
+      setLeadTypes(prev => [...prev, created])
+      setNewTypeName('')
+      toast.success(`"${name}" added`)
+    } catch (err) {
+      console.error('Failed to add lead type:', err)
+      toast.error(`Failed to add lead type: ${err.message}`)
+    } finally {
+      setAddingType(false)
+    }
+  }
+
+  async function handleDeleteLeadType(type) {
+    if (!confirm(`Remove lead type "${type.name}"? Existing leads with this type will keep their value.`)) return
+    setDeletingTypeId(type.id)
+    try {
+      await deleteLeadTypeOption(type.id)
+      setLeadTypes(prev => prev.filter(t => t.id !== type.id))
+      toast.success(`"${type.name}" removed`)
+    } catch (err) {
+      console.error('Failed to delete lead type:', err)
+      toast.error(`Failed to remove lead type: ${err.message}`)
+    } finally {
+      setDeletingTypeId(null)
+    }
+  }
+
   return (
     <div className="page-container">
       <div style={{ marginBottom: '24px' }}>
@@ -89,10 +143,82 @@ function Admin() {
           <Shield size={24} /> Admin
         </h1>
         <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
-          Manage users and admin access.
+          Manage users, admin access, and lead configuration.
         </p>
       </div>
 
+      {/* Lead Types */}
+      <div className="card" style={{ padding: '20px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: '600' }}>
+            <Tag size={18} /> Lead Types
+          </h3>
+          <span style={{ fontSize: '13px', color: '#6b7280' }}>
+            {leadTypesLoading ? '' : `${leadTypes.length} types`}
+          </span>
+        </div>
+
+        {leadTypesLoading ? (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+            <div className="loading-spinner" style={{ margin: '0 auto 8px' }}></div>
+            Loading…
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+              {leadTypes.map(type => (
+                <div
+                  key={type.id}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '5px 10px', background: '#f3f4f6', borderRadius: '20px',
+                    fontSize: '13px', fontWeight: '500', color: '#374151'
+                  }}
+                >
+                  {type.name}
+                  <button
+                    onClick={() => handleDeleteLeadType(type)}
+                    disabled={deletingTypeId === type.id}
+                    title="Remove this lead type"
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      padding: '0 2px', display: 'flex', alignItems: 'center',
+                      color: '#9ca3af', lineHeight: 1
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+              {leadTypes.length === 0 && (
+                <span style={{ fontSize: '13px', color: '#9ca3af' }}>No lead types configured.</span>
+              )}
+            </div>
+
+            <form onSubmit={handleAddLeadType} style={{ display: 'flex', gap: '8px', maxWidth: '400px' }}>
+              <input
+                type="text"
+                value={newTypeName}
+                onChange={e => setNewTypeName(e.target.value)}
+                placeholder="e.g., Search Fund"
+                style={{ flex: 1, padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                maxLength={60}
+              />
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                disabled={addingType || !newTypeName.trim()}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Plus size={14} />
+                {addingType ? 'Adding…' : 'Add'}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+
+      {/* Users */}
       <div className="card" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: '600' }}>

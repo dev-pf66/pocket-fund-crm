@@ -2174,6 +2174,43 @@ export async function getOutreachQueue(currentPersonId) {
   return { leads: queue || [], batchStats }
 }
 
+// ============================================================================
+// LEAD TYPE OPTIONS
+// ============================================================================
+
+export async function getLeadTypeOptions() {
+  const cached = cacheGet('lead_type_options', 60000)
+  if (cached) return cached
+  const { data, error } = await supabase
+    .from('crm_lead_type_options')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true })
+  if (error) throw error
+  cacheSet('lead_type_options', data)
+  return data
+}
+
+export async function addLeadTypeOption(name) {
+  const { data, error } = await supabase
+    .from('crm_lead_type_options')
+    .insert([{ name: name.trim(), sort_order: 999 }])
+    .select()
+    .single()
+  if (error) throw error
+  cacheClear('lead_type_options')
+  return data
+}
+
+export async function deleteLeadTypeOption(id) {
+  const { error } = await supabase
+    .from('crm_lead_type_options')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+  cacheClear('lead_type_options')
+}
+
 // Mark a queued lead as reached out: logs a LinkedIn outreach entry and
 // transitions the lead to 'cold_outreach' so it drops out of the queue.
 export async function markLeadReachedOut(lead, currentPersonId, currentPersonName) {

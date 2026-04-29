@@ -6,6 +6,7 @@ import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingU
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
+import { useLeadTypes } from '../hooks/useLeadTypes'
 import LeadForm from './LeadForm'
 
 const DAILY_GOAL = 10
@@ -782,10 +783,9 @@ function LeadEditCard({ leadId, onSaved }) {
           <div style={metaLabelStyle}>Lead Type</div>
           <select style={inputStyle} value={fv('lead_type')} onChange={e => setField('lead_type', e.target.value)}>
             <option value="">—</option>
-            <option value="Independent Sponsor">Independent Sponsor</option>
-            <option value="PE Firm">PE Firm</option>
-            <option value="Family Office">Family Office</option>
-            <option value="Other">Other</option>
+            {leadTypes.map(t => (
+              <option key={t.id} value={t.name}>{t.name}</option>
+            ))}
           </select>
         </div>
         <div>
@@ -816,6 +816,7 @@ function LeadEditCard({ leadId, onSaved }) {
 function OutreachAdmin() {
   const { toast } = useToast()
   const { currentPerson, people } = useApp()
+  const leadTypes = useLeadTypes()
   const navigate = useNavigate()
   const isMobile = useIsMobileDevice()
   const isAdmin = isAdminUser(currentPerson)

@@ -7,6 +7,7 @@ import LeadForm from './LeadForm'
 import QuickAddCard from '../components/QuickAddCard'
 import { Plus, Search, Filter, Upload, Save, ChevronDown, X, Bookmark } from 'lucide-react'
 import { useSessionState } from '../hooks/useSessionState'
+import { useLeadTypes } from '../hooks/useLeadTypes'
 
 const STAGES = [
   { key: 'new_lead', label: 'New Leads', color: '#a78bfa' },
@@ -79,6 +80,7 @@ function countActiveAdvancedFilters(filters) {
 function LeadsBoard() {
   const { currentPerson } = useApp()
   const navigate = useNavigate()
+  const leadTypes = useLeadTypes()
   // Seed from cache so sidebar nav back to Pipeline renders instantly.
   const [leads, setLeads] = useState(() => cachePeek('leads:{}') || [])
   const [loading, setLoading] = useState(() => !cachePeek('leads:{}'))
@@ -448,24 +450,15 @@ function LeadsBoard() {
               >
                 All Types
               </button>
-              <button
-                className={`filter-chip ${filterType === 'PE Firm' ? 'active' : ''}`}
-                onClick={() => setFilterType('PE Firm')}
-              >
-                PE Firms
-              </button>
-              <button
-                className={`filter-chip ${filterType === 'Family Office' ? 'active' : ''}`}
-                onClick={() => setFilterType('Family Office')}
-              >
-                Family Offices
-              </button>
-              <button
-                className={`filter-chip ${filterType === 'Independent Sponsor' ? 'active' : ''}`}
-                onClick={() => setFilterType('Independent Sponsor')}
-              >
-                Independent Sponsors
-              </button>
+              {leadTypes.map(t => (
+                <button
+                  key={t.id}
+                  className={`filter-chip ${filterType === t.name ? 'active' : ''}`}
+                  onClick={() => setFilterType(t.name)}
+                >
+                  {t.name}
+                </button>
+              ))}
               <button
                 className={`filter-chip ${filterType === 'needs_samples' ? 'active' : ''}`}
                 onClick={() => setFilterType('needs_samples')}
