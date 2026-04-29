@@ -1458,7 +1458,10 @@ export async function getOutreachLog(filters = {}, personId = null) {
   if (filters.days_back) {
     const daysAgo = new Date()
     daysAgo.setDate(daysAgo.getDate() - filters.days_back)
-    query = query.gte('outreach_date', daysAgo.toISOString().split('T')[0])
+    const today = new Date().toISOString().split('T')[0]
+    query = query
+      .gte('outreach_date', daysAgo.toISOString().split('T')[0])
+      .lte('outreach_date', today)
   }
 
   if (personId) query = query.eq('logged_by', personId)
