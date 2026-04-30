@@ -1905,12 +1905,13 @@ export async function getAllOutreachLogs(filters = {}) {
  * loading the full outreach rows. Returns: [{logged_by, outreach_date, status}]
  */
 export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
-  const since = new Date()
-  since.setDate(since.getDate() - daysBack)
+  const d = new Date()
+  d.setDate(d.getDate() - daysBack)
+  const localSince = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   let q = supabase
     .from('crm_outreach_log')
     .select('logged_by, outreach_date, status, outreach_type')
-    .gte('outreach_date', since.toISOString().split('T')[0])
+    .gte('outreach_date', localSince)
   if (personId) q = q.eq('logged_by', personId)
 
   const { data, error } = await q

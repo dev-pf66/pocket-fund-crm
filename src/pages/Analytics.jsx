@@ -15,23 +15,29 @@ const TIME_WINDOWS = [
   { label: '90 days',   fromOffset: 89, toOffset: 0 },
 ]
 
+// Always use local calendar date, never UTC — toISOString() returns UTC which
+// shifts the date for users in non-UTC timezones.
+function localDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function getWeekKey(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
   const day = d.getDay()
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
   const mon = new Date(d)
   mon.setDate(diff)
-  return mon.toISOString().split('T')[0]
+  return localDateStr(mon)
 }
 
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + n)
-  return d.toISOString().split('T')[0]
+  return localDateStr(d)
 }
 
 function todayStr() {
-  return new Date().toISOString().split('T')[0]
+  return localDateStr()
 }
 
 function fmtWeek(wk) {
@@ -64,9 +70,7 @@ function Analytics() {
   async function load() {
     setLoading(true)
     try {
-      const since = new Date()
-      since.setDate(since.getDate() - 90)
-      const sinceDate = since.toISOString().split('T')[0]
+      const sinceDate = addDays(localDateStr(), -90)
 
       const [outreach, meetings] = await Promise.all([
         getOutreachStatsByPerson(90),
