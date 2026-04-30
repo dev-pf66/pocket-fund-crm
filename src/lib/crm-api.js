@@ -1444,7 +1444,7 @@ export async function getOutreachLog(filters = {}, personId = null) {
     .from('crm_outreach_log')
     .select(`
       *,
-      lead:crm_leads(id, name, firm_name, stage),
+      lead:crm_leads(id, name, firm_name, stage, outreach_stage),
       logged_by_person:logged_by(id, name)
     `)
     .order('outreach_date', { ascending: false })
@@ -1865,7 +1865,7 @@ export async function getAllOutreachLogs(filters = {}) {
     .from('crm_outreach_log')
     .select(`
       *,
-      lead:crm_leads(id, name, firm_name, stage),
+      lead:crm_leads(id, name, firm_name, stage, outreach_stage),
       logged_by_person:logged_by(id, name)
     `)
     .order('outreach_date', { ascending: false })

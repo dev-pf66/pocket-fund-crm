@@ -962,7 +962,7 @@ function OutreachAdmin() {
         const promoted = await promoteOutreachToLead(entry, currentPerson?.id)
         leadId = promoted.id
         setEntries(prev => prev.map(x => x.id === entry.id
-          ? { ...x, lead_id: promoted.id, lead: { id: promoted.id, name: promoted.name, firm_name: promoted.firm_name, stage: promoted.stage } }
+          ? { ...x, lead_id: promoted.id, lead: { id: promoted.id, name: promoted.name, firm_name: promoted.firm_name, stage: promoted.stage, outreach_stage: promoted.outreach_stage ?? null } }
           : x))
       }
       const fullLead = await getLeadById(leadId)
@@ -1145,7 +1145,7 @@ function OutreachAdmin() {
                   ...x,
                   lead_name: saved.name,
                   firm_name: x.firm_name || saved.firm_name,
-                  lead: { id: saved.id, name: saved.name, firm_name: saved.firm_name, stage: saved.stage }
+                  lead: { id: saved.id, name: saved.name, firm_name: saved.firm_name, stage: saved.stage, outreach_stage: saved.outreach_stage ?? null }
                 }
               : x))
             toast.success('Contact updated')
@@ -1172,7 +1172,7 @@ function OutreachAdmin() {
                   lead_id: saved.id,
                   lead_name: saved.name,
                   firm_name: x.firm_name || saved.firm_name,
-                  lead: { id: saved.id, name: saved.name, firm_name: saved.firm_name, stage: saved.stage }
+                  lead: { id: saved.id, name: saved.name, firm_name: saved.firm_name, stage: saved.stage, outreach_stage: saved.outreach_stage ?? null }
                 }
               : x))
             toast.success('Contact card created')
@@ -1209,7 +1209,7 @@ function OutreachAdmin() {
                         ...x,
                         lead_name: updated.name,
                         firm_name: x.firm_name || updated.firm_name,
-                        lead: { id: updated.id, name: updated.name, firm_name: updated.firm_name, stage: updated.stage }
+                        lead: { id: updated.id, name: updated.name, firm_name: updated.firm_name, stage: updated.stage, outreach_stage: updated.outreach_stage ?? null }
                       }
                     : x))
                 }}
@@ -1461,7 +1461,7 @@ function OutreachAdmin() {
                                     ...x,
                                     lead_name: updated.name,
                                     firm_name: x.firm_name || updated.firm_name,
-                                    lead: { id: updated.id, name: updated.name, firm_name: updated.firm_name, stage: updated.stage }
+                                    lead: { id: updated.id, name: updated.name, firm_name: updated.firm_name, stage: updated.stage, outreach_stage: updated.outreach_stage ?? null }
                                   }
                                 : x))
                             }}
