@@ -15,29 +15,26 @@ const TIME_WINDOWS = [
   { label: '90 days',   fromOffset: 89, toOffset: 0 },
 ]
 
-// Always use local calendar date, never UTC — toISOString() returns UTC which
-// shifts the date for users in non-UTC timezones.
-function localDateStr(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function getWeekKey(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00')
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  const mon = new Date(d)
-  mon.setDate(diff)
-  return localDateStr(mon)
-}
-
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return localDateStr(d)
-}
+// All dates in IST (UTC+5:30) — hardcoded, never changes.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
 
 function todayStr() {
-  return localDateStr()
+  return new Date(Date.now() + IST_OFFSET_MS).toISOString().split('T')[0]
+}
+
+// Date arithmetic on YYYY-MM-DD strings (parses at UTC noon, no tz risk).
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().split('T')[0]
+}
+
+// Monday-anchored week key for a YYYY-MM-DD string.
+function getWeekKey(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00Z')
+  const day = d.getUTCDay()
+  const offset = day === 0 ? -6 : 1 - day
+  return addDays(dateStr, offset)
 }
 
 function fmtWeek(wk) {
@@ -70,7 +67,7 @@ function Analytics() {
   async function load() {
     setLoading(true)
     try {
-      const sinceDate = addDays(localDateStr(), -90)
+      const sinceDate = addDays(todayStr(), -90)
 
       const [outreach, meetings] = await Promise.all([
         getOutreachStatsByPerson(90),

@@ -22,23 +22,26 @@ const PLATFORM_LABELS = {
 
 const PLATFORMS = ['cold_email', 'linkedin_message', 'phone_call', 'other']
 
+// All dates in IST (UTC+5:30) — hardcoded, never changes.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+
 function todayStr() {
-  return new Date().toISOString().split('T')[0]
+  return new Date(Date.now() + IST_OFFSET_MS).toISOString().split('T')[0]
+}
+
+// Date arithmetic on YYYY-MM-DD strings (parses at UTC noon, no timezone risk).
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().split('T')[0]
 }
 
 // Monday-anchored week start.
 function weekStart(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00')
-  const day = d.getDay()
+  const d = new Date(dateStr + 'T12:00:00Z')
+  const day = d.getUTCDay()
   const offset = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + offset)
-  return d.toISOString().split('T')[0]
-}
-
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return d.toISOString().split('T')[0]
+  return addDays(dateStr, offset)
 }
 
 function formatShort(dateStr) {

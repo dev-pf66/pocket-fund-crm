@@ -5,6 +5,30 @@
 import { supabase } from './supabase'
 import { normalizeLinkedInUrl, nameFromLinkedInUrl } from './linkedin'
 
+// All dates are in IST (UTC+5:30). This is hardcoded and must never change —
+// the entire team operates in India and every stored date must be the IST calendar date.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000 // +05:30, no DST
+
+function istDateStr(utcMs = Date.now()) {
+  return new Date(utcMs + IST_OFFSET_MS).toISOString().split('T')[0]
+}
+
+// Date arithmetic on YYYY-MM-DD strings. Parses at UTC noon so adding/
+// subtracting whole days never crosses a date boundary unexpectedly.
+function istAddDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().split('T')[0]
+}
+
+// Monday-anchored ISO week start for a YYYY-MM-DD string.
+function istWeekStart(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00Z')
+  const day = d.getUTCDay() // 0=Sun
+  const offset = day === 0 ? -6 : 1 - day
+  return istAddDays(dateStr, offset)
+}
+
 // Fire-and-forget post to the server-side event dispatcher.
 // Never blocks the caller; errors are logged but swallowed.
 async function fireTTEvent(event_type, payload) {
@@ -507,7 +531,7 @@ export async function getStaleLeads(personId = null) {
  * Get leads with follow-ups due today
  */
 export async function getFollowUpsDueToday(personId = null) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = istDateStr()
 
   let query = supabase
     .from('crm_leads')
@@ -1456,12 +1480,9 @@ export async function getOutreachLog(filters = {}, personId = null) {
   }
 
   if (filters.days_back) {
-    const daysAgo = new Date()
-    daysAgo.setDate(daysAgo.getDate() - filters.days_back)
-    const today = new Date().toISOString().split('T')[0]
     query = query
-      .gte('outreach_date', daysAgo.toISOString().split('T')[0])
-      .lte('outreach_date', today)
+      .gte('outreach_date', istAddDays(istDateStr(), -filters.days_back))
+      .lte('outreach_date', istDateStr())
   }
 
   if (personId) query = query.eq('logged_by', personId)
@@ -1481,7 +1502,7 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
     .insert([{
       ...outreachData,
       logged_by: currentPersonId,
-      outreach_date: outreachData.outreach_date || new Date().toISOString().split('T')[0]
+      outreach_date: outreachData.outreach_date || istDateStr()
     }])
     .select()
     .single()
@@ -1614,12 +1635,10 @@ export async function getTodaysOutreachCount() {
  * aggregation.
  */
 export async function getDailyOutreachStats(daysBack = 30, personId = null) {
-  const since = new Date()
-  since.setDate(since.getDate() - daysBack)
   let q = supabase
     .from('crm_outreach_log')
     .select('outreach_date, status')
-    .gte('outreach_date', since.toISOString().split('T')[0])
+    .gte('outreach_date', istAddDays(istDateStr(), -daysBack))
   if (personId) q = q.eq('logged_by', personId)
   const { data, error } = await q
   if (error) throw error
@@ -1656,16 +1675,14 @@ export async function getOutreachStreak() {
 export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGoal = 10, weekDays = 7 } = {}) {
   if (!personId) return { todayCount: 0, streak: 0, dailyStats: [] }
 
-  const since = new Date()
-  since.setDate(since.getDate() - daysBack)
   const { data, error } = await supabase
     .from('crm_outreach_log')
     .select('outreach_date')
     .eq('logged_by', personId)
-    .gte('outreach_date', since.toISOString().split('T')[0])
+    .gte('outreach_date', istAddDays(istDateStr(), -daysBack))
   if (error) throw error
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = istDateStr()
   const byDate = new Map()
   for (const r of data || []) {
     byDate.set(r.outreach_date, (byDate.get(r.outreach_date) || 0) + 1)
@@ -1675,21 +1692,16 @@ export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGo
 
   // Streak: consecutive days hitting the goal. Include today if hit;
   // otherwise start from yesterday so a mid-day lull doesn't reset it.
-  const addDays = (dateStr, n) => {
-    const d = new Date(dateStr + 'T00:00:00')
-    d.setDate(d.getDate() + n)
-    return d.toISOString().split('T')[0]
-  }
   let streak = 0
-  let cursor = todayCount >= dailyGoal ? today : addDays(today, -1)
+  let cursor = todayCount >= dailyGoal ? today : istAddDays(today, -1)
   while ((byDate.get(cursor) || 0) >= dailyGoal) {
     streak += 1
-    cursor = addDays(cursor, -1)
+    cursor = istAddDays(cursor, -1)
   }
 
   const dailyStats = []
   for (let i = 0; i < weekDays; i += 1) {
-    const date = addDays(today, -i)
+    const date = istAddDays(today, -i)
     const count = byDate.get(date) || 0
     dailyStats.push({ date, total_outreaches: count, goal_met: count >= dailyGoal })
   }
@@ -1701,7 +1713,7 @@ export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGo
  * Get outreach summary for today
  */
 export async function getTodaysOutreachSummary() {
-  const today = new Date().toISOString().split('T')[0]
+  const today = istDateStr()
   const outreaches = await getOutreachLog({ outreach_date: today })
 
   const summary = {
@@ -1887,9 +1899,7 @@ export async function getAllOutreachLogs(filters = {}) {
   }
 
   if (filters.days_back) {
-    const since = new Date()
-    since.setDate(since.getDate() - filters.days_back)
-    query = query.gte('outreach_date', since.toISOString().split('T')[0])
+    query = query.gte('outreach_date', istAddDays(istDateStr(), -filters.days_back))
   }
 
   if (filters.logged_by) query = query.eq('logged_by', filters.logged_by)
@@ -1905,13 +1915,10 @@ export async function getAllOutreachLogs(filters = {}) {
  * loading the full outreach rows. Returns: [{logged_by, outreach_date, status}]
  */
 export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
-  const d = new Date()
-  d.setDate(d.getDate() - daysBack)
-  const localSince = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   let q = supabase
     .from('crm_outreach_log')
     .select('logged_by, outreach_date, status, outreach_type')
-    .gte('outreach_date', localSince)
+    .gte('outreach_date', istAddDays(istDateStr(), -daysBack))
   if (personId) q = q.eq('logged_by', personId)
 
   const { data, error } = await q
@@ -1926,11 +1933,7 @@ export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
 // ============================================================================
 
 function getWeekStartDate(date = new Date()) {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  const monday = new Date(d.setDate(diff))
-  return monday.toISOString().split('T')[0]
+  return istWeekStart(istDateStr(date.getTime()))
 }
 
 /**
@@ -1942,7 +1945,7 @@ function getWeekStartDate(date = new Date()) {
 export function getPeriodStart(frequency, date = new Date()) {
   const d = new Date(date)
   if (frequency === 'daily') {
-    return d.toISOString().split('T')[0]
+    return istDateStr(d.getTime())
   }
   if (frequency === 'weekly') {
     return getWeekStartDate(d)

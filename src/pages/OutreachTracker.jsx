@@ -106,7 +106,7 @@ function OutreachTracker() {
       // Get outreaches based on filter
       const filters = {}
       if (filter.view === 'today') {
-        filters.outreach_date = new Date().toISOString().split('T')[0]
+        filters.outreach_date = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0]
       } else if (filter.view === 'week') {
         filters.days_back = 7
       } else {
