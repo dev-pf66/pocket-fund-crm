@@ -1,373 +1,417 @@
-import { useState, useEffect } from 'react'
-import { getAnalytics, getDailyOutreachStats } from '../lib/crm-api'
+import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../App'
-import { TrendingUp, Clock, Target, Award, Send } from 'lucide-react'
+import { getOutreachStatsByPerson } from '../lib/crm-api'
+import { supabase } from '../lib/supabase'
+import { Send, MessageSquare, Calendar, TrendingUp } from 'lucide-react'
+
+const TIME_WINDOWS = [
+  { label: '7d', value: 7 },
+  { label: '30d', value: 30 },
+  { label: '90d', value: 90 },
+]
+
+function getWeekKey(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  const mon = new Date(d)
+  mon.setDate(diff)
+  return mon.toISOString().split('T')[0]
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return d.toISOString().split('T')[0]
+}
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0]
+}
+
+function fmtWeek(wk) {
+  return new Date(wk + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function StatBox({ label, value, color }) {
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: '22px', fontWeight: '700', color: color || 'var(--primary)' }}>{value}</div>
+      <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>{label}</div>
+    </div>
+  )
+}
 
 function Analytics() {
-  const { currentPerson } = useApp()
-  const [data, setData] = useState(null)
-  const [outreachStats, setOutreachStats] = useState([])
+  const { people } = useApp()
+  const [days, setDays] = useState(30)
+  const [outreachRows, setOutreachRows] = useState([])
+  const [meetingRows, setMeetingRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const [personFilter, setPersonFilter] = useState('all')
 
   useEffect(() => {
-    loadAnalytics()
-  }, [currentPerson?.id])
+    load()
+  }, [])
 
-  async function loadAnalytics() {
-    if (!currentPerson?.id) return
+  async function load() {
     setLoading(true)
     try {
-      const analytics = await getAnalytics(currentPerson.id)
-      setData(analytics)
+      const since = new Date()
+      since.setDate(since.getDate() - 90)
+      const sinceDate = since.toISOString().split('T')[0]
 
-      // Try to load outreach stats, but don't fail if table doesn't exist yet
-      try {
-        const outreach = await getDailyOutreachStats(7, currentPerson.id)
-        setOutreachStats(outreach)
-      } catch (outreachError) {
-        console.log('Outreach stats not available yet (table may not exist)')
-        setOutreachStats([])
-      }
-    } catch (error) {
-      console.error('Failed to load analytics:', error)
+      const [outreach, meetings] = await Promise.all([
+        getOutreachStatsByPerson(90),
+        supabase
+          .from('crm_lead_activities')
+          .select('logged_by, activity_date, activity_type')
+          .in('activity_type', ['call', 'meeting'])
+          .gte('activity_date', sinceDate)
+          .then(({ data, error }) => { if (error) throw error; return data || [] })
+      ])
+      setOutreachRows(outreach)
+      setMeetingRows(meetings)
+    } catch (e) {
+      console.error('Analytics load failed', e)
     } finally {
       setLoading(false)
     }
   }
 
+  const today = todayStr()
+  const sinceDate = addDays(today, -(days - 1))
+
+  // People who have any outreach data in 90-day window
+  const activePeople = useMemo(() => {
+    const ids = new Set(outreachRows.map(r => r.logged_by))
+    return people.filter(p => ids.has(p.id))
+  }, [people, outreachRows])
+
+  const visiblePeople = useMemo(() => {
+    if (personFilter === 'all') return activePeople
+    return activePeople.filter(p => p.id === personFilter)
+  }, [activePeople, personFilter])
+
+  // Rows within the selected time window + person filter
+  const filteredRows = useMemo(() => {
+    return outreachRows.filter(r => {
+      if (r.outreach_date > today) return false
+      if (r.outreach_date < sinceDate) return false
+      if (personFilter !== 'all' && r.logged_by !== personFilter) return false
+      return true
+    })
+  }, [outreachRows, today, sinceDate, personFilter])
+
+  // Per-person aggregates
+  const personStats = useMemo(() => {
+    const map = {}
+    for (const row of filteredRows) {
+      const pid = row.logged_by
+      if (!map[pid]) map[pid] = { total: 0, replies: 0, byDate: {} }
+      map[pid].total += 1
+      if (row.status === 'replied') map[pid].replies += 1
+      map[pid].byDate[row.outreach_date] = (map[pid].byDate[row.outreach_date] || 0) + 1
+    }
+    return map
+  }, [filteredRows])
+
+  // Weekly breakdown per person
+  const weeklyStats = useMemo(() => {
+    const map = {}
+    for (const row of filteredRows) {
+      const pid = row.logged_by
+      const wk = getWeekKey(row.outreach_date)
+      if (!map[pid]) map[pid] = {}
+      map[pid][wk] = (map[pid][wk] || 0) + 1
+    }
+    return map
+  }, [filteredRows])
+
+  // Sorted unique week keys within window
+  const weekKeys = useMemo(() => {
+    const wks = new Set()
+    for (const row of filteredRows) wks.add(getWeekKey(row.outreach_date))
+    return [...wks].sort().reverse()
+  }, [filteredRows])
+
+  // Meetings per week (filtered)
+  const meetingsByWeek = useMemo(() => {
+    const map = {}
+    for (const row of meetingRows) {
+      const date = (row.activity_date || '').split('T')[0]
+      if (!date || date > today || date < sinceDate) continue
+      if (personFilter !== 'all' && row.logged_by !== personFilter) continue
+      const wk = getWeekKey(date)
+      map[wk] = (map[wk] || 0) + 1
+    }
+    return map
+  }, [meetingRows, today, sinceDate, personFilter])
+
+  const totalMeetings = Object.values(meetingsByWeek).reduce((s, v) => s + v, 0)
+  const weeksInWindow = Math.max(1, days / 7)
+  const annualProjection = Math.round((totalMeetings / weeksInWindow) * 52)
+  const maxMeetingsWeek = Math.max(1, ...Object.values(meetingsByWeek))
+
   if (loading) {
     return <div className="loading">Loading analytics...</div>
   }
 
-  if (!data) {
-    return <div>Failed to load analytics</div>
-  }
-
-  const { conversion, velocity, sources, weekly } = data
-
   return (
     <div>
       <div className="page-header">
-        <h1>Analytics & Insights</h1>
-      </div>
-
-      {/* Conversion Funnel */}
-      <div className="card">
-        <h2><TrendingUp size={20} /> Conversion Funnel</h2>
-        <p style={{ color: 'var(--gray-600)', marginBottom: '24px' }}>
-          How leads move through your pipeline
-        </p>
-
-        <div className="funnel-container">
-          <div className="funnel-stage" style={{ '--width': '100%', '--color': '#a78bfa' }}>
-            <div className="funnel-bar">
-              <div className="funnel-label">
-                <span className="funnel-stage-name">New Leads</span>
-                <span className="funnel-count">{conversion.new_lead}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="funnel-arrow">
-            <div className="conversion-rate">
-              {conversion.new_to_cold_rate}% contacted
-            </div>
-          </div>
-
-          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.cold_outreach / conversion.new_lead) * 100 : 100}%`, '--color': '#60a5fa' }}>
-            <div className="funnel-bar">
-              <div className="funnel-label">
-                <span className="funnel-stage-name">Cold Outreach</span>
-                <span className="funnel-count">{conversion.cold_outreach}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="funnel-arrow">
-            <div className="conversion-rate">
-              {conversion.cold_to_responded_rate}% reply
-            </div>
-          </div>
-
-          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.responded / conversion.new_lead) * 100 : (conversion.cold_outreach > 0 ? (conversion.responded / conversion.cold_outreach) * 100 : 0)}%`, '--color': '#06b6d4' }}>
-            <div className="funnel-bar">
-              <div className="funnel-label">
-                <span className="funnel-stage-name">Responded</span>
-                <span className="funnel-count">{conversion.responded}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="funnel-arrow">
-            <div className="conversion-rate">
-              {conversion.responded_to_warm_rate}% warm
-            </div>
-          </div>
-
-          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.warm_lead / conversion.new_lead) * 100 : (conversion.cold_outreach > 0 ? (conversion.warm_lead / conversion.cold_outreach) * 100 : 0)}%`, '--color': '#fbbf24' }}>
-            <div className="funnel-bar">
-              <div className="funnel-label">
-                <span className="funnel-stage-name">Warm Leads</span>
-                <span className="funnel-count">{conversion.warm_lead}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="funnel-arrow">
-            <div className="conversion-rate">
-              {conversion.warm_to_active_rate}% convert
-            </div>
-          </div>
-
-          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.active_conversation / conversion.new_lead) * 100 : (conversion.cold_outreach > 0 ? (conversion.active_conversation / conversion.cold_outreach) * 100 : 0)}%`, '--color': '#f97316' }}>
-            <div className="funnel-bar">
-              <div className="funnel-label">
-                <span className="funnel-stage-name">Active Conversations</span>
-                <span className="funnel-count">{conversion.active_conversation}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="funnel-arrow">
-            <div className="conversion-rate">
-              {conversion.active_to_client_rate}% close
-            </div>
-          </div>
-
-          <div className="funnel-stage" style={{ '--width': `${conversion.new_lead > 0 ? (conversion.client / conversion.new_lead) * 100 : (conversion.cold_outreach > 0 ? (conversion.client / conversion.cold_outreach) * 100 : 0)}%`, '--color': '#22c55e' }}>
-            <div className="funnel-bar">
-              <div className="funnel-label">
-                <span className="funnel-stage-name">Clients</span>
-                <span className="funnel-count">{conversion.client}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="overall-conversion">
-          <strong>Overall Conversion:</strong> {conversion.overall_rate}% of leads → clients
-        </div>
-      </div>
-
-      {/* Pipeline Velocity */}
-      <div className="analytics-grid">
-        <div className="card">
-          <h2><Clock size={20} /> Pipeline Velocity</h2>
-          <p style={{ color: 'var(--gray-600)', marginBottom: '20px' }}>
-            Average days in each stage
-          </p>
-
-          <div className="velocity-stats">
-            <div className="velocity-item">
-              <div className="velocity-stage">New Lead</div>
-              <div className="velocity-days">{velocity.new_lead} days</div>
-            </div>
-            <div className="velocity-item">
-              <div className="velocity-stage">Cold Outreach</div>
-              <div className="velocity-days">{velocity.cold_outreach} days</div>
-            </div>
-            <div className="velocity-item">
-              <div className="velocity-stage">Responded</div>
-              <div className="velocity-days">{velocity.responded} days</div>
-            </div>
-            <div className="velocity-item">
-              <div className="velocity-stage">Warm Lead</div>
-              <div className="velocity-days">{velocity.warm_lead} days</div>
-            </div>
-            <div className="velocity-item">
-              <div className="velocity-stage">Active Conversation</div>
-              <div className="velocity-days">{velocity.active_conversation} days</div>
-            </div>
-            <div className="velocity-item" style={{ borderBottom: 'none' }}>
-              <div className="velocity-stage">Total Time to Close</div>
-              <div className="velocity-days" style={{ fontSize: '24px', color: 'var(--primary)' }}>
-                {velocity.total} days
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <h2><Target size={20} /> Lead Sources ROI</h2>
-          <p style={{ color: 'var(--gray-600)', marginBottom: '20px' }}>
-            Which sources convert best
-          </p>
-
-          <div className="sources-list">
-            {sources.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-500)' }}>
-                No lead source data yet
-              </div>
-            )}
-
-            {sources.map(source => (
-              <div key={source.source} className="source-item">
-                <div className="source-name">{source.source || 'Unknown'}</div>
-                <div className="source-stats">
-                  <div className="source-count">{source.total} leads</div>
-                  <div className="source-conversion">{source.conversion_rate}% → clients</div>
-                </div>
-                <div className="source-bar">
-                  <div
-                    className="source-bar-fill"
-                    style={{ width: `${source.conversion_rate}%` }}
-                  ></div>
-                </div>
-              </div>
+        <h1>Analytics</h1>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <select
+            value={personFilter}
+            onChange={e => setPersonFilter(e.target.value)}
+            className="form-select"
+            style={{ minWidth: '140px' }}
+          >
+            <option value="all">All People</option>
+            {activePeople.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {TIME_WINDOWS.map(tw => (
+              <button
+                key={tw.value}
+                onClick={() => setDays(tw.value)}
+                className={days === tw.value ? 'btn btn-primary' : 'btn btn-secondary'}
+                style={{ padding: '6px 14px', fontSize: '13px' }}
+              >
+                {tw.label}
+              </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Weekly Trends */}
-      <div className="card">
-        <h2><Award size={20} /> Last 4 Weeks Performance</h2>
-        <div className="weekly-grid">
-          {weekly.map((week, idx) => (
-            <div key={idx} className="week-card">
-              <div className="week-label">Week {4 - idx}</div>
-              <div className="week-stats">
-                <div className="week-stat">
-                  <div className="week-stat-value">{week.new_leads}</div>
-                  <div className="week-stat-label">New Leads</div>
+      {/* Per-person summary cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        {visiblePeople.map(person => {
+          const st = personStats[person.id] || { total: 0, replies: 0 }
+          const replyRate = st.total > 0 ? Math.round((st.replies / st.total) * 100) : 0
+          const dailyAvg = (st.total / days).toFixed(1)
+          const weeklyAvg = (st.total / weeksInWindow).toFixed(1)
+          const rateColor = replyRate >= 10 ? 'var(--success)' : replyRate >= 5 ? '#f59e0b' : 'inherit'
+          return (
+            <div key={person.id} className="card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: 'var(--primary)', color: 'white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: '600', fontSize: '14px', flexShrink: 0
+                }}>
+                  {person.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?'}
                 </div>
-                <div className="week-stat">
-                  <div className="week-stat-value">{week.moved_to_active}</div>
-                  <div className="week-stat-label">→ Active</div>
-                </div>
-                <div className="week-stat">
-                  <div className="week-stat-value" style={{ color: '#22c55e' }}>{week.closed}</div>
-                  <div className="week-stat-label">Closed</div>
+                <div>
+                  <div style={{ fontWeight: '600', fontSize: '15px' }}>{person.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Last {days} days</div>
                 </div>
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <StatBox label="Total" value={st.total} />
+                <StatBox label="Daily avg" value={dailyAvg} />
+                <StatBox label="Weekly avg" value={weeklyAvg} />
+                <StatBox label="Reply rate" value={`${replyRate}%`} color={rateColor} />
+              </div>
             </div>
-          ))}
-        </div>
+          )
+        })}
+        {visiblePeople.length === 0 && (
+          <div style={{ gridColumn: '1/-1', padding: '48px', textAlign: 'center', color: 'var(--gray-500)' }}>
+            No outreach data in this window.
+          </div>
+        )}
       </div>
 
-      {/* Daily Outreach Activity */}
-      <div className="card">
-        <h2><Send size={20} /> Daily Outreach Activity (Last 7 Days)</h2>
-        <p style={{ color: 'var(--gray-600)', marginBottom: '20px' }}>
-          Track daily outreach progress toward 10/day goal
-        </p>
-
-        {outreachStats.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
-            No outreach logged yet. Start tracking in the Outreach Tracker! 🚀
-          </div>
-        ) : (
+      {/* Weekly outreach table */}
+      {weekKeys.length > 0 && (
+        <div className="card" style={{ marginBottom: '24px' }}>
+          <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Send size={18} /> Weekly Outreach
+          </h2>
+          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+            Outreach logged per person per week
+          </p>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--gray-200)', textAlign: 'left' }}>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Date</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Total</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Emails</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>LinkedIn</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Calls</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Replies</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Goal</th>
+                <tr style={{ borderBottom: '2px solid var(--gray-200)' }}>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', whiteSpace: 'nowrap' }}>Person</th>
+                  {weekKeys.map(wk => (
+                    <th key={wk} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--gray-600)' }}>
+                      w/{fmtWeek(wk)}
+                    </th>
+                  ))}
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600' }}>Total</th>
                 </tr>
               </thead>
               <tbody>
-                {outreachStats.map((day, idx) => {
-                  const total = Number(day.total_outreaches)
-                  const goalMet = day.goal_met
+                {visiblePeople.map(person => {
+                  const pw = weeklyStats[person.id] || {}
+                  const personTotal = Object.values(pw).reduce((s, v) => s + v, 0)
                   return (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--gray-100)' }}>
-                      <td style={{ padding: '12px 8px', fontSize: '14px', fontWeight: '500' }}>
-                        {new Date(day.outreach_date).toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </td>
-                      <td style={{ padding: '12px 8px', fontSize: '18px', fontWeight: 'bold', color: goalMet ? 'var(--success)' : 'var(--primary)' }}>
-                        {total}
-                      </td>
-                      <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--gray-600)' }}>
-                        {day.cold_emails}
-                      </td>
-                      <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--gray-600)' }}>
-                        {day.linkedin_messages}
-                      </td>
-                      <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--gray-600)' }}>
-                        {day.phone_calls}
-                      </td>
-                      <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--success)', fontWeight: '600' }}>
-                        {day.replied_count}
-                      </td>
-                      <td style={{ padding: '12px 8px' }}>
-                        {goalMet ? (
-                          <span style={{
-                            background: 'var(--success)',
-                            color: 'white',
-                            padding: '4px 12px',
-                            borderRadius: '12px',
-                            fontSize: '13px',
-                            fontWeight: '600'
-                          }}>
-                            ✓ Met
-                          </span>
-                        ) : (
-                          <span style={{
-                            background: 'var(--gray-200)',
-                            color: 'var(--gray-600)',
-                            padding: '4px 12px',
-                            borderRadius: '12px',
-                            fontSize: '13px',
-                            fontWeight: '600'
-                          }}>
-                            {total}/10
-                          </span>
-                        )}
+                    <tr key={person.id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: '500', whiteSpace: 'nowrap' }}>{person.name}</td>
+                      {weekKeys.map(wk => {
+                        const count = pw[wk] || 0
+                        return (
+                          <td key={wk} style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            <span style={{
+                              display: 'inline-block', minWidth: '28px',
+                              padding: '2px 8px', borderRadius: '12px', fontSize: '13px',
+                              background: count >= 50 ? '#dcfce7' : count >= 20 ? '#fef9c3' : count > 0 ? 'var(--gray-100)' : 'transparent',
+                              color: count >= 50 ? '#166534' : count >= 20 ? '#713f12' : 'inherit',
+                              fontWeight: count > 0 ? '600' : '400'
+                            }}>
+                              {count || '—'}
+                            </span>
+                          </td>
+                        )
+                      })}
+                      <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '700', color: 'var(--primary)' }}>
+                        {personTotal}
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
 
-            {/* Summary Stats */}
-            <div style={{
-              marginTop: '24px',
-              padding: '16px',
-              background: 'var(--gray-50)',
-              borderRadius: '8px',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-              gap: '16px'
-            }}>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '4px' }}>Total Outreaches</div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--primary)' }}>
-                  {outreachStats.reduce((sum, day) => sum + Number(day.total_outreaches), 0)}
+      {/* Reply rate + Meetings */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        {/* Reply rate */}
+        <div className="card">
+          <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MessageSquare size={18} /> Reply Rate
+          </h2>
+          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+            Replies received / outreach sent
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {visiblePeople.map(person => {
+              const st = personStats[person.id] || { total: 0, replies: 0 }
+              const rate = st.total > 0 ? (st.replies / st.total) * 100 : 0
+              const rateColor = rate >= 10 ? 'var(--success)' : rate >= 5 ? '#f59e0b' : 'var(--gray-600)'
+              return (
+                <div key={person.id}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '14px' }}>
+                    <span style={{ fontWeight: '500' }}>{person.name}</span>
+                    <span style={{ fontWeight: '700', color: rateColor }}>
+                      {Math.round(rate)}%{' '}
+                      <span style={{ fontWeight: '400', color: 'var(--gray-500)', fontSize: '12px' }}>
+                        ({st.replies}/{st.total})
+                      </span>
+                    </span>
+                  </div>
+                  <div style={{ height: '8px', background: 'var(--gray-200)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${Math.min(100, rate)}%`, height: '100%', borderRadius: '4px',
+                      background: rate >= 10 ? 'var(--success)' : rate >= 5 ? '#f59e0b' : 'var(--primary)',
+                      transition: 'width 0.4s ease'
+                    }} />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '4px' }}>Daily Average</div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--primary)' }}>
-                  {Math.round(outreachStats.reduce((sum, day) => sum + Number(day.total_outreaches), 0) / outreachStats.length)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '4px' }}>Days Hit Goal</div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--success)' }}>
-                  {outreachStats.filter(d => d.goal_met).length}/{outreachStats.length}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '4px' }}>Reply Rate</div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--success)' }}>
-                  {Math.round((outreachStats.reduce((sum, day) => sum + Number(day.replied_count), 0) /
-                    outreachStats.reduce((sum, day) => sum + Number(day.total_outreaches), 0)) * 100) || 0}%
-                </div>
-              </div>
+              )
+            })}
+            {visiblePeople.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-500)' }}>No data</div>
+            )}
+          </div>
+        </div>
+
+        {/* Meetings booked */}
+        <div className="card">
+          <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Calendar size={18} /> Meetings Booked
+          </h2>
+          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+            Calls & meetings logged
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--primary)' }}>{totalMeetings}</div>
+              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Last {days} days</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--success)' }}>{annualProjection}</div>
+              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Annual run rate</div>
             </div>
           </div>
-        )}
+          {weekKeys.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {weekKeys.slice(0, 8).map(wk => {
+                const count = meetingsByWeek[wk] || 0
+                return (
+                  <div key={wk} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
+                    <div style={{ width: '64px', color: 'var(--gray-500)', flexShrink: 0, fontSize: '12px' }}>
+                      {fmtWeek(wk)}
+                    </div>
+                    <div style={{ flex: 1, height: '14px', background: 'var(--gray-100)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${(count / maxMeetingsWeek) * 100}%`, height: '100%',
+                        background: 'var(--primary)', borderRadius: '3px'
+                      }} />
+                    </div>
+                    <div style={{ width: '20px', textAlign: 'right', fontWeight: '600' }}>{count || '—'}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {weekKeys.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-500)' }}>No meeting data</div>
+          )}
+        </div>
       </div>
+
+      {/* Daily heatmap — shown when a single person is selected */}
+      {personFilter !== 'all' && visiblePeople.length === 1 && (
+        <div className="card">
+          <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <TrendingUp size={18} /> Daily Activity — {visiblePeople[0].name}
+          </h2>
+          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '16px' }}>
+            Each square = one day. Darker = more outreach.
+          </p>
+          {(() => {
+            const st = personStats[visiblePeople[0].id] || { byDate: {} }
+            const maxDay = Math.max(1, ...Object.values(st.byDate))
+            const dates = []
+            for (let i = days - 1; i >= 0; i--) dates.push(addDays(today, -i))
+            const colors = ['var(--gray-100)', '#bbf7d0', '#4ade80', '#22c55e', '#15803d']
+            return (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                {dates.map(date => {
+                  const count = st.byDate[date] || 0
+                  const intensity = count === 0 ? 0 : Math.min(4, Math.ceil((count / maxDay) * 4))
+                  return (
+                    <div
+                      key={date}
+                      title={`${date}: ${count} outreach`}
+                      style={{
+                        width: days <= 30 ? '26px' : '18px',
+                        height: days <= 30 ? '26px' : '18px',
+                        borderRadius: '4px',
+                        background: colors[intensity],
+                        cursor: 'default',
+                        flexShrink: 0
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </div>
+      )}
     </div>
   )
 }
