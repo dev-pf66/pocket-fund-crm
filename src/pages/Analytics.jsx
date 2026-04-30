@@ -48,6 +48,8 @@ function Analytics() {
   const [outreachRows, setOutreachRows] = useState([])
   const [meetingRows, setMeetingRows] = useState([])
   const [loading, setLoading] = useState(true)
+  // personFilter is always a string ('all' or stringified id) so it round-trips
+  // cleanly through <select> e.target.value (which is always a string).
   const [personFilter, setPersonFilter] = useState('all')
 
   useEffect(() => {
@@ -79,18 +81,19 @@ function Analytics() {
     }
   }
 
-  const today = todayStr()
-  const sinceDate = addDays(today, -(days - 1))
+  const today = useMemo(() => todayStr(), [])
+  const sinceDate = useMemo(() => addDays(today, -(days - 1)), [today, days])
 
-  // People who have any outreach data in 90-day window
+  // People who have any outreach data in 90-day window.
+  // Stringify ids so they match personFilter (always a string from <select>).
   const activePeople = useMemo(() => {
-    const ids = new Set(outreachRows.map(r => r.logged_by))
-    return people.filter(p => ids.has(p.id))
+    const ids = new Set(outreachRows.map(r => String(r.logged_by)))
+    return people.filter(p => ids.has(String(p.id)))
   }, [people, outreachRows])
 
   const visiblePeople = useMemo(() => {
     if (personFilter === 'all') return activePeople
-    return activePeople.filter(p => p.id === personFilter)
+    return activePeople.filter(p => String(p.id) === personFilter)
   }, [activePeople, personFilter])
 
   // Rows within the selected time window + person filter
@@ -98,7 +101,7 @@ function Analytics() {
     return outreachRows.filter(r => {
       if (r.outreach_date > today) return false
       if (r.outreach_date < sinceDate) return false
-      if (personFilter !== 'all' && r.logged_by !== personFilter) return false
+      if (personFilter !== 'all' && String(r.logged_by) !== personFilter) return false
       return true
     })
   }, [outreachRows, today, sinceDate, personFilter])
@@ -135,21 +138,28 @@ function Analytics() {
     return [...wks].sort().reverse()
   }, [filteredRows])
 
-  // Meetings per week (filtered)
+  // Meetings per week (filtered). Uses its own week-key set so weeks with
+  // meetings but no outreach still appear in the meetings bar chart.
   const meetingsByWeek = useMemo(() => {
     const map = {}
     for (const row of meetingRows) {
       const date = (row.activity_date || '').split('T')[0]
       if (!date || date > today || date < sinceDate) continue
-      if (personFilter !== 'all' && row.logged_by !== personFilter) continue
+      if (personFilter !== 'all' && String(row.logged_by) !== personFilter) continue
       const wk = getWeekKey(date)
       map[wk] = (map[wk] || 0) + 1
     }
     return map
   }, [meetingRows, today, sinceDate, personFilter])
 
+  // Week keys for the meetings bar — union of outreach weeks and meeting weeks
+  const meetingWeekKeys = useMemo(() => {
+    const wks = new Set([...weekKeys, ...Object.keys(meetingsByWeek)])
+    return [...wks].sort().reverse().slice(0, 8)
+  }, [weekKeys, meetingsByWeek])
+
   const totalMeetings = Object.values(meetingsByWeek).reduce((s, v) => s + v, 0)
-  const weeksInWindow = Math.max(1, days / 7)
+  const weeksInWindow = Math.max(1, Math.ceil(days / 7))
   const annualProjection = Math.round((totalMeetings / weeksInWindow) * 52)
   const maxMeetingsWeek = Math.max(1, ...Object.values(meetingsByWeek))
 
@@ -194,7 +204,7 @@ function Analytics() {
           const st = personStats[person.id] || { total: 0, replies: 0 }
           const replyRate = st.total > 0 ? Math.round((st.replies / st.total) * 100) : 0
           const dailyAvg = (st.total / days).toFixed(1)
-          const weeklyAvg = (st.total / weeksInWindow).toFixed(1)
+          const weeklyAvg = (st.total / Math.max(1, Math.ceil(days / 7))).toFixed(1)
           const rateColor = replyRate >= 10 ? 'var(--success)' : replyRate >= 5 ? '#f59e0b' : 'inherit'
           return (
             <div key={person.id} className="card" style={{ padding: '20px' }}>
@@ -345,9 +355,9 @@ function Analytics() {
               <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Annual run rate</div>
             </div>
           </div>
-          {weekKeys.length > 0 && (
+          {meetingWeekKeys.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {weekKeys.slice(0, 8).map(wk => {
+              {meetingWeekKeys.map(wk => {
                 const count = meetingsByWeek[wk] || 0
                 return (
                   <div key={wk} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
@@ -366,7 +376,7 @@ function Analytics() {
               })}
             </div>
           )}
-          {weekKeys.length === 0 && (
+          {meetingWeekKeys.length === 0 && (
             <div style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-500)' }}>No meeting data</div>
           )}
         </div>
