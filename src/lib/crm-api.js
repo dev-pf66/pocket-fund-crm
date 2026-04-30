@@ -4,7 +4,7 @@
 
 import { supabase } from './supabase'
 import { normalizeLinkedInUrl, nameFromLinkedInUrl } from './linkedin'
-import { IST_OFFSET_MS, istToday, istAddDays, istWeekStart } from './dateUtils'
+import { IST_OFFSET_MS, istAddDays, istWeekStart } from './dateUtils'
 
 // Accepts an optional utcMs so callers can get the IST date for a specific
 // moment; defaults to now. All other code should call istToday() directly.
@@ -1916,25 +1916,26 @@ export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
 // ============================================================================
 
 function getWeekStartDate(date = new Date()) {
-  return istWeekStart(istToday(date.getTime()))
+  return istWeekStart(istDateStr(date.getTime()))
 }
 
 /**
  * Period-start (YYYY-MM-DD) for a given frequency.
- * - daily:   today
- * - weekly:  Monday of this week
- * - monthly: first day of this month
+ * - daily:   today in IST
+ * - weekly:  Monday of this IST week
+ * - monthly: first day of this IST month
  */
 export function getPeriodStart(frequency, date = new Date()) {
   const d = new Date(date)
+  const istDate = istDateStr(d.getTime()) // always the IST calendar date
   if (frequency === 'daily') {
-    return istDateStr(d.getTime())
+    return istDate
   }
   if (frequency === 'weekly') {
-    return getWeekStartDate(d)
+    return istWeekStart(istDate)
   }
   if (frequency === 'monthly') {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+    return istDate.slice(0, 7) + '-01' // YYYY-MM-01
   }
   throw new Error(`Unknown frequency: ${frequency}`)
 }
