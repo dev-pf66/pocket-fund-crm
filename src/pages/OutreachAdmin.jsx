@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, promoteOutreachToLead, getLeadById, updateLead } from '../lib/crm-api'
+import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, updateLead, promoteOutreachToLead, getLeadById } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2, Plus } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -646,6 +646,20 @@ function MobileEntryCard({
               {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
             </select>
           </div>
+          <div><div style={metaLabelStyle}>Lead Stage</div>
+            <select
+              style={{ ...metaValueStyle, width: '100%', cursor: entry.lead?.id ? 'pointer' : 'not-allowed', opacity: entry.lead?.id ? 1 : 0.5 }}
+              value={entry.lead?.outreach_stage || ''}
+              disabled={!entry.lead?.id}
+              onChange={e => onSaveField('outreach_stage', e.target.value)}
+            >
+              <option value="">—</option>
+              <option value="cold">Cold</option>
+              <option value="messaged">Messaged</option>
+              <option value="replied">Replied</option>
+              <option value="meeting">Meeting</option>
+            </select>
+          </div>
           {entry.notes && (
             <div><div style={metaLabelStyle}>Notes</div><div style={metaValueStyle}>{entry.notes}</div></div>
           )}
@@ -1005,8 +1019,15 @@ function OutreachAdmin() {
 
   async function saveEntryField(entryId, field, value) {
     try {
-      await updateOutreach(entryId, { [field]: value || null })
-      setEntries(prev => prev.map(e => e.id === entryId ? { ...e, [field]: value } : e))
+      if (field === 'outreach_stage') {
+        const entry = entries.find(e => e.id === entryId)
+        if (!entry?.lead?.id) return
+        await updateLead(entry.lead.id, { outreach_stage: value || null })
+        setEntries(prev => prev.map(e => e.id === entryId ? { ...e, lead: { ...e.lead, outreach_stage: value } } : e))
+      } else {
+        await updateOutreach(entryId, { [field]: value || null })
+        setEntries(prev => prev.map(e => e.id === entryId ? { ...e, [field]: value } : e))
+      }
     } catch (err) {
       console.error('Failed to update entry:', err)
       toast.error('Failed to save: ' + err.message)
@@ -1412,6 +1433,29 @@ function OutreachAdmin() {
                               <select style={{ ...metaValueStyle, width: '100%', cursor: 'pointer' }} value={entry.lead_source || ''} onChange={e => saveEntryField(entry.id, 'lead_source', e.target.value)}>
                                 <option value="">—</option>
                                 {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <div style={metaLabelStyle}>Lead Stage</div>
+                              <select
+                                style={{ ...metaValueStyle, width: '100%', cursor: entry.lead?.id ? 'pointer' : 'not-allowed', opacity: entry.lead?.id ? 1 : 0.5 }}
+                                value={entry.lead?.outreach_stage || ''}
+                                disabled={!entry.lead?.id}
+                                onChange={async e => {
+                                  const val = e.target.value
+                                  try {
+                                    await updateLead(entry.lead.id, { outreach_stage: val || null })
+                                    setEntries(prev => prev.map(x => x.id === entry.id ? { ...x, lead: { ...x.lead, outreach_stage: val } } : x))
+                                  } catch (err) {
+                                    toast.error('Failed to save lead stage: ' + err.message)
+                                  }
+                                }}
+                              >
+                                <option value="">—</option>
+                                <option value="cold">Cold</option>
+                                <option value="messaged">Messaged</option>
+                                <option value="replied">Replied</option>
+                                <option value="meeting">Meeting</option>
                               </select>
                             </div>
                             {entry.notes && (
