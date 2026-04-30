@@ -39,11 +39,13 @@ function Layout() {
           <NavLink to="/outreach-queue" onClick={() => setMobileMenuOpen(false)}><Inbox size={18} />Outreach Queue</NavLink>
           <NavLink to="/outreach-admin" onClick={() => setMobileMenuOpen(false)}><ClipboardList size={18} />Outreach Log</NavLink>
           <NavLink to="/my-goals" onClick={() => setMobileMenuOpen(false)}><CheckSquare size={18} />Goals</NavLink>
-          <NavLink to="/analytics" onClick={() => setMobileMenuOpen(false)}><BarChart3 size={18} />Analytics</NavLink>
-          <NavLink to="/investors" onClick={() => setMobileMenuOpen(false)}><Briefcase size={18} />Investor Contacts</NavLink>
-          <NavLink to="/templates" onClick={() => setMobileMenuOpen(false)}><Mail size={18} />Email Templates</NavLink>
-          <NavLink to="/samples" onClick={() => setMobileMenuOpen(false)}><FileText size={18} />Sample Deals</NavLink>
           <NavLink to="/help" onClick={() => setMobileMenuOpen(false)}><HelpCircle size={18} />Help</NavLink>
+          {isAdminUser(currentPerson) && (<>
+            <NavLink to="/analytics" onClick={() => setMobileMenuOpen(false)}><BarChart3 size={18} />Analytics</NavLink>
+            <NavLink to="/investors" onClick={() => setMobileMenuOpen(false)}><Briefcase size={18} />Investor Contacts</NavLink>
+            <NavLink to="/templates" onClick={() => setMobileMenuOpen(false)}><Mail size={18} />Email Templates</NavLink>
+            <NavLink to="/samples" onClick={() => setMobileMenuOpen(false)}><FileText size={18} />Sample Deals</NavLink>
+          </>)}
           {currentPerson?.email === PARTNERS_OWNER_EMAIL && (
             <NavLink to="/partners" onClick={() => setMobileMenuOpen(false)}><Handshake size={18} />Potential Partners</NavLink>
           )}

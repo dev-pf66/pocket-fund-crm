@@ -65,11 +65,18 @@ export function useApp() {
   return useContext(AppContext)
 }
 
+const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
+function isAdminUser(person) {
+  if (!person) return false
+  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
+
 function AppContent() {
   const { user, loading: authLoading, isAuthenticated } = useAuth()
   const [currentPerson, setCurrentPerson] = useState(null)
   const [people, setPeople] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
+  const isAdmin = isAdminUser(currentPerson)
 
   useEffect(() => {
     if (isAuthenticated && user?.email) {
@@ -148,11 +155,13 @@ function AppContent() {
               <Route path="my-goals" element={<MyGoals />} />
               <Route path="admin" element={<Admin />} />
               <Route path="import" element={<ImportLeads />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="investors" element={<Investors />} />
-              <Route path="investors/:id" element={<InvestorDetail />} />
-              <Route path="templates" element={<EmailTemplates />} />
-              <Route path="samples" element={<SampleDeals />} />
+              {isAdmin && <>
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="investors" element={<Investors />} />
+                <Route path="investors/:id" element={<InvestorDetail />} />
+                <Route path="templates" element={<EmailTemplates />} />
+                <Route path="samples" element={<SampleDeals />} />
+              </>}
               <Route path="help" element={<Help />} />
               <Route path="help/admin" element={<HelpAdmin />} />
               {currentPerson?.email === PARTNERS_OWNER_EMAIL && (
