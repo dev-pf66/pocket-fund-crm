@@ -4,10 +4,15 @@ import { getOutreachStatsByPerson } from '../lib/crm-api'
 import { supabase } from '../lib/supabase'
 import { Send, MessageSquare, Calendar, TrendingUp } from 'lucide-react'
 
+// fromOffset = days back for range start, toOffset = days back for range end.
+// e.g. Yesterday: from=1,to=1 — Today: from=0,to=0 — 7d: from=6,to=0
 const TIME_WINDOWS = [
-  { label: '7d', value: 7 },
-  { label: '30d', value: 30 },
-  { label: '90d', value: 90 },
+  { label: 'Today',     fromOffset: 0,  toOffset: 0 },
+  { label: 'Yesterday', fromOffset: 1,  toOffset: 1 },
+  { label: '3 days',    fromOffset: 2,  toOffset: 0 },
+  { label: '7 days',    fromOffset: 6,  toOffset: 0 },
+  { label: '30 days',   fromOffset: 29, toOffset: 0 },
+  { label: '90 days',   fromOffset: 89, toOffset: 0 },
 ]
 
 function getWeekKey(dateStr) {
@@ -44,7 +49,7 @@ function StatBox({ label, value, color }) {
 
 function Analytics() {
   const { people } = useApp()
-  const [days, setDays] = useState(30)
+  const [timeWin, setTimeWin] = useState(TIME_WINDOWS[3]) // default: 7 days
   const [outreachRows, setOutreachRows] = useState([])
   const [meetingRows, setMeetingRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -82,7 +87,10 @@ function Analytics() {
   }
 
   const today = useMemo(() => todayStr(), [])
-  const sinceDate = useMemo(() => addDays(today, -(days - 1)), [today, days])
+  const sinceDate = useMemo(() => addDays(today, -timeWin.fromOffset), [today, timeWin])
+  const toDate   = useMemo(() => addDays(today, -timeWin.toOffset),   [today, timeWin])
+  // Number of calendar days in the selected window (used for averages / heatmap)
+  const days = timeWin.fromOffset - timeWin.toOffset + 1
 
   // People who have any outreach data in 90-day window.
   // Stringify ids so they match personFilter (always a string from <select>).
@@ -99,12 +107,12 @@ function Analytics() {
   // Rows within the selected time window + person filter
   const filteredRows = useMemo(() => {
     return outreachRows.filter(r => {
-      if (r.outreach_date > today) return false
       if (r.outreach_date < sinceDate) return false
+      if (r.outreach_date > toDate) return false
       if (personFilter !== 'all' && String(r.logged_by) !== personFilter) return false
       return true
     })
-  }, [outreachRows, today, sinceDate, personFilter])
+  }, [outreachRows, sinceDate, toDate, personFilter])
 
   // Per-person aggregates
   const personStats = useMemo(() => {
@@ -144,13 +152,13 @@ function Analytics() {
     const map = {}
     for (const row of meetingRows) {
       const date = (row.activity_date || '').split('T')[0]
-      if (!date || date > today || date < sinceDate) continue
+      if (!date || date < sinceDate || date > toDate) continue
       if (personFilter !== 'all' && String(row.logged_by) !== personFilter) continue
       const wk = getWeekKey(date)
       map[wk] = (map[wk] || 0) + 1
     }
     return map
-  }, [meetingRows, today, sinceDate, personFilter])
+  }, [meetingRows, sinceDate, toDate, personFilter])
 
   // Week keys for the meetings bar — union of outreach weeks and meeting weeks
   const meetingWeekKeys = useMemo(() => {
@@ -183,12 +191,12 @@ function Analytics() {
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             {TIME_WINDOWS.map(tw => (
               <button
-                key={tw.value}
-                onClick={() => setDays(tw.value)}
-                className={days === tw.value ? 'btn btn-primary' : 'btn btn-secondary'}
+                key={tw.label}
+                onClick={() => setTimeWin(tw)}
+                className={timeWin.label === tw.label ? 'btn btn-primary' : 'btn btn-secondary'}
                 style={{ padding: '6px 14px', fontSize: '13px' }}
               >
                 {tw.label}
@@ -219,7 +227,7 @@ function Analytics() {
                 </div>
                 <div>
                   <div style={{ fontWeight: '600', fontSize: '15px' }}>{person.name}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Last {days} days</div>
+                  <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{timeWin.label}</div>
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -348,7 +356,7 @@ function Analytics() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
             <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
               <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--primary)' }}>{totalMeetings}</div>
-              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Last {days} days</div>
+              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>{timeWin.label}</div>
             </div>
             <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
               <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--success)' }}>{annualProjection}</div>
@@ -395,7 +403,7 @@ function Analytics() {
             const st = personStats[visiblePeople[0].id] || { byDate: {} }
             const maxDay = Math.max(1, ...Object.values(st.byDate))
             const dates = []
-            for (let i = days - 1; i >= 0; i--) dates.push(addDays(today, -i))
+            for (let i = timeWin.fromOffset; i >= timeWin.toOffset; i--) dates.push(addDays(today, -i))
             const colors = ['var(--gray-100)', '#bbf7d0', '#4ade80', '#22c55e', '#15803d']
             return (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
