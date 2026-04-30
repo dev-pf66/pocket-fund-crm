@@ -6,10 +6,9 @@ import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
+import { istToday } from '../lib/dateUtils'
 
-function todayStr() {
-  return new Date().toISOString().split('T')[0]
-}
+const todayStr = istToday
 
 // Days until / since a YYYY-MM-DD date relative to today. Negative = overdue.
 function daysUntil(dateStr) {

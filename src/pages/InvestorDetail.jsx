@@ -5,10 +5,11 @@ import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, Trash2, Edit2, Save, X, MessageSquare, Users, Handshake, StickyNote, Plus } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
+import { istToday } from '../lib/dateUtils'
 
 const emptyInteraction = () => ({
   interaction_type: 'call',
-  interaction_date: new Date().toISOString().split('T')[0],
+  interaction_date: istToday(),
   notes: ''
 })
 

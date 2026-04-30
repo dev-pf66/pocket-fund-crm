@@ -6,6 +6,7 @@ import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCir
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
+import { istToday } from '../lib/dateUtils'
 import { parseCSVText, parseDateCell } from '../lib/csv'
 
 // Map free-text CSV values into the canonical dropdown keys the table uses.
@@ -106,7 +107,7 @@ function OutreachTracker() {
       // Get outreaches based on filter
       const filters = {}
       if (filter.view === 'today') {
-        filters.outreach_date = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0]
+        filters.outreach_date = istToday()
       } else if (filter.view === 'week') {
         filters.days_back = 7
       } else {

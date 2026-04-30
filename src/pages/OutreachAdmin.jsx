@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, updateLead, promoteOutreachToLead, getLeadById } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2, Plus } from 'lucide-react'
+import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
@@ -22,31 +23,12 @@ const PLATFORM_LABELS = {
 
 const PLATFORMS = ['cold_email', 'linkedin_message', 'phone_call', 'other']
 
-// All dates in IST (UTC+5:30) — hardcoded, never changes.
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+// Local aliases — all backed by the shared IST utility in dateUtils.js
+const todayStr   = istToday
+const addDays    = istAddDays
+const weekStart  = istWeekStart
 
-function todayStr() {
-  return new Date(Date.now() + IST_OFFSET_MS).toISOString().split('T')[0]
-}
-
-// Date arithmetic on YYYY-MM-DD strings (parses at UTC noon, no timezone risk).
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().split('T')[0]
-}
-
-// Monday-anchored week start.
-function weekStart(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00Z')
-  const day = d.getUTCDay()
-  const offset = day === 0 ? -6 : 1 - day
-  return addDays(dateStr, offset)
-}
-
-function formatShort(dateStr) {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+const formatShort = fmtDate
 
 function FitStars({ score }) {
   if (!score) return <span style={{ color: '#9ca3af', fontSize: '13px' }}>—</span>

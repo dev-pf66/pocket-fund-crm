@@ -6,8 +6,9 @@ import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Sa
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
+import { istToday } from '../lib/dateUtils'
 
-const today = () => new Date().toISOString().split('T')[0]
+const today = istToday
 const emptyActivity = () => ({ activity_type: 'call', notes: '', transcript: '', activity_date: today() })
 const emptyTranscript = () => ({ title: '', transcript: '', call_date: today() })
 

@@ -3,6 +3,7 @@ import { useApp } from '../App'
 import { getOutreachStatsByPerson } from '../lib/crm-api'
 import { supabase } from '../lib/supabase'
 import { Send, MessageSquare, Calendar, TrendingUp } from 'lucide-react'
+import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 
 // fromOffset = days back for range start, toOffset = days back for range end.
 // e.g. Yesterday: from=1,to=1 — Today: from=0,to=0 — 7d: from=6,to=0
@@ -14,32 +15,6 @@ const TIME_WINDOWS = [
   { label: '30 days',   fromOffset: 29, toOffset: 0 },
   { label: '90 days',   fromOffset: 89, toOffset: 0 },
 ]
-
-// All dates in IST (UTC+5:30) — hardcoded, never changes.
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
-
-function todayStr() {
-  return new Date(Date.now() + IST_OFFSET_MS).toISOString().split('T')[0]
-}
-
-// Date arithmetic on YYYY-MM-DD strings (parses at UTC noon, no tz risk).
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().split('T')[0]
-}
-
-// Monday-anchored week key for a YYYY-MM-DD string.
-function getWeekKey(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00Z')
-  const day = d.getUTCDay()
-  const offset = day === 0 ? -6 : 1 - day
-  return addDays(dateStr, offset)
-}
-
-function fmtWeek(wk) {
-  return new Date(wk + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
 
 function StatBox({ label, value, color }) {
   return (
@@ -67,7 +42,7 @@ function Analytics() {
   async function load() {
     setLoading(true)
     try {
-      const sinceDate = addDays(todayStr(), -90)
+      const sinceDate = istAddDays(istToday(), -90)
 
       const [outreach, meetings] = await Promise.all([
         getOutreachStatsByPerson(90),
@@ -87,9 +62,9 @@ function Analytics() {
     }
   }
 
-  const today = useMemo(() => todayStr(), [])
-  const sinceDate = useMemo(() => addDays(today, -timeWin.fromOffset), [today, timeWin])
-  const toDate   = useMemo(() => addDays(today, -timeWin.toOffset),   [today, timeWin])
+  const today = useMemo(() => istToday(), [])
+  const sinceDate = useMemo(() => istAddDays(today, -timeWin.fromOffset), [today, timeWin])
+  const toDate   = useMemo(() => istAddDays(today, -timeWin.toOffset),   [today, timeWin])
   // Number of calendar days in the selected window (used for averages / heatmap)
   const days = timeWin.fromOffset - timeWin.toOffset + 1
 
@@ -133,7 +108,7 @@ function Analytics() {
     const map = {}
     for (const row of filteredRows) {
       const pid = row.logged_by
-      const wk = getWeekKey(row.outreach_date)
+      const wk = istWeekStart(row.outreach_date)
       if (!map[pid]) map[pid] = {}
       map[pid][wk] = (map[pid][wk] || 0) + 1
     }
@@ -143,7 +118,7 @@ function Analytics() {
   // Sorted unique week keys within window
   const weekKeys = useMemo(() => {
     const wks = new Set()
-    for (const row of filteredRows) wks.add(getWeekKey(row.outreach_date))
+    for (const row of filteredRows) wks.add(istWeekStart(row.outreach_date))
     return [...wks].sort().reverse()
   }, [filteredRows])
 
@@ -155,7 +130,7 @@ function Analytics() {
       const date = (row.activity_date || '').split('T')[0]
       if (!date || date < sinceDate || date > toDate) continue
       if (personFilter !== 'all' && String(row.logged_by) !== personFilter) continue
-      const wk = getWeekKey(date)
+      const wk = istWeekStart(date)
       map[wk] = (map[wk] || 0) + 1
     }
     return map
@@ -263,7 +238,7 @@ function Analytics() {
                   <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', whiteSpace: 'nowrap' }}>Person</th>
                   {weekKeys.map(wk => (
                     <th key={wk} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--gray-600)' }}>
-                      w/{fmtWeek(wk)}
+                      w/{fmtDate(wk)}
                     </th>
                   ))}
                   <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600' }}>Total</th>
@@ -371,7 +346,7 @@ function Analytics() {
                 return (
                   <div key={wk} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
                     <div style={{ width: '64px', color: 'var(--gray-500)', flexShrink: 0, fontSize: '12px' }}>
-                      {fmtWeek(wk)}
+                      {fmtDate(wk)}
                     </div>
                     <div style={{ flex: 1, height: '14px', background: 'var(--gray-100)', borderRadius: '3px', overflow: 'hidden' }}>
                       <div style={{
@@ -404,7 +379,7 @@ function Analytics() {
             const st = personStats[visiblePeople[0].id] || { byDate: {} }
             const maxDay = Math.max(1, ...Object.values(st.byDate))
             const dates = []
-            for (let i = timeWin.fromOffset; i >= timeWin.toOffset; i--) dates.push(addDays(today, -i))
+            for (let i = timeWin.fromOffset; i >= timeWin.toOffset; i--) dates.push(istAddDays(today, -i))
             const colors = ['var(--gray-100)', '#bbf7d0', '#4ade80', '#22c55e', '#15803d']
             return (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>

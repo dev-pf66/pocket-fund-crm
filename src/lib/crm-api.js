@@ -4,29 +4,12 @@
 
 import { supabase } from './supabase'
 import { normalizeLinkedInUrl, nameFromLinkedInUrl } from './linkedin'
+import { IST_OFFSET_MS, istToday, istAddDays, istWeekStart } from './dateUtils'
 
-// All dates are in IST (UTC+5:30). This is hardcoded and must never change —
-// the entire team operates in India and every stored date must be the IST calendar date.
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000 // +05:30, no DST
-
+// Accepts an optional utcMs so callers can get the IST date for a specific
+// moment; defaults to now. All other code should call istToday() directly.
 function istDateStr(utcMs = Date.now()) {
   return new Date(utcMs + IST_OFFSET_MS).toISOString().split('T')[0]
-}
-
-// Date arithmetic on YYYY-MM-DD strings. Parses at UTC noon so adding/
-// subtracting whole days never crosses a date boundary unexpectedly.
-function istAddDays(dateStr, n) {
-  const d = new Date(dateStr + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().split('T')[0]
-}
-
-// Monday-anchored ISO week start for a YYYY-MM-DD string.
-function istWeekStart(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00Z')
-  const day = d.getUTCDay() // 0=Sun
-  const offset = day === 0 ? -6 : 1 - day
-  return istAddDays(dateStr, offset)
 }
 
 // Fire-and-forget post to the server-side event dispatcher.
@@ -1933,7 +1916,7 @@ export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
 // ============================================================================
 
 function getWeekStartDate(date = new Date()) {
-  return istWeekStart(istDateStr(date.getTime()))
+  return istWeekStart(istToday(date.getTime()))
 }
 
 /**
