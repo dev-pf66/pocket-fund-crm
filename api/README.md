@@ -42,6 +42,7 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `POST` | [`/api/investors`](#post-apiinvestors) | API key | Create a new investor |
 | `GET` | `/api/daily-leads` | Cron secret | Auto-import leads from LinkedIn (v1) |
 | `GET` | `/api/daily-leads-v2` | Cron secret | Auto-import from LinkedIn + Crunchbase (v2) |
+| `POST` | [`/api/events/fire`](#post-apieventsfire) | Supabase JWT | Fire an internal app event (Task Tracker integration) |
 
 ---
 
@@ -709,8 +710,15 @@ Pipeline stages a lead progresses through:
 
 ### Lead Type
 
-| Value |
-|-------|
+The values below are the built-in defaults. Lead types (along with
+`industry`, `deal_size`, `location`, and `lead_source`) are now
+**configurable** at runtime via the `crm_field_options` table —
+admins can add or remove options from the Admin page and the new
+options appear in the form dropdowns immediately. The DB column is
+free-form text, so any string is technically accepted.
+
+| Value (default) |
+|---|
 | `Independent Sponsor` |
 | `PE Firm` |
 | `Family Office` |
@@ -718,13 +726,29 @@ Pipeline stages a lead progresses through:
 
 ### Lead Source
 
-| Value |
-|-------|
+Same as Lead Type: defaults below, fully configurable via
+`crm_field_options`.
+
+| Value (default) |
+|---|
 | `LinkedIn` |
 | `Referral` |
 | `Cold Email` |
 | `Event` |
 | `Website` |
+
+### Outreach Stage
+
+Tracks where the lead is in the *outreach* sub-flow, independent of the
+overall pipeline `stage`. Constrained by a `CHECK` constraint at the DB
+level — only these four values are accepted:
+
+| Value | Description |
+|---|---|
+| `cold` | No outreach attempted yet |
+| `messaged` | First message sent |
+| `replied` | They replied |
+| `meeting` | Meeting booked |
 
 ### Investor Type
 
@@ -780,6 +804,7 @@ Full field reference for the `crm_leads` table:
 | `lead_type` | string | POST | See [Lead Type enum](#lead-type) |
 | `deal_criteria` | string | POST | What they're looking for |
 | `stage` | string | POST | See [Stage enum](#stage) |
+| `outreach_stage` | string | POST | See [Outreach Stage enum](#outreach-stage) |
 | `lead_source` | string | POST | See [Lead Source enum](#lead-source) |
 | `notes` | string | POST | General notes |
 | `initial_conversation` | string | POST | First conversation notes |
@@ -803,6 +828,98 @@ Full field reference for the `crm_leads` table:
 | `assigned_to` | integer | System | Assigned team member |
 | `assigned_by` | integer | System | Who assigned the lead |
 | `assigned_date` | timestamp | System | When lead was assigned |
+
+---
+
+## Internal: Events
+
+### POST /api/events/fire
+
+Fire an internal app event so the server can fan it out to integrations
+(currently the Task Tracker integration). Called by the frontend after
+certain user actions; **not** part of the public CRM API.
+
+**Auth:** unlike the other endpoints, this one expects the caller's
+Supabase session, not the `CRM_API_KEY`.
+
+```
+Authorization: Bearer <supabase_access_token>
+```
+
+The handler resolves the token to a `people` row and uses that as the
+actor for downstream calls.
+
+**Body:**
+
+```json
+{
+  "event_type": "outreach_logged" | "lead_stage_changed",
+  "payload": { ... }
+}
+```
+
+| `event_type` | Payload shape |
+|---|---|
+| `outreach_logged` | The newly inserted `crm_outreach_log` row |
+| `lead_stage_changed` | `{ lead, oldStage }` — full lead row plus the previous stage string |
+
+Unknown `event_type` values return `400`.
+
+**Response:**
+
+```json
+{ "ok": true, "result": { ... } }
+```
+
+`result` is whatever the integration handler returns; callers usually
+ignore it.
+
+---
+
+## Related Tables (No Public API)
+
+These tables back features in the app but don't have HTTP endpoints
+yet — listed here so integrations know they exist if they ever need
+to query them directly via Supabase.
+
+### `crm_partners`
+
+Personal pipeline of potential partnership contacts (creators,
+investors, podcasts, etc.). Per-user RLS scoped to `created_by`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | integer | Primary key |
+| `name` | string | Partner name |
+| `categories` | text[] | One or more of: `creator`, `community`, `investor`, `fund`, `podcast`, `media`, `competitor`, `adjacent_industry`, plus any custom strings the user adds. GIN-indexed. |
+| `stage` | string | `potential` / `reached_out` / `in_conversation` / `active_partner` / `passed` |
+| `url`, `email`, `handle`, `audience_size`, `notes` | strings | All optional |
+| `next_follow_up_date`, `last_contact_date` | date | Drive the follow-up reminders banner |
+| `created_by` | integer | FK to `people` (RLS owner) |
+
+### `crm_field_options`
+
+Admin-configurable lookup table for dropdown values. Each row has a
+`field_name` (`lead_type`, `lead_source`, `industry`, `deal_size`,
+`location`) and a `name`/`id`. The frontend reads it via the
+`useFieldOptions` and `useLeadTypes` hooks; if the table is empty or
+unreachable, code falls back to the hardcoded defaults shown in the
+enum tables above.
+
+---
+
+## Per-User Data Isolation
+
+Database-layer RLS now enforces per-user visibility on `crm_leads`,
+`crm_outreach_log`, `crm_lead_activities`, and `crm_partners`. The
+HTTP API endpoints above use the Supabase **service role key**, which
+bypasses RLS — so any client with `CRM_API_KEY` still gets full
+team-wide access. The isolation only applies to the in-app
+experience (each analyst sees their own leads, outreach, etc.) and
+to anyone using the Supabase anon key directly.
+
+If you build new endpoints that should respect isolation, query
+through a user JWT instead of the service role.
 
 ---
 
