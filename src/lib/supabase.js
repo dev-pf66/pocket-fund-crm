@@ -77,6 +77,25 @@ export async function setUserAdmin(id, isAdmin) {
 }
 
 export async function deleteUser(id) {
+  // Null out all FK references to this person before deleting.
+  // The supabase-migration-admin-rls.sql migration adds ON DELETE SET NULL
+  // to these constraints, but we do it explicitly here as a safe fallback
+  // in case that migration hasn't been applied.
+  const nullOuts = [
+    supabase.from('crm_leads').update({ created_by: null }).eq('created_by', id),
+    supabase.from('crm_leads').update({ assigned_to: null }).eq('assigned_to', id),
+    supabase.from('crm_leads').update({ assigned_by: null }).eq('assigned_by', id),
+    supabase.from('crm_lead_activities').update({ logged_by: null }).eq('logged_by', id),
+    supabase.from('crm_outreach_log').update({ logged_by: null }).eq('logged_by', id),
+    supabase.from('crm_sample_deals').update({ created_by: null }).eq('created_by', id),
+    supabase.from('crm_email_templates').update({ created_by: null }).eq('created_by', id),
+    supabase.from('crm_transcripts').update({ created_by: null }).eq('created_by', id),
+  ]
+  const results = await Promise.all(nullOuts)
+  for (const { error } of results) {
+    if (error) throw error
+  }
+
   const { data, error } = await supabase
     .from('people')
     .delete()
