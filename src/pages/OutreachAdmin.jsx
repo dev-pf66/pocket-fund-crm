@@ -491,7 +491,7 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
 
 function MobileEntryCard({
   entry, expanded, onToggleExpand, onOpenContact, onAddContact, onToggleResponded,
-  onLeadSaved, promoting, toggling, formatDate,
+  onLeadSaved, currentPersonId, promoting, toggling, formatDate,
   onSaveField, industryOptions = [], dealSizeOptions = [], locationOptions = [], leadSourceOptions = []
 }) {
   const hasLead = !!entry.lead
@@ -648,8 +648,8 @@ function MobileEntryCard({
           {entry.notes && (
             <div><div style={metaLabelStyle}>Notes</div><div style={metaValueStyle}>{entry.notes}</div></div>
           )}
-          {entry.lead?.id && (
-            <LeadEditCard leadId={entry.lead.id} onSaved={onLeadSaved} />
+          {(entry.lead?.id || entry.lead_name) && (
+            <LeadEditCard entry={entry} currentPersonId={currentPersonId} onSaved={onLeadSaved} />
           )}
         </div>
       )}
@@ -687,23 +687,42 @@ function isAdminUser(person) {
   return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
 }
 
-// Inline editor for the lead linked to an outreach entry. Mounts when the
-// row expands, fetches the full lead, and saves only the fields the user
-// touched so untouched columns aren't clobbered. onSaved bubbles the
-// updated lead up so the parent table cell can re-render with the new
-// name/firm without a full refetch.
-function LeadEditCard({ leadId, onSaved }) {
+// Inline editor for the lead behind an outreach entry. Handles both cases:
+//   - Linked entry (entry.lead.id set): fetch the full lead and save edits
+//     via updateLead.
+//   - Unlinked entry (only lead_name on the outreach row): pre-populate the
+//     form from the outreach row; on first save, promote to a real lead
+//     and apply edits in one round-trip.
+// Saves only the fields the user touched so untouched columns aren't
+// clobbered. onSaved bubbles the updated lead up so the parent table cell
+// re-renders without a full refetch.
+function LeadEditCard({ entry, currentPersonId, onSaved }) {
   const { toast } = useToast()
   const leadTypes = useLeadTypes()
+  const linkedLeadId = entry?.lead?.id || null
   const [lead, setLead] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!!linkedLeadId)
   const [edits, setEdits] = useState({})
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    if (!linkedLeadId) {
+      // Unlinked: seed the editor from the outreach row's denormalized
+      // fields so the user sees what's known and can fill in the rest.
+      setLead({
+        id: null,
+        name: entry.lead_name || '',
+        firm_name: entry.firm_name || '',
+        lead_source: entry.lead_source || '',
+        notes: ''
+      })
+      setEdits({})
+      setLoading(false)
+      return
+    }
     let alive = true
     setLoading(true)
-    getLeadById(leadId)
+    getLeadById(linkedLeadId)
       .then(d => { if (alive) { setLead(d); setEdits({}) } })
       .catch(err => {
         console.error('Failed to load lead:', err)
@@ -711,7 +730,7 @@ function LeadEditCard({ leadId, onSaved }) {
       })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [leadId])
+  }, [linkedLeadId, entry?.id])
 
   const fv = (k) => edits[k] !== undefined ? edits[k] : (lead?.[k] ?? '')
   const setField = (k, v) => setEdits(prev => ({ ...prev, [k]: v }))
@@ -721,14 +740,25 @@ function LeadEditCard({ leadId, onSaved }) {
     if (!dirty) return
     setSaving(true)
     try {
-      const updated = await updateLead(leadId, edits)
+      let updated
+      if (linkedLeadId) {
+        updated = await updateLead(linkedLeadId, edits)
+      } else {
+        // Promote first, then apply the edits to the freshly-created lead.
+        // promoteOutreachToLead also backfills outreach.lead_id so future
+        // expands hit the linked-lead path.
+        const promoted = await promoteOutreachToLead(entry, currentPersonId)
+        updated = Object.keys(edits).length > 0
+          ? await updateLead(promoted.id, edits)
+          : promoted
+      }
       setLead(updated)
       setEdits({})
-      toast.success('Lead updated')
+      toast.success(linkedLeadId ? 'Lead updated' : 'Lead created')
       if (onSaved) onSaved(updated)
     } catch (err) {
-      console.error('Failed to update lead:', err)
-      toast.error('Failed to update lead: ' + err.message)
+      console.error('Failed to save lead:', err)
+      toast.error('Failed to save lead: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -1203,10 +1233,12 @@ function OutreachAdmin() {
                 onOpenContact={(ev) => openContact(entry, ev)}
                 onAddContact={(ev) => { ev.stopPropagation(); setAddContactFor(entry) }}
                 onToggleResponded={(ev) => toggleResponded(entry, ev)}
+                currentPersonId={currentPerson?.id}
                 onLeadSaved={(updated) => {
                   setEntries(prev => prev.map(x => x.id === entry.id
                     ? {
                         ...x,
+                        lead_id: updated.id,
                         lead_name: updated.name,
                         firm_name: x.firm_name || updated.firm_name,
                         lead: { id: updated.id, name: updated.name, firm_name: updated.firm_name, stage: updated.stage, outreach_stage: updated.outreach_stage ?? null }
@@ -1452,13 +1484,15 @@ function OutreachAdmin() {
                           </div>
                         </div>
 
-                        {entry.lead?.id && (
+                        {(entry.lead?.id || entry.lead_name) && (
                           <LeadEditCard
-                            leadId={entry.lead.id}
+                            entry={entry}
+                            currentPersonId={currentPerson?.id}
                             onSaved={(updated) => {
                               setEntries(prev => prev.map(x => x.id === entry.id
                                 ? {
                                     ...x,
+                                    lead_id: updated.id,
                                     lead_name: updated.name,
                                     firm_name: x.firm_name || updated.firm_name,
                                     lead: { id: updated.id, name: updated.name, firm_name: updated.firm_name, stage: updated.stage, outreach_stage: updated.outreach_stage ?? null }
