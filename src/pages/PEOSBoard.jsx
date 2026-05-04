@@ -1,0 +1,714 @@
+import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  getDemos, createDemo, updateDemo, moveDemo, deleteDemo,
+  getLeads, createLead, findLeadByLinkedInUrl
+} from '../lib/crm-api'
+import { useApp } from '../App'
+import { useToast } from '../components/Toast'
+import { useSessionState } from '../hooks/useSessionState'
+import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
+import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, X } from 'lucide-react'
+import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
+
+const STAGES = [
+  { key: 'scheduled',  label: 'Scheduled',  color: '#a78bfa' },
+  { key: 'done',       label: 'Demo Done',  color: '#60a5fa' },
+  { key: 'signed_up',  label: 'Signed Up',  color: '#22c55e' },
+  { key: 'passed',     label: 'Passed',     color: '#9ca3af' }
+]
+
+function fmtDate(dateStr) {
+  if (!dateStr) return null
+  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00')
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function PEOSBoard() {
+  const { currentPerson } = useApp()
+  const { toast } = useToast()
+  const isMobile = useIsMobileDevice()
+  const [demos, setDemos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editingDemo, setEditingDemo] = useState(null)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [draggedDemo, setDraggedDemo] = useState(null)
+
+  const [searchQuery, setSearchQuery] = useSessionState('peos:searchQuery', '')
+
+  useEffect(() => {
+    loadDemos()
+  }, [currentPerson?.id])
+
+  async function loadDemos() {
+    if (!currentPerson?.id) return
+    setLoading(true)
+    try {
+      const data = await getDemos(currentPerson.id)
+      setDemos(data)
+    } catch (err) {
+      console.error('Failed to load demos:', err)
+      toast.error('Failed to load demos')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredDemos = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return demos
+    return demos.filter(d => {
+      const name = d.lead?.name || ''
+      const firm = d.lead?.firm_name || ''
+      return (
+        name.toLowerCase().includes(q) ||
+        firm.toLowerCase().includes(q) ||
+        (d.use_case || '').toLowerCase().includes(q) ||
+        (d.feedback || '').toLowerCase().includes(q) ||
+        (d.next_steps || '').toLowerCase().includes(q)
+      )
+    })
+  }, [demos, searchQuery])
+
+  function demosInStage(stage) {
+    return filteredDemos.filter(d => d.stage === stage)
+  }
+
+  function handleDragStart(e, demo) {
+    setDraggedDemo(demo)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  async function handleDrop(e, newStage) {
+    e.preventDefault()
+    if (!draggedDemo || draggedDemo.stage === newStage) {
+      setDraggedDemo(null)
+      return
+    }
+    const prev = demos
+    setDemos(prev.map(d => d.id === draggedDemo.id ? { ...d, stage: newStage } : d))
+    setDraggedDemo(null)
+    try {
+      await moveDemo(draggedDemo.id, newStage)
+    } catch (err) {
+      console.error('Failed to move demo:', err)
+      toast.error('Failed to move demo')
+      setDemos(prev)
+    }
+  }
+
+  async function handleStageChange(demo, newStage) {
+    if (demo.stage === newStage) return
+    const prev = demos
+    setDemos(prev.map(d => d.id === demo.id ? { ...d, stage: newStage } : d))
+    try {
+      await moveDemo(demo.id, newStage)
+    } catch (err) {
+      console.error('Failed to move demo:', err)
+      toast.error('Failed to move')
+      setDemos(prev)
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!confirm('Delete this demo entry?')) return
+    const prev = demos
+    setDemos(prev.filter(d => d.id !== id))
+    try {
+      await deleteDemo(id)
+      toast.success('Demo deleted')
+    } catch (err) {
+      console.error('Failed to delete demo:', err)
+      toast.error('Failed to delete')
+      setDemos(prev)
+    }
+  }
+
+  return (
+    <div className="page-container">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h1 style={{ margin: 0 }}>PE OS</h1>
+          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>Demo calls for the PE OS product</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
+          <Plus size={16} /> Add Demo
+        </button>
+      </div>
+
+      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
+          <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+          <input
+            type="text"
+            placeholder="Search by lead, firm, use case, feedback…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="form-control"
+            style={{ paddingLeft: '34px', fontSize: '13px' }}
+          />
+        </div>
+        <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
+          <strong style={{ color: '#111827' }}>{filteredDemos.length}</strong> shown
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+          <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
+          Loading demos…
+        </div>
+      ) : isMobile ? (
+        <MobileDemoList
+          stages={STAGES}
+          demosInStage={demosInStage}
+          onEdit={setEditingDemo}
+          onDelete={handleDelete}
+          onStageChange={handleStageChange}
+        />
+      ) : (
+        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+          {STAGES.map(stage => {
+            const items = demosInStage(stage.key)
+            return (
+              <div
+                key={stage.key}
+                onDragOver={handleDragOver}
+                onDrop={e => handleDrop(e, stage.key)}
+                style={{
+                  flex: '0 0 280px',
+                  background: '#f9fafb',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  minHeight: '300px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }}></span>
+                  <strong style={{ fontSize: '13px', color: '#111827' }}>{stage.label}</strong>
+                  <span style={{ fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {items.map(d => (
+                    <DemoCard
+                      key={d.id}
+                      demo={d}
+                      onEdit={() => setEditingDemo(d)}
+                      onDelete={() => handleDelete(d.id)}
+                      onDragStart={handleDragStart}
+                    />
+                  ))}
+                  {items.length === 0 && (
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#9ca3af', fontSize: '12px' }}>
+                      Drag a demo here
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {(showAddForm || editingDemo) && (
+        <DemoForm
+          demo={editingDemo}
+          currentPersonId={currentPerson?.id}
+          onClose={() => { setShowAddForm(false); setEditingDemo(null) }}
+          onSave={async (formData) => {
+            try {
+              if (editingDemo) {
+                const updated = await updateDemo(editingDemo.id, formData)
+                setDemos(prev => prev.map(d => d.id === updated.id ? updated : d))
+                toast.success('Demo updated')
+              } else {
+                const created = await createDemo(formData, currentPerson.id)
+                setDemos(prev => [created, ...prev])
+                toast.success('Demo added')
+              }
+              setShowAddForm(false)
+              setEditingDemo(null)
+            } catch (err) {
+              console.error('Failed to save demo:', err)
+              toast.error('Failed to save: ' + err.message)
+            }
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function DemoCard({ demo, onEdit, onDelete, onDragStart }) {
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, demo)}
+      onClick={onEdit}
+      style={{
+        background: 'white',
+        border: '1px solid #e5e7eb',
+        borderRadius: '6px',
+        padding: '10px 12px',
+        cursor: 'grab',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {demo.lead ? (
+            <Link
+              to={`/leads/${demo.lead.id}`}
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: '#1d4ed8', fontWeight: 600, fontSize: '13px', textDecoration: 'none', lineHeight: 1.3 }}
+            >
+              {demo.lead.name}
+            </Link>
+          ) : (
+            <div style={{ color: '#9ca3af', fontWeight: 600, fontSize: '13px' }}>No lead linked</div>
+          )}
+          {demo.lead?.firm_name && (
+            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{demo.lead.firm_name}</div>
+          )}
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          title="Delete"
+          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '2px' }}
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+
+      {demo.demo_date && (
+        <div style={{ fontSize: '11px', color: '#374151', marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <Calendar size={11} /> {fmtDate(demo.demo_date)}
+        </div>
+      )}
+
+      {demo.use_case && (
+        <div style={{
+          fontSize: '11px', color: '#4b5563', marginTop: '6px',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+        }}>
+          {demo.use_case}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MobileDemoList({ stages, demosInStage, onEdit, onDelete, onStageChange }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {stages.map(stage => {
+        const items = demosInStage(stage.key)
+        if (items.length === 0) return null
+        return (
+          <div key={stage.key}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '0 4px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }} />
+              <strong style={{ fontSize: '13px', color: '#111827' }}>{stage.label}</strong>
+              <span style={{ fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {items.map(d => (
+                <MobileDemoCard
+                  key={d.id}
+                  demo={d}
+                  stages={stages}
+                  onEdit={() => onEdit(d)}
+                  onDelete={() => onDelete(d.id)}
+                  onStageChange={(newStage) => onStageChange(d, newStage)}
+                />
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function MobileDemoCard({ demo, stages, onEdit, onDelete, onStageChange }) {
+  return (
+    <div
+      onClick={onEdit}
+      style={{
+        background: 'white',
+        border: '1px solid #e5e7eb',
+        borderRadius: '8px',
+        padding: '12px 14px',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '6px' }}>
+        <div>
+          {demo.lead ? (
+            <Link
+              to={`/leads/${demo.lead.id}`}
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: '#1d4ed8', fontWeight: 600, fontSize: '15px', textDecoration: 'none' }}
+            >
+              {demo.lead.name}
+            </Link>
+          ) : (
+            <span style={{ color: '#9ca3af', fontWeight: 600, fontSize: '15px' }}>No lead linked</span>
+          )}
+          {demo.lead?.firm_name && (
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{demo.lead.firm_name}</div>
+          )}
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          title="Delete"
+          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {demo.demo_date && (
+        <div style={{ fontSize: '12px', color: '#374151', marginBottom: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <Calendar size={12} /> {fmtDate(demo.demo_date)}
+        </div>
+      )}
+      {demo.use_case && (
+        <div style={{
+          fontSize: '12px', color: '#4b5563', marginBottom: '10px',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+        }}>
+          {demo.use_case}
+        </div>
+      )}
+
+      <select
+        value={demo.stage}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => { e.stopPropagation(); onStageChange(e.target.value) }}
+        style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+      >
+        {stages.map(s => (
+          <option key={s.key} value={s.key}>Move to: {s.label}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+// Add / edit form. For new demos, includes a "lead picker" that lets you
+// pick from existing leads OR paste a LinkedIn URL (which auto-creates the
+// lead so the demo can link to it). For existing demos, the lead is fixed.
+function DemoForm({ demo, currentPersonId, onClose, onSave }) {
+  const { toast } = useToast()
+  const isEdit = !!demo
+
+  const [form, setForm] = useState({
+    lead_id: demo?.lead_id || demo?.lead?.id || null,
+    stage: demo?.stage || 'scheduled',
+    demo_date: demo?.demo_date || '',
+    decision_maker: demo?.decision_maker || '',
+    team_size: demo?.team_size || '',
+    use_case: demo?.use_case || '',
+    feedback: demo?.feedback || '',
+    transcript: demo?.transcript || '',
+    next_steps: demo?.next_steps || '',
+    notes: demo?.notes || ''
+  })
+  const [saving, setSaving] = useState(false)
+
+  // Lead picker state — only used in create mode.
+  const [leads, setLeads] = useState([])
+  const [leadSearch, setLeadSearch] = useState('')
+  const [pickedLead, setPickedLead] = useState(demo?.lead || null)
+  const [linkedinUrl, setLinkedinUrl] = useState('')
+  const [resolvingUrl, setResolvingUrl] = useState(false)
+
+  useEffect(() => {
+    if (isEdit) return
+    let alive = true
+    getLeads({}, currentPersonId)
+      .then(data => { if (alive) setLeads(data) })
+      .catch(err => console.error('Failed to load leads:', err))
+    return () => { alive = false }
+  }, [isEdit, currentPersonId])
+
+  const filteredLeads = useMemo(() => {
+    const q = leadSearch.trim().toLowerCase()
+    if (!q) return leads.slice(0, 25)
+    return leads
+      .filter(l => (l.name || '').toLowerCase().includes(q) || (l.firm_name || '').toLowerCase().includes(q))
+      .slice(0, 25)
+  }, [leads, leadSearch])
+
+  function update(field, value) {
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  function pickLead(lead) {
+    setPickedLead(lead)
+    update('lead_id', lead.id)
+  }
+
+  async function resolveLinkedInUrl() {
+    const url = linkedinUrl.trim()
+    if (!url) return
+    if (!isLinkedInUrl(url)) {
+      toast.warn("That doesn't look like a LinkedIn URL")
+      return
+    }
+    setResolvingUrl(true)
+    try {
+      let lead = await findLeadByLinkedInUrl(url)
+      if (!lead) {
+        const guessedName = nameFromLinkedInUrl(url) || 'Unknown'
+        lead = await createLead({
+          name: guessedName,
+          linkedin_url: url,
+          stage: 'cold_outreach',
+          lead_source: 'LinkedIn'
+        }, currentPersonId)
+        toast.success(`Created lead "${lead.name}"`)
+      }
+      pickLead(lead)
+      setLinkedinUrl('')
+    } catch (err) {
+      console.error('Failed to resolve LinkedIn URL:', err)
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setResolvingUrl(false)
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!isEdit && !form.lead_id) {
+      toast.warn('Pick a lead first (search existing or paste a LinkedIn URL)')
+      return
+    }
+    setSaving(true)
+    try {
+      const payload = { ...form }
+      if (!payload.demo_date) payload.demo_date = null
+      // lead_id can't change on edit — strip it to avoid sending to update.
+      if (isEdit) delete payload.lead_id
+      await onSave(payload)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h2 style={{ margin: 0 }}>{isEdit ? 'Edit Demo' : 'Add Demo'}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {/* Lead — fixed on edit, picker on create */}
+          {isEdit ? (
+            <div className="form-group">
+              <label>Lead</label>
+              <div style={{ padding: '8px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+                {demo.lead ? (
+                  <Link to={`/leads/${demo.lead.id}`} style={{ fontWeight: 600, color: '#1d4ed8' }}>
+                    {demo.lead.name}{demo.lead.firm_name ? ` — ${demo.lead.firm_name}` : ''}
+                  </Link>
+                ) : <span style={{ color: '#9ca3af' }}>No lead linked</span>}
+              </div>
+            </div>
+          ) : (
+            <div className="form-group">
+              <label>Lead *</label>
+              {pickedLead ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px' }}>
+                  <div>
+                    <strong>{pickedLead.name}</strong>
+                    {pickedLead.firm_name && <span style={{ color: '#6b7280', marginLeft: '8px' }}>{pickedLead.firm_name}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setPickedLead(null); update('lead_id', null) }}
+                    style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}
+                    title="Change lead"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px' }}>
+                    <Linkedin size={16} style={{ color: '#0a66c2', flexShrink: 0 }} />
+                    <input
+                      type="url"
+                      placeholder="Paste LinkedIn URL to add a new lead…"
+                      value={linkedinUrl}
+                      onChange={e => setLinkedinUrl(e.target.value)}
+                      style={{ flex: 1, fontSize: '13px' }}
+                      disabled={resolvingUrl}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={resolveLinkedInUrl}
+                      disabled={resolvingUrl || !linkedinUrl.trim()}
+                    >
+                      {resolvingUrl ? 'Resolving…' : 'Use'}
+                    </button>
+                  </div>
+                  <div style={{ position: 'relative', marginBottom: '6px' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                    <input
+                      type="text"
+                      placeholder="…or search existing leads"
+                      value={leadSearch}
+                      onChange={e => setLeadSearch(e.target.value)}
+                      style={{ width: '100%', paddingLeft: '32px', fontSize: '13px' }}
+                    />
+                  </div>
+                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+                    {filteredLeads.length === 0 ? (
+                      <div style={{ padding: '14px', textAlign: 'center', color: '#9ca3af', fontSize: '12px' }}>
+                        {leads.length === 0 ? 'No leads yet — paste a LinkedIn URL above to add one.' : 'No matches'}
+                      </div>
+                    ) : (
+                      filteredLeads.map(l => (
+                        <button
+                          key={l.id}
+                          type="button"
+                          onClick={() => pickLead(l)}
+                          style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            padding: '8px 12px', background: 'white', border: 'none',
+                            borderBottom: '1px solid #f3f4f6', cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ fontSize: '13px', fontWeight: 500, color: '#111827' }}>{l.name}</div>
+                          {l.firm_name && (
+                            <div style={{ fontSize: '11px', color: '#6b7280' }}>{l.firm_name}</div>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Stage</label>
+              <select value={form.stage} onChange={e => update('stage', e.target.value)}>
+                {STAGES.map(s => (
+                  <option key={s.key} value={s.key}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Demo Date</label>
+              <input type="date" value={form.demo_date} onChange={e => update('demo_date', e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Decision Maker</label>
+              <input
+                type="text"
+                value={form.decision_maker}
+                onChange={e => update('decision_maker', e.target.value)}
+                placeholder="Who actually decides on tooling"
+              />
+            </div>
+            <div className="form-group">
+              <label>Team Size</label>
+              <input
+                type="text"
+                value={form.team_size}
+                onChange={e => update('team_size', e.target.value)}
+                placeholder="e.g. 8 investment professionals"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Use Case</label>
+            <textarea
+              value={form.use_case}
+              onChange={e => update('use_case', e.target.value)}
+              placeholder="How they'd use PE OS — workflow, pain points, what would replace…"
+              rows={3}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Feedback from Call</label>
+            <textarea
+              value={form.feedback}
+              onChange={e => update('feedback', e.target.value)}
+              placeholder="What they liked, didn't like, objections…"
+              rows={3}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Next Steps</label>
+            <textarea
+              value={form.next_steps}
+              onChange={e => update('next_steps', e.target.value)}
+              placeholder="Follow-up actions, who's doing what by when"
+              rows={2}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Transcript</label>
+            <textarea
+              value={form.transcript}
+              onChange={e => update('transcript', e.target.value)}
+              placeholder="Paste full transcript or a link to one"
+              rows={5}
+              style={{ fontFamily: 'monospace', fontSize: '12px' }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Other Notes</label>
+            <textarea
+              value={form.notes}
+              onChange={e => update('notes', e.target.value)}
+              rows={2}
+            />
+          </div>
+
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={saving || (!isEdit && !form.lead_id)}
+            >
+              {saving ? 'Saving…' : isEdit ? 'Update' : 'Add Demo'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export default PEOSBoard

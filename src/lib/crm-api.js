@@ -2269,3 +2269,78 @@ export async function markLeadReachedOut(lead, currentPersonId, currentPersonNam
   cacheClear('dashboard')
   return data
 }
+
+// ============================================================================
+// PE OS DEMOS
+// ============================================================================
+
+// Fetch demos with the linked lead's basic fields embedded (so the kanban
+// cards can show name + firm without a follow-up query). When personId is
+// provided, scopes to that person's demos; admins typically pass null.
+export async function getDemos(personId = null) {
+  let q = supabase
+    .from('crm_demos')
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, email, linkedin_url, stage)
+    `)
+    .order('updated_at', { ascending: false })
+  if (personId) q = q.eq('created_by', personId)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+
+export async function createDemo(demoData, currentPersonId) {
+  const { data, error } = await supabase
+    .from('crm_demos')
+    .insert([{ ...demoData, created_by: currentPersonId }])
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, email, linkedin_url, stage)
+    `)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateDemo(id, updates) {
+  const cleanUpdates = {}
+  Object.keys(updates).forEach(key => {
+    if (['id', 'created_at', 'updated_at', 'created_by', 'lead'].includes(key)) return
+    if (updates[key] !== undefined) cleanUpdates[key] = updates[key]
+  })
+  const { data, error } = await supabase
+    .from('crm_demos')
+    .update(cleanUpdates)
+    .eq('id', id)
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, email, linkedin_url, stage)
+    `)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function moveDemo(id, stage) {
+  const { data, error } = await supabase
+    .from('crm_demos')
+    .update({ stage })
+    .eq('id', id)
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, email, linkedin_url, stage)
+    `)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteDemo(id) {
+  const { error } = await supabase
+    .from('crm_demos')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
