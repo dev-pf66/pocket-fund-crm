@@ -18,6 +18,42 @@ const STAGES = [
   { key: 'passed',     label: 'Passed',     color: '#9ca3af' }
 ]
 
+// Canned scales for the demo form. Stored as plain strings so admins
+// can extend them later without a schema change.
+const FIRM_SIZE_OPTIONS = [
+  '< $50M AUM',
+  '$50M – $250M',
+  '$250M – $1B',
+  '$1B – $5B',
+  '$5B+'
+]
+
+const TEAM_SIZE_OPTIONS = [
+  '1 (solo)',
+  '2 – 5',
+  '6 – 10',
+  '11 – 25',
+  '26 – 50',
+  '50+'
+]
+
+// keenness is a 1-5 int, rendered with a label so the meaning is obvious.
+const KEENNESS_OPTIONS = [
+  { value: 1, label: 'Cold' },
+  { value: 2, label: 'Curious' },
+  { value: 3, label: 'Interested' },
+  { value: 4, label: 'Engaged' },
+  { value: 5, label: 'Eager' }
+]
+
+function keennessColor(v) {
+  if (v >= 5) return '#16a34a'
+  if (v >= 4) return '#22c55e'
+  if (v >= 3) return '#f59e0b'
+  if (v >= 2) return '#f97316'
+  return '#9ca3af'
+}
+
 function fmtDate(dateStr) {
   if (!dateStr) return null
   const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00')
@@ -287,11 +323,35 @@ function DemoCard({ demo, onEdit, onDelete, onDragStart }) {
         </button>
       </div>
 
-      {demo.demo_date && (
-        <div style={{ fontSize: '11px', color: '#374151', marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <Calendar size={11} /> {fmtDate(demo.demo_date)}
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+        {demo.demo_date && (
+          <span style={{ fontSize: '11px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Calendar size={11} /> {fmtDate(demo.demo_date)}
+          </span>
+        )}
+        {demo.keenness && (
+          <span
+            title={`Keenness: ${KEENNESS_OPTIONS.find(o => o.value === demo.keenness)?.label || demo.keenness}/5`}
+            style={{
+              fontSize: '10px', fontWeight: 600,
+              padding: '1px 6px', borderRadius: '999px',
+              background: keennessColor(demo.keenness) + '22',
+              color: keennessColor(demo.keenness)
+            }}
+          >
+            {demo.keenness}/5
+          </span>
+        )}
+        {demo.firm_size && (
+          <span style={{
+            fontSize: '10px', color: '#6b7280',
+            padding: '1px 6px', borderRadius: '999px',
+            background: '#f3f4f6'
+          }}>
+            {demo.firm_size}
+          </span>
+        )}
+      </div>
 
       {demo.use_case && (
         <div style={{
@@ -375,11 +435,28 @@ function MobileDemoCard({ demo, stages, onEdit, onDelete, onStageChange }) {
         </button>
       </div>
 
-      {demo.demo_date && (
-        <div style={{ fontSize: '12px', color: '#374151', marginBottom: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <Calendar size={12} /> {fmtDate(demo.demo_date)}
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        {demo.demo_date && (
+          <span style={{ fontSize: '12px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Calendar size={12} /> {fmtDate(demo.demo_date)}
+          </span>
+        )}
+        {demo.keenness && (
+          <span style={{
+            fontSize: '11px', fontWeight: 600,
+            padding: '2px 8px', borderRadius: '999px',
+            background: keennessColor(demo.keenness) + '22',
+            color: keennessColor(demo.keenness)
+          }}>
+            {demo.keenness}/5
+          </span>
+        )}
+        {demo.firm_size && (
+          <span style={{ fontSize: '11px', color: '#6b7280', padding: '2px 8px', borderRadius: '999px', background: '#f3f4f6' }}>
+            {demo.firm_size}
+          </span>
+        )}
+      </div>
       {demo.use_case && (
         <div style={{
           fontSize: '12px', color: '#4b5563', marginBottom: '10px',
@@ -416,6 +493,8 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
     demo_date: demo?.demo_date || '',
     decision_maker: demo?.decision_maker || '',
     team_size: demo?.team_size || '',
+    firm_size: demo?.firm_size || '',
+    keenness: demo?.keenness ?? '',
     use_case: demo?.use_case || '',
     feedback: demo?.feedback || '',
     transcript: demo?.transcript || '',
@@ -497,6 +576,11 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
     try {
       const payload = { ...form }
       if (!payload.demo_date) payload.demo_date = null
+      payload.keenness = payload.keenness === '' || payload.keenness == null
+        ? null
+        : Number(payload.keenness)
+      if (!payload.firm_size) payload.firm_size = null
+      if (!payload.team_size) payload.team_size = null
       // lead_id can't change on edit — strip it to avoid sending to update.
       if (isEdit) delete payload.lead_id
       await onSave(payload)
@@ -624,21 +708,45 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
 
           <div className="form-row">
             <div className="form-group">
+              <label>Firm Size (AUM)</label>
+              <select value={form.firm_size} onChange={e => update('firm_size', e.target.value)}>
+                <option value="">—</option>
+                {FIRM_SIZE_OPTIONS.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Team Size</label>
+              <select value={form.team_size} onChange={e => update('team_size', e.target.value)}>
+                <option value="">—</option>
+                {TEAM_SIZE_OPTIONS.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Keenness</label>
+              <select
+                value={form.keenness}
+                onChange={e => update('keenness', e.target.value)}
+              >
+                <option value="">—</option>
+                {KEENNESS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.value} — {opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
               <label>Decision Maker</label>
               <input
                 type="text"
                 value={form.decision_maker}
                 onChange={e => update('decision_maker', e.target.value)}
                 placeholder="Who actually decides on tooling"
-              />
-            </div>
-            <div className="form-group">
-              <label>Team Size</label>
-              <input
-                type="text"
-                value={form.team_size}
-                onChange={e => update('team_size', e.target.value)}
-                placeholder="e.g. 8 investment professionals"
               />
             </div>
           </div>
