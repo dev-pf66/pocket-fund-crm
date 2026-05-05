@@ -191,6 +191,20 @@ export async function updateLead(id, updates) {
     }
   })
 
+  // If a stage change is in the updates, grab the prior stage so we can
+  // fire lead_stage_changed with oldStage when it actually moves. Only
+  // pay for the extra read when stage is in scope — most updates aren't
+  // stage moves and shouldn't bear the cost.
+  let priorStage = null
+  if (cleanUpdates.stage !== undefined) {
+    const { data: prior } = await supabase
+      .from('crm_leads')
+      .select('stage')
+      .eq('id', id)
+      .single()
+    priorStage = prior?.stage ?? null
+  }
+
   const { data, error } = await supabase
     .from('crm_leads')
     .update(cleanUpdates)
@@ -204,6 +218,16 @@ export async function updateLead(id, updates) {
   }
   cacheClear('leads')
   cacheClear('dashboard')
+
+  // Fire AFTER the write succeeds so we never dispatch a stage event
+  // for an update that errored out. Mirrors the moveLead path so R2
+  // (responded), R3 (active_conversation), and R4 (client) trigger the
+  // same TT tasks regardless of whether the stage moved via drag-drop
+  // (moveLead) or an inline edit / form save (updateLead).
+  if (cleanUpdates.stage !== undefined && priorStage !== data.stage) {
+    fireTTEvent('lead_stage_changed', { lead: data, oldStage: priorStage })
+  }
+
   return data
 }
 
