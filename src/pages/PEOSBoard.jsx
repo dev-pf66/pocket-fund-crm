@@ -61,6 +61,47 @@ function fmtDate(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+// Format a UTC timestamp as "Apr 27, 3:30 PM IST". The CRM team operates
+// in IST, so always render in Asia/Kolkata regardless of the browser's
+// timezone — matches the rest of the app (dateUtils.js).
+function fmtDateTimeIST(ts) {
+  if (!ts) return null
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString('en-US', {
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+    timeZone: 'Asia/Kolkata'
+  }) + ' IST'
+}
+
+// For the form's <input type="datetime-local">, convert a UTC timestamp
+// to the IST-equivalent local string ('YYYY-MM-DDTHH:mm') so the value
+// the user typed comes back unchanged. Returns '' for null.
+function toLocalIstInput(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return ''
+  // Shift into IST then format. Don't use toISOString because that's UTC.
+  const ist = new Date(d.getTime() + (5.5 * 60 * 60 * 1000) - (d.getTimezoneOffset() * 60 * 1000))
+  return ist.toISOString().slice(0, 16)
+}
+
+// Convert a 'YYYY-MM-DDTHH:mm' string the user typed (assumed IST) back
+// into a UTC ISO timestamp for storage.
+function fromLocalIstInput(local) {
+  if (!local) return null
+  // The browser parses the datetime-local string as if it were local time,
+  // so we'd get the user's browser tz. Reinterpret it as IST instead by
+  // building the timestamp manually.
+  const [datePart, timePart] = local.split('T')
+  const [y, m, d] = datePart.split('-').map(Number)
+  const [hh, mm] = (timePart || '00:00').split(':').map(Number)
+  // Date.UTC gives the UTC ms for that wall-clock time; subtract the IST
+  // offset so the resulting timestamp represents that IST instant.
+  return new Date(Date.UTC(y, m - 1, d, hh, mm) - 5.5 * 60 * 60 * 1000).toISOString()
+}
+
 function PEOSBoard() {
   const { currentPerson } = useApp()
   const { toast } = useToast()
@@ -108,7 +149,17 @@ function PEOSBoard() {
   }, [demos, searchQuery])
 
   function demosInStage(stage) {
-    return filteredDemos.filter(d => d.stage === stage)
+    const items = filteredDemos.filter(d => d.stage === stage)
+    if (stage === 'scheduled') {
+      // Soonest upcoming call at the top so the user sees what's next.
+      // Falls back to demo_date when no datetime is set, then to created_at.
+      return items.slice().sort((a, b) => {
+        const ka = a.demo_datetime || a.demo_date || a.created_at
+        const kb = b.demo_datetime || b.demo_date || b.created_at
+        return String(ka).localeCompare(String(kb))
+      })
+    }
+    return items
   }
 
   function handleDragStart(e, demo) {
@@ -324,11 +375,15 @@ function DemoCard({ demo, onEdit, onDelete, onDragStart }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
-        {demo.demo_date && (
+        {demo.demo_datetime ? (
+          <span style={{ fontSize: '11px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Calendar size={11} /> {fmtDateTimeIST(demo.demo_datetime)}
+          </span>
+        ) : demo.demo_date ? (
           <span style={{ fontSize: '11px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <Calendar size={11} /> {fmtDate(demo.demo_date)}
           </span>
-        )}
+        ) : null}
         {demo.keenness && (
           <span
             title={`Keenness: ${KEENNESS_OPTIONS.find(o => o.value === demo.keenness)?.label || demo.keenness}/5`}
@@ -436,11 +491,15 @@ function MobileDemoCard({ demo, stages, onEdit, onDelete, onStageChange }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        {demo.demo_date && (
+        {demo.demo_datetime ? (
+          <span style={{ fontSize: '12px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Calendar size={12} /> {fmtDateTimeIST(demo.demo_datetime)}
+          </span>
+        ) : demo.demo_date ? (
           <span style={{ fontSize: '12px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <Calendar size={12} /> {fmtDate(demo.demo_date)}
           </span>
-        )}
+        ) : null}
         {demo.keenness && (
           <span style={{
             fontSize: '11px', fontWeight: 600,
@@ -491,6 +550,7 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
     lead_id: demo?.lead_id || demo?.lead?.id || null,
     stage: demo?.stage || 'scheduled',
     demo_date: demo?.demo_date || '',
+    demo_datetime_local: toLocalIstInput(demo?.demo_datetime),
     decision_maker: demo?.decision_maker || '',
     team_size: demo?.team_size || '',
     firm_size: demo?.firm_size || '',
@@ -575,7 +635,17 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
     setSaving(true)
     try {
       const payload = { ...form }
-      if (!payload.demo_date) payload.demo_date = null
+      // Convert the IST-interpreted datetime-local back to a UTC ISO
+      // string for storage. Strip the helper-only field before save.
+      payload.demo_datetime = fromLocalIstInput(payload.demo_datetime_local)
+      delete payload.demo_datetime_local
+      // If a datetime is set, derive demo_date from it so the date column
+      // stays consistent and legacy display paths still work.
+      if (payload.demo_datetime) {
+        payload.demo_date = payload.demo_datetime.slice(0, 10)
+      } else if (!payload.demo_date) {
+        payload.demo_date = null
+      }
       payload.keenness = payload.keenness === '' || payload.keenness == null
         ? null
         : Number(payload.keenness)
@@ -701,10 +771,24 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
               </select>
             </div>
             <div className="form-group">
-              <label>Demo Date</label>
-              <input type="date" value={form.demo_date} onChange={e => update('demo_date', e.target.value)} />
+              <label>Demo Date &amp; Time (IST)</label>
+              <input
+                type="datetime-local"
+                value={form.demo_datetime_local}
+                onChange={e => update('demo_datetime_local', e.target.value)}
+              />
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                Times are stored and shown in IST. Leave blank if you only know the date.
+              </div>
             </div>
           </div>
+
+          {!form.demo_datetime_local && (
+            <div className="form-group">
+              <label>Demo Date (date only)</label>
+              <input type="date" value={form.demo_date} onChange={e => update('demo_date', e.target.value)} />
+            </div>
+          )}
 
           <div className="form-row">
             <div className="form-group">
