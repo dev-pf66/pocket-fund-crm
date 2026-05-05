@@ -2372,3 +2372,16 @@ export async function deleteDemo(id) {
     .eq('id', id)
   if (error) throw error
 }
+
+// Lightweight projection used by the Sales Pipeline "PE OS" filter:
+// returns the distinct lead_ids that appear in crm_demos so the page
+// can highlight leads with at least one demo without loading the full
+// demo rows.
+export async function getDemoLeadIds(personId = null) {
+  let q = supabase.from('crm_demos').select('lead_id')
+  if (personId) q = q.eq('created_by', personId)
+  const { data, error } = await q
+  if (error) throw error
+  return new Set((data || []).map(r => r.lead_id).filter(Boolean))
+}
+

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, moveLead, getCRMSettings, cachePeek } from '../lib/crm-api'
+import { getLeads, moveLead, getCRMSettings, cachePeek, getDemoLeadIds } from '../lib/crm-api'
 import { useApp } from '../App'
 import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
@@ -84,6 +84,8 @@ function LeadsBoard() {
   // Seed from cache so sidebar nav back to Pipeline renders instantly.
   const [leads, setLeads] = useState(() => cachePeek('leads:{}') || [])
   const [loading, setLoading] = useState(() => !cachePeek('leads:{}'))
+  // Lead IDs that show up in any PE OS demo. Drives the "PE OS" filter pill.
+  const [demoLeadIds, setDemoLeadIds] = useState(() => new Set())
   const [settings, setSettings] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [draggedLead, setDraggedLead] = useState(null)
@@ -115,8 +117,12 @@ function LeadsBoard() {
   const loadLeads = useCallback(async function loadLeads() {
     if (!currentPerson?.id) return
     try {
-      const data = await getLeads({}, currentPerson.id)
+      const [data, demoIds] = await Promise.all([
+        getLeads({}, currentPerson.id),
+        getDemoLeadIds(currentPerson.id).catch(() => new Set())
+      ])
       setLeads(data)
+      setDemoLeadIds(demoIds)
     } catch (error) {
       console.error('Failed to load leads:', error)
     } finally {
@@ -247,8 +253,14 @@ function LeadsBoard() {
 
       // Type filter
       if (filterType !== 'all') {
-        if (filterType === 'needs_samples' && !lead.needs_sample_deals) continue
-        if (filterType !== 'needs_samples' && lead.lead_type !== filterType) continue
+        if (filterType === 'needs_samples') {
+          if (!lead.needs_sample_deals) continue
+        } else if (filterType === 'has_demo') {
+          // "PE OS" pill: keep only leads that appear in at least one demo.
+          if (!demoLeadIds.has(lead.id)) continue
+        } else {
+          if (lead.lead_type !== filterType) continue
+        }
       }
 
       // Lead score range
@@ -310,7 +322,7 @@ function LeadsBoard() {
     }
 
     return result
-  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin])
+  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds])
 
   if (loading && leads.length === 0) {
     return (
@@ -450,15 +462,28 @@ function LeadsBoard() {
               >
                 All Types
               </button>
-              {leadTypes.map(t => (
-                <button
-                  key={t.id}
-                  className={`filter-chip ${filterType === t.name ? 'active' : ''}`}
-                  onClick={() => setFilterType(t.name)}
-                >
-                  {t.name}
-                </button>
-              ))}
+              {leadTypes
+                // The PE OS function pill below filters by demo presence; hide
+                // any "PE OS" lead-type entry (left over in crm_field_options
+                // from before the kanban existed) so we don't render two pills
+                // with the same label.
+                .filter(t => (t.name || '').toLowerCase() !== 'pe os')
+                .map(t => (
+                  <button
+                    key={t.id}
+                    className={`filter-chip ${filterType === t.name ? 'active' : ''}`}
+                    onClick={() => setFilterType(t.name)}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              <button
+                className={`filter-chip ${filterType === 'has_demo' ? 'active' : ''}`}
+                onClick={() => setFilterType('has_demo')}
+                title="Leads that have at least one PE OS demo"
+              >
+                PE OS
+              </button>
               <button
                 className={`filter-chip ${filterType === 'needs_samples' ? 'active' : ''}`}
                 onClick={() => setFilterType('needs_samples')}
