@@ -1517,7 +1517,11 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
     }
   }
 
-  fireTTEvent('outreach_logged', { outreach: data })
+  // /api/events/fire treats the payload AS the outreach row
+  // (it does `onOutreachLogged({ outreach: payload })`), so send
+  // the raw row — wrapping it would double-nest and the dispatcher
+  // would silently bail out with missing_fields.
+  fireTTEvent('outreach_logged', data)
 
   return data
 }

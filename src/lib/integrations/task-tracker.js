@@ -75,7 +75,11 @@ export async function onOutreachLogged({ outreach }) {
     .eq('logged_by', personId).eq('outreach_date', date)
   if (error) throw error
 
-  if (count !== 10) return { skipped: 'count_not_ten', count }
+  // Floor instead of exact equality so a batch log that crosses 10 in
+  // one go (e.g. 8 → 12 from a CSV upload) still fires. The mapping
+  // check below makes this idempotent — we won't fire twice for the
+  // same person/day.
+  if (count < 10) return { skipped: 'count_below_floor', count }
 
   const entityKey = `${personId}:${date}`
   const existing = await getMapping('outreach_daily', entityKey)
