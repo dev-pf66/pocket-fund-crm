@@ -38,6 +38,21 @@ const FOLLOWUP_PRESETS = [
 
 const SAVED_SEARCHES_KEY = 'pf_crm_saved_searches'
 
+// Inline styles for the Sales Pipeline filter sections — keeps the markup
+// declarative and avoids piling onto the global CSS.
+const filterSectionStyle = {
+  marginBottom: '14px'
+}
+
+const filterSectionLabelStyle = {
+  fontSize: '11px',
+  fontWeight: 700,
+  color: '#9ca3af',
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  marginBottom: '8px'
+}
+
 function getDefaultFilters() {
   return {
     searchQuery: '',
@@ -395,6 +410,11 @@ function LeadsBoard() {
     return result
   }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead])
 
+  const filteredLeadCount = useMemo(
+    () => Object.values(leadsByStage).reduce((sum, list) => sum + list.length, 0),
+    [leadsByStage]
+  )
+
   if (loading && leads.length === 0) {
     return (
       <div>
@@ -564,165 +584,177 @@ function LeadsBoard() {
             </div>
 
             <div className="advanced-filters">
-              <div className="advanced-filters-grid">
-                {/* Lead Score Range */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Lead Score</label>
-                  <div className="filter-range-input">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={scoreMin}
-                      onChange={(e) => setScoreMin(Math.max(0, Math.min(100, Number(e.target.value))))}
-                      placeholder="Min"
-                    />
-                    <span className="range-separator">-</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={scoreMax}
-                      onChange={(e) => setScoreMax(Math.max(0, Math.min(100, Number(e.target.value))))}
-                      placeholder="Max"
-                    />
-                  </div>
-                </div>
-
-                {/* Lead Source */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Lead Source</label>
-                  <select
-                    className="advanced-filter-select"
-                    value={sourceFilter}
-                    onChange={(e) => setSourceFilter(e.target.value)}
-                  >
-                    <option value="all">All Sources</option>
-                    {LEAD_SOURCES.map(src => (
-                      <option key={src} value={src}>{src}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Last Activity */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Last Activity</label>
-                  <select
-                    className="advanced-filter-select"
-                    value={activityFilter}
-                    onChange={(e) => setActivityFilter(e.target.value)}
-                  >
-                    {ACTIVITY_PRESETS.map(p => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Follow-up Due */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Follow-up Due</label>
-                  <select
-                    className="advanced-filter-select"
-                    value={followUpFilter}
-                    onChange={(e) => setFollowUpFilter(e.target.value)}
-                  >
-                    {FOLLOWUP_PRESETS.map(p => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Has LinkedIn URL */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Has LinkedIn</label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      className={`filter-chip small ${hasLinkedin === 'all' ? 'active' : ''}`}
-                      onClick={() => setHasLinkedin('all')}
+              {/* Person */}
+              <div style={filterSectionStyle}>
+                <div style={filterSectionLabelStyle}>Person</div>
+                <div className="advanced-filters-grid">
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Analyst</label>
+                    <select
+                      className="advanced-filter-select"
+                      value={analystFilter}
+                      onChange={(e) => setAnalystFilter(e.target.value)}
                     >
-                      Any
-                    </button>
-                    <button
-                      className={`filter-chip small ${hasLinkedin === 'yes' ? 'active' : ''}`}
-                      onClick={() => setHasLinkedin('yes')}
+                      <option value="all">Any analyst</option>
+                      {(people || []).map(p => (
+                        <option key={p.id} value={String(p.id)}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Activity & status */}
+              <div style={filterSectionStyle}>
+                <div style={filterSectionLabelStyle}>Activity &amp; Status</div>
+                <div className="advanced-filters-grid">
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Lead Score</label>
+                    <div className="filter-range-input">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={scoreMin}
+                        onChange={(e) => setScoreMin(Math.max(0, Math.min(100, Number(e.target.value))))}
+                        placeholder="Min"
+                      />
+                      <span className="range-separator">-</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={scoreMax}
+                        onChange={(e) => setScoreMax(Math.max(0, Math.min(100, Number(e.target.value))))}
+                        placeholder="Max"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Outreach Response</label>
+                    <select
+                      className="advanced-filter-select"
+                      value={responseFilter}
+                      onChange={(e) => setResponseFilter(e.target.value)}
                     >
-                      Yes
-                    </button>
-                    <button
-                      className={`filter-chip small ${hasLinkedin === 'no' ? 'active' : ''}`}
-                      onClick={() => setHasLinkedin('no')}
+                      <option value="all">Any</option>
+                      <option value="replied">Replied</option>
+                      <option value="sent">Sent (no reply yet)</option>
+                      <option value="no_response">No response</option>
+                      <option value="bounced">Bounced</option>
+                      <option value="never_contacted">Never contacted</option>
+                    </select>
+                  </div>
+
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Last Activity</label>
+                    <select
+                      className="advanced-filter-select"
+                      value={activityFilter}
+                      onChange={(e) => setActivityFilter(e.target.value)}
                     >
-                      No
-                    </button>
+                      {ACTIVITY_PRESETS.map(p => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Follow-up Due</label>
+                    <select
+                      className="advanced-filter-select"
+                      value={followUpFilter}
+                      onChange={(e) => setFollowUpFilter(e.target.value)}
+                    >
+                      {FOLLOWUP_PRESETS.map(p => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
+              </div>
 
-                {/* Has Email */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Has Email</label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button className={`filter-chip small ${hasEmail === 'all' ? 'active' : ''}`} onClick={() => setHasEmail('all')}>Any</button>
-                    <button className={`filter-chip small ${hasEmail === 'yes' ? 'active' : ''}`} onClick={() => setHasEmail('yes')}>Yes</button>
-                    <button className={`filter-chip small ${hasEmail === 'no' ? 'active' : ''}`} onClick={() => setHasEmail('no')}>No</button>
+              {/* Lead info */}
+              <div style={filterSectionStyle}>
+                <div style={filterSectionLabelStyle}>Lead Info</div>
+                <div className="advanced-filters-grid">
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Lead Source</label>
+                    <select
+                      className="advanced-filter-select"
+                      value={sourceFilter}
+                      onChange={(e) => setSourceFilter(e.target.value)}
+                    >
+                      <option value="all">All Sources</option>
+                      {LEAD_SOURCES.map(src => (
+                        <option key={src} value={src}>{src}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Added</label>
+                    <select
+                      className="advanced-filter-select"
+                      value={createdFilter}
+                      onChange={(e) => setCreatedFilter(e.target.value)}
+                    >
+                      <option value="all">Any time</option>
+                      <option value="7d">Last 7 days</option>
+                      <option value="30d">Last 30 days</option>
+                      <option value="90d">Last 90 days</option>
+                      <option value="this_month">This month</option>
+                    </select>
                   </div>
                 </div>
+              </div>
 
-                {/* Has Phone */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Has Phone</label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button className={`filter-chip small ${hasPhone === 'all' ? 'active' : ''}`} onClick={() => setHasPhone('all')}>Any</button>
-                    <button className={`filter-chip small ${hasPhone === 'yes' ? 'active' : ''}`} onClick={() => setHasPhone('yes')}>Yes</button>
-                    <button className={`filter-chip small ${hasPhone === 'no' ? 'active' : ''}`} onClick={() => setHasPhone('no')}>No</button>
+              {/* Contact info */}
+              <div style={filterSectionStyle}>
+                <div style={filterSectionLabelStyle}>Contact Info</div>
+                <div className="advanced-filters-grid">
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Has LinkedIn</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        className={`filter-chip small ${hasLinkedin === 'all' ? 'active' : ''}`}
+                        onClick={() => setHasLinkedin('all')}
+                      >
+                        Any
+                      </button>
+                      <button
+                        className={`filter-chip small ${hasLinkedin === 'yes' ? 'active' : ''}`}
+                        onClick={() => setHasLinkedin('yes')}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        className={`filter-chip small ${hasLinkedin === 'no' ? 'active' : ''}`}
+                        onClick={() => setHasLinkedin('no')}
+                      >
+                        No
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Analyst (specific person) */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Analyst</label>
-                  <select
-                    className="advanced-filter-select"
-                    value={analystFilter}
-                    onChange={(e) => setAnalystFilter(e.target.value)}
-                  >
-                    <option value="all">Any analyst</option>
-                    {(people || []).map(p => (
-                      <option key={p.id} value={String(p.id)}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Has Email</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className={`filter-chip small ${hasEmail === 'all' ? 'active' : ''}`} onClick={() => setHasEmail('all')}>Any</button>
+                      <button className={`filter-chip small ${hasEmail === 'yes' ? 'active' : ''}`} onClick={() => setHasEmail('yes')}>Yes</button>
+                      <button className={`filter-chip small ${hasEmail === 'no' ? 'active' : ''}`} onClick={() => setHasEmail('no')}>No</button>
+                    </div>
+                  </div>
 
-                {/* Latest outreach response */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Outreach Response</label>
-                  <select
-                    className="advanced-filter-select"
-                    value={responseFilter}
-                    onChange={(e) => setResponseFilter(e.target.value)}
-                  >
-                    <option value="all">Any</option>
-                    <option value="replied">Replied</option>
-                    <option value="sent">Sent (no reply yet)</option>
-                    <option value="no_response">No response</option>
-                    <option value="bounced">Bounced</option>
-                    <option value="never_contacted">Never contacted</option>
-                  </select>
-                </div>
-
-                {/* Created within */}
-                <div className="advanced-filter-group">
-                  <label className="advanced-filter-label">Added</label>
-                  <select
-                    className="advanced-filter-select"
-                    value={createdFilter}
-                    onChange={(e) => setCreatedFilter(e.target.value)}
-                  >
-                    <option value="all">Any time</option>
-                    <option value="7d">Last 7 days</option>
-                    <option value="30d">Last 30 days</option>
-                    <option value="90d">Last 90 days</option>
-                    <option value="this_month">This month</option>
-                  </select>
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Has Phone</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className={`filter-chip small ${hasPhone === 'all' ? 'active' : ''}`} onClick={() => setHasPhone('all')}>Any</button>
+                      <button className={`filter-chip small ${hasPhone === 'yes' ? 'active' : ''}`} onClick={() => setHasPhone('yes')}>Yes</button>
+                      <button className={`filter-chip small ${hasPhone === 'no' ? 'active' : ''}`} onClick={() => setHasPhone('no')}>No</button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -736,6 +768,62 @@ function LeadsBoard() {
           </>
         )}
       </div>
+
+      {/* Floating results bar — surfaces how filtered the view is and
+          gives a one-click clear without reopening the panel. Hidden when
+          there's nothing useful to say (no filters AND no leads loaded). */}
+      {(activeFilterCount > 0 || searchQuery || (leads.length > 0)) && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            flexWrap: 'wrap',
+            padding: '8px 14px',
+            margin: '0 0 12px',
+            background: '#f9fafb',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            fontSize: '13px',
+            color: '#4b5563'
+          }}
+        >
+          <span>
+            <strong style={{ color: '#111827', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+              {filteredLeadCount}
+            </strong>
+            {' of '}
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{leads.length}</span>
+            {' lead'}{leads.length === 1 ? '' : 's'}{' shown'}
+          </span>
+          {(activeFilterCount > 0 || searchQuery) && (
+            <span style={{
+              fontSize: '11px', fontWeight: 600,
+              padding: '2px 8px', borderRadius: '999px',
+              background: '#eff6ff', color: '#1d4ed8'
+            }}>
+              {activeFilterCount + (searchQuery ? 1 : 0)} filter{(activeFilterCount + (searchQuery ? 1 : 0)) === 1 ? '' : 's'} active
+            </span>
+          )}
+          {(activeFilterCount > 0 || searchQuery) && (
+            <button
+              onClick={() => { setSearchQuery(''); clearAllFilters() }}
+              style={{
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                color: '#1d4ed8',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '2px 6px'
+              }}
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="crm-board">
         {STAGES.map(stage => {
@@ -769,6 +857,7 @@ function LeadsBoard() {
                     key={lead.id}
                     lead={lead}
                     settings={settings}
+                    latestOutreachStatus={responseStatusByLead.get(lead.id)}
                     onDragStart={handleDragStart}
                     onClick={() => navigate(`/leads/${lead.id}`)}
                     onRefresh={loadLeads}

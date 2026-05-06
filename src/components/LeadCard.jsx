@@ -2,9 +2,25 @@ import { useState, useCallback, memo } from 'react'
 import { logActivity } from '../lib/crm-api'
 import { useApp } from '../App'
 import StalenessBadge from './StalenessBadge'
-import { Phone, Mail, MessageCircle } from 'lucide-react'
+import { Phone, Mail, MessageCircle, AtSign, Linkedin } from 'lucide-react'
 
-const LeadCard = memo(function LeadCard({ lead, settings, onDragStart, onClick, onRefresh }) {
+// Pick a single urgency cue for the card header. Priority order matters
+// because we only show one dot — overdue follow-ups should win over a
+// recent reply. Stages that are terminal (client / passed) are quiet.
+function urgencyForLead(lead, latestOutreachStatus) {
+  const terminal = lead.stage === 'client' || lead.stage === 'passed'
+  if (!terminal && lead.next_follow_up_date) {
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const due = new Date(lead.next_follow_up_date + 'T00:00:00')
+    if (due < today) return { color: '#dc2626', title: 'Follow-up overdue' }
+    if (due.getTime() === today.getTime()) return { color: '#d97706', title: 'Follow-up due today' }
+  }
+  if (latestOutreachStatus === 'replied') return { color: '#16a34a', title: 'Replied' }
+  if (latestOutreachStatus === 'bounced') return { color: '#dc2626', title: 'Outreach bounced' }
+  return null
+}
+
+const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, onDragStart, onClick, onRefresh }) {
   const { currentPerson } = useApp()
   const [logging, setLogging] = useState(false)
 
@@ -54,6 +70,8 @@ const LeadCard = memo(function LeadCard({ lead, settings, onDragStart, onClick, 
     created: '✨'
   }
 
+  const urgency = urgencyForLead(lead, latestOutreachStatus)
+
   return (
     <div
       className="lead-card"
@@ -62,7 +80,18 @@ const LeadCard = memo(function LeadCard({ lead, settings, onDragStart, onClick, 
       onClick={onClick}
     >
       <div className="lead-card-header">
-        <h4>{lead.name}</h4>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+          {urgency && (
+            <span
+              title={urgency.title}
+              style={{
+                width: '8px', height: '8px', borderRadius: '50%',
+                background: urgency.color, flexShrink: 0
+              }}
+            />
+          )}
+          <h4 style={{ margin: 0, minWidth: 0 }}>{lead.name}</h4>
+        </div>
         {settings && (
           <StalenessBadge lead={lead} settings={settings} />
         )}
@@ -73,24 +102,46 @@ const LeadCard = memo(function LeadCard({ lead, settings, onDragStart, onClick, 
           <p className="lead-firm">{lead.firm_name}</p>
         )}
 
-        {lead.lead_type && (
-          <span className="lead-type-badge">{lead.lead_type}</span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+          {lead.lead_type && (
+            <span className="lead-type-badge">{lead.lead_type}</span>
+          )}
+          {/* Compact contact-method icons — at-a-glance tells you what
+              channels you have available, instead of a heavy "Has Email"
+              flag. Muted when missing. */}
+          <span title={lead.email ? `Email: ${lead.email}` : 'No email on file'}
+                style={{ color: lead.email ? '#16a34a' : '#d1d5db', display: 'inline-flex' }}>
+            <AtSign size={12} />
+          </span>
+          <span title={lead.phone ? `Phone: ${lead.phone}` : 'No phone on file'}
+                style={{ color: lead.phone ? '#16a34a' : '#d1d5db', display: 'inline-flex' }}>
+            <Phone size={12} />
+          </span>
+          <span title={lead.linkedin_url ? lead.linkedin_url : 'No LinkedIn on file'}
+                style={{ color: lead.linkedin_url ? '#0a66c2' : '#d1d5db', display: 'inline-flex' }}>
+            <Linkedin size={12} />
+          </span>
+        </div>
 
         {lead.needs_sample_deals && (
-          <div className="lead-flag">
+          <div className="lead-flag" style={{ fontSize: '11px' }}>
             📋 Needs samples
           </div>
         )}
 
         {lead.next_follow_up_date && (
-          <div className="lead-flag">
+          <div className="lead-flag" style={{
+            fontSize: '11px',
+            color: urgency?.color === '#dc2626' ? '#dc2626'
+                 : urgency?.color === '#d97706' ? '#d97706'
+                 : undefined
+          }}>
             📅 Follow up: {new Date(lead.next_follow_up_date).toLocaleDateString()}
           </div>
         )}
 
         {lead.reach_out_later_date && (
-          <div className="lead-flag">
+          <div className="lead-flag" style={{ fontSize: '11px' }}>
             🔔 Reach out: {new Date(lead.reach_out_later_date).toLocaleDateString()}
           </div>
         )}
