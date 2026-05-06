@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, moveLead, getCRMSettings, cachePeek, getDemoLeadIds } from '../lib/crm-api'
+import { getLeads, moveLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus } from '../lib/crm-api'
 import { useApp } from '../App'
 import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
@@ -48,7 +48,12 @@ function getDefaultFilters() {
     sourceFilter: 'all',
     activityFilter: 'all',
     followUpFilter: 'all',
-    hasLinkedin: 'all'
+    hasLinkedin: 'all',
+    analystFilter: 'all',
+    responseFilter: 'all',
+    createdFilter: 'all',
+    hasEmail: 'all',
+    hasPhone: 'all'
   }
 }
 
@@ -74,11 +79,16 @@ function countActiveAdvancedFilters(filters) {
   if (filters.hasLinkedin !== 'all') count++
   if (filters.filterType !== 'all') count++
   if (filters.assignmentFilter !== 'all') count++
+  if (filters.analystFilter && filters.analystFilter !== 'all') count++
+  if (filters.responseFilter && filters.responseFilter !== 'all') count++
+  if (filters.createdFilter && filters.createdFilter !== 'all') count++
+  if (filters.hasEmail && filters.hasEmail !== 'all') count++
+  if (filters.hasPhone && filters.hasPhone !== 'all') count++
   return count
 }
 
 function LeadsBoard() {
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const navigate = useNavigate()
   const leadTypes = useLeadTypes()
   // Seed from cache so sidebar nav back to Pipeline renders instantly.
@@ -86,6 +96,8 @@ function LeadsBoard() {
   const [loading, setLoading] = useState(() => !cachePeek('leads:{}'))
   // Lead IDs that show up in any PE OS demo. Drives the "PE OS" filter pill.
   const [demoLeadIds, setDemoLeadIds] = useState(() => new Set())
+  // Map<lead_id, latest_outreach_status>. Drives the response-status filter.
+  const [responseStatusByLead, setResponseStatusByLead] = useState(() => new Map())
   const [settings, setSettings] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [draggedLead, setDraggedLead] = useState(null)
@@ -102,6 +114,13 @@ function LeadsBoard() {
   const [activityFilter, setActivityFilter] = useSessionState('lb:activityFilter', 'all')
   const [followUpFilter, setFollowUpFilter] = useSessionState('lb:followUpFilter', 'all')
   const [hasLinkedin, setHasLinkedin] = useSessionState('lb:hasLinkedin', 'all')
+  // New filters: specific analyst (assigned_to id as string), latest outreach
+  // response, created-within window, has-email/phone toggles.
+  const [analystFilter, setAnalystFilter] = useSessionState('lb:analystFilter', 'all')
+  const [responseFilter, setResponseFilter] = useSessionState('lb:responseFilter', 'all')
+  const [createdFilter, setCreatedFilter] = useSessionState('lb:createdFilter', 'all')
+  const [hasEmail, setHasEmail] = useSessionState('lb:hasEmail', 'all')
+  const [hasPhone, setHasPhone] = useSessionState('lb:hasPhone', 'all')
 
   // Saved searches state
   const [savedSearches, setSavedSearches] = useState(() => loadSavedSearches())
@@ -117,12 +136,14 @@ function LeadsBoard() {
   const loadLeads = useCallback(async function loadLeads() {
     if (!currentPerson?.id) return
     try {
-      const [data, demoIds] = await Promise.all([
+      const [data, demoIds, statusMap] = await Promise.all([
         getLeads({}, currentPerson.id),
-        getDemoLeadIds(currentPerson.id).catch(() => new Set())
+        getDemoLeadIds(currentPerson.id).catch(() => new Set()),
+        getLeadLatestOutreachStatus(currentPerson.id).catch(() => new Map())
       ])
       setLeads(data)
       setDemoLeadIds(demoIds)
+      setResponseStatusByLead(statusMap)
     } catch (error) {
       console.error('Failed to load leads:', error)
     } finally {
@@ -169,6 +190,11 @@ function LeadsBoard() {
     setActivityFilter(defaults.activityFilter)
     setFollowUpFilter(defaults.followUpFilter)
     setHasLinkedin(defaults.hasLinkedin)
+    setAnalystFilter(defaults.analystFilter)
+    setResponseFilter(defaults.responseFilter)
+    setCreatedFilter(defaults.createdFilter)
+    setHasEmail(defaults.hasEmail)
+    setHasPhone(defaults.hasPhone)
   }
 
   function getCurrentFilters() {
@@ -181,7 +207,12 @@ function LeadsBoard() {
       sourceFilter,
       activityFilter,
       followUpFilter,
-      hasLinkedin
+      hasLinkedin,
+      analystFilter,
+      responseFilter,
+      createdFilter,
+      hasEmail,
+      hasPhone
     }
   }
 
@@ -195,6 +226,11 @@ function LeadsBoard() {
     setActivityFilter(filters.activityFilter || 'all')
     setFollowUpFilter(filters.followUpFilter || 'all')
     setHasLinkedin(filters.hasLinkedin || 'all')
+    setAnalystFilter(filters.analystFilter || 'all')
+    setResponseFilter(filters.responseFilter || 'all')
+    setCreatedFilter(filters.createdFilter || 'all')
+    setHasEmail(filters.hasEmail || 'all')
+    setHasPhone(filters.hasPhone || 'all')
     setShowFilters(true)
   }
 
@@ -250,6 +286,41 @@ function LeadsBoard() {
       // Assignment filter
       if (assignmentFilter === 'mine' && lead.assigned_to !== currentPerson?.id) continue
       if (assignmentFilter === 'unassigned' && lead.assigned_to != null) continue
+
+      // Analyst filter (specific person — admins use this to drill into a
+      // teammate's book, separate from the My/Unassigned chips above).
+      if (analystFilter !== 'all') {
+        if (String(lead.assigned_to ?? '') !== String(analystFilter)) continue
+      }
+
+      // Latest outreach response. 'never_contacted' = no entry in the map.
+      if (responseFilter !== 'all') {
+        const latest = responseStatusByLead.get(lead.id)
+        if (responseFilter === 'never_contacted') {
+          if (latest) continue
+        } else {
+          if (latest !== responseFilter) continue
+        }
+      }
+
+      // Created-within window relative to today.
+      if (createdFilter !== 'all' && lead.created_at) {
+        const created = new Date(lead.created_at)
+        const days = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24))
+        if (createdFilter === '7d' && days > 7) continue
+        if (createdFilter === '30d' && days > 30) continue
+        if (createdFilter === '90d' && days > 90) continue
+        if (createdFilter === 'this_month') {
+          const now = new Date()
+          if (created.getFullYear() !== now.getFullYear() || created.getMonth() !== now.getMonth()) continue
+        }
+      }
+
+      // Has-email / has-phone toggles (mirror hasLinkedin).
+      if (hasEmail === 'yes' && !lead.email) continue
+      if (hasEmail === 'no' && lead.email) continue
+      if (hasPhone === 'yes' && !lead.phone) continue
+      if (hasPhone === 'no' && lead.phone) continue
 
       // Type filter
       if (filterType !== 'all') {
@@ -322,7 +393,7 @@ function LeadsBoard() {
     }
 
     return result
-  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds])
+  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead])
 
   if (loading && leads.length === 0) {
     return (
@@ -584,6 +655,74 @@ function LeadsBoard() {
                       No
                     </button>
                   </div>
+                </div>
+
+                {/* Has Email */}
+                <div className="advanced-filter-group">
+                  <label className="advanced-filter-label">Has Email</label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button className={`filter-chip small ${hasEmail === 'all' ? 'active' : ''}`} onClick={() => setHasEmail('all')}>Any</button>
+                    <button className={`filter-chip small ${hasEmail === 'yes' ? 'active' : ''}`} onClick={() => setHasEmail('yes')}>Yes</button>
+                    <button className={`filter-chip small ${hasEmail === 'no' ? 'active' : ''}`} onClick={() => setHasEmail('no')}>No</button>
+                  </div>
+                </div>
+
+                {/* Has Phone */}
+                <div className="advanced-filter-group">
+                  <label className="advanced-filter-label">Has Phone</label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button className={`filter-chip small ${hasPhone === 'all' ? 'active' : ''}`} onClick={() => setHasPhone('all')}>Any</button>
+                    <button className={`filter-chip small ${hasPhone === 'yes' ? 'active' : ''}`} onClick={() => setHasPhone('yes')}>Yes</button>
+                    <button className={`filter-chip small ${hasPhone === 'no' ? 'active' : ''}`} onClick={() => setHasPhone('no')}>No</button>
+                  </div>
+                </div>
+
+                {/* Analyst (specific person) */}
+                <div className="advanced-filter-group">
+                  <label className="advanced-filter-label">Analyst</label>
+                  <select
+                    className="advanced-filter-select"
+                    value={analystFilter}
+                    onChange={(e) => setAnalystFilter(e.target.value)}
+                  >
+                    <option value="all">Any analyst</option>
+                    {(people || []).map(p => (
+                      <option key={p.id} value={String(p.id)}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Latest outreach response */}
+                <div className="advanced-filter-group">
+                  <label className="advanced-filter-label">Outreach Response</label>
+                  <select
+                    className="advanced-filter-select"
+                    value={responseFilter}
+                    onChange={(e) => setResponseFilter(e.target.value)}
+                  >
+                    <option value="all">Any</option>
+                    <option value="replied">Replied</option>
+                    <option value="sent">Sent (no reply yet)</option>
+                    <option value="no_response">No response</option>
+                    <option value="bounced">Bounced</option>
+                    <option value="never_contacted">Never contacted</option>
+                  </select>
+                </div>
+
+                {/* Created within */}
+                <div className="advanced-filter-group">
+                  <label className="advanced-filter-label">Added</label>
+                  <select
+                    className="advanced-filter-select"
+                    value={createdFilter}
+                    onChange={(e) => setCreatedFilter(e.target.value)}
+                  >
+                    <option value="all">Any time</option>
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="90d">Last 90 days</option>
+                    <option value="this_month">This month</option>
+                  </select>
                 </div>
               </div>
 

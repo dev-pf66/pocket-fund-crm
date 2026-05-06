@@ -2385,3 +2385,27 @@ export async function getDemoLeadIds(personId = null) {
   return new Set((data || []).map(r => r.lead_id).filter(Boolean))
 }
 
+// Map<lead_id, latest_outreach_status> for every lead with any outreach
+// entry. Used by the Sales Pipeline's response-status filter so leads
+// can be sliced by 'replied' / 'no_response' / 'bounced' without the
+// page loading the full outreach log.
+//
+// "Latest" is by outreach_date descending — replies override an earlier
+// 'sent' on the same lead, which is the behavior we want.
+export async function getLeadLatestOutreachStatus(personId = null) {
+  let q = supabase
+    .from('crm_outreach_log')
+    .select('lead_id, status, outreach_date')
+    .not('lead_id', 'is', null)
+    .order('outreach_date', { ascending: false })
+  if (personId) q = q.eq('logged_by', personId)
+  const { data, error } = await q
+  if (error) throw error
+  const map = new Map()
+  for (const row of data || []) {
+    // First row per lead_id wins because we ordered desc.
+    if (!map.has(row.lead_id)) map.set(row.lead_id, row.status || 'sent')
+  }
+  return map
+}
+
