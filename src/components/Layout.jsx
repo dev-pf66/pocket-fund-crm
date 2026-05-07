@@ -40,9 +40,9 @@ function Layout() {
           <NavLink to="/outreach-admin" onClick={() => setMobileMenuOpen(false)}><ClipboardList size={18} />Outreach Log</NavLink>
           <NavLink to="/pe-os" onClick={() => setMobileMenuOpen(false)}><Presentation size={18} />PE OS</NavLink>
           <NavLink to="/my-goals" onClick={() => setMobileMenuOpen(false)}><CheckSquare size={18} />Goals</NavLink>
+          <NavLink to="/analytics" onClick={() => setMobileMenuOpen(false)}><BarChart3 size={18} />Analytics</NavLink>
           <NavLink to="/help" onClick={() => setMobileMenuOpen(false)}><HelpCircle size={18} />Help</NavLink>
           {isAdminUser(currentPerson) && (<>
-            <NavLink to="/analytics" onClick={() => setMobileMenuOpen(false)}><BarChart3 size={18} />Analytics</NavLink>
             <NavLink to="/investors" onClick={() => setMobileMenuOpen(false)}><Briefcase size={18} />Investor Contacts</NavLink>
             <NavLink to="/templates" onClick={() => setMobileMenuOpen(false)}><Mail size={18} />Email Templates</NavLink>
             <NavLink to="/samples" onClick={() => setMobileMenuOpen(false)}><FileText size={18} />Sample Deals</NavLink>

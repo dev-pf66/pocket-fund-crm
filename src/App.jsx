@@ -157,8 +157,11 @@ function AppContent() {
               <Route path="my-goals" element={<MyGoals />} />
               <Route path="admin" element={<Admin />} />
               <Route path="import" element={<ImportLeads />} />
+              {/* Analytics is open to everyone — non-admins see only
+                  their own numbers (auto-scoped by RLS + the page's
+                  built-in admin check). The other admin pages stay gated. */}
+              <Route path="analytics" element={<Analytics />} />
               {isAdmin && <>
-                <Route path="analytics" element={<Analytics />} />
                 <Route path="investors" element={<Investors />} />
                 <Route path="investors/:id" element={<InvestorDetail />} />
                 <Route path="templates" element={<EmailTemplates />} />

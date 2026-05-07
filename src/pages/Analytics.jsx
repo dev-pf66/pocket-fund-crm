@@ -25,15 +25,35 @@ function StatBox({ label, value, color }) {
   )
 }
 
+// Mirrors the helper in Layout.jsx.
+const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
+function isAdminUser(person) {
+  if (!person) return false
+  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
+
 function Analytics() {
-  const { people } = useApp()
+  const { currentPerson, people } = useApp()
+  const isAdmin = isAdminUser(currentPerson)
   const [timeWin, setTimeWin] = useState(TIME_WINDOWS[3]) // default: 7 days
   const [outreachRows, setOutreachRows] = useState([])
   const [meetingRows, setMeetingRows] = useState([])
   const [loading, setLoading] = useState(true)
   // personFilter is always a string ('all' or stringified id) so it round-trips
-  // cleanly through <select> e.target.value (which is always a string).
-  const [personFilter, setPersonFilter] = useState('all')
+  // cleanly through <select> e.target.value (which is always a string). For
+  // non-admins this stays locked to their own id — they only see their own
+  // numbers. Admins keep the team-wide selector.
+  const [personFilter, setPersonFilter] = useState(() =>
+    isAdmin ? 'all' : (currentPerson?.id ? String(currentPerson.id) : 'all')
+  )
+
+  // If currentPerson resolves after first render (auth race), backfill the
+  // filter so non-admins don't briefly see 'all'.
+  useEffect(() => {
+    if (!isAdmin && currentPerson?.id) {
+      setPersonFilter(String(currentPerson.id))
+    }
+  }, [isAdmin, currentPerson?.id])
 
   useEffect(() => {
     load()
@@ -154,19 +174,21 @@ function Analytics() {
   return (
     <div>
       <div className="page-header">
-        <h1>Analytics</h1>
+        <h1>{isAdmin ? 'Analytics' : 'My Analytics'}</h1>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <select
-            value={personFilter}
-            onChange={e => setPersonFilter(e.target.value)}
-            className="form-select"
-            style={{ minWidth: '140px' }}
-          >
-            <option value="all">All People</option>
-            {activePeople.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          {isAdmin && (
+            <select
+              value={personFilter}
+              onChange={e => setPersonFilter(e.target.value)}
+              className="form-select"
+              style={{ minWidth: '140px' }}
+            >
+              <option value="all">All People</option>
+              {activePeople.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             {TIME_WINDOWS.map(tw => (
               <button
