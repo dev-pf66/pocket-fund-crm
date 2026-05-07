@@ -21,8 +21,25 @@ function daysSince(dateStr) {
   return Math.ceil((Date.now() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
 }
 
+// Mirrors the helper in Layout.jsx.
+const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
+function isAdminUser(person) {
+  if (!person) return false
+  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
+
 function Dashboard() {
   const { currentPerson, people } = useApp()
+  const isAdmin = isAdminUser(currentPerson)
+  // Non-admins only see their own card on the per-person grids; admins
+  // see the full team. Mirrors the data isolation we already enforce on
+  // the underlying queries via RLS.
+  const visiblePeople = useMemo(
+    () => isAdmin
+      ? (people || [])
+      : (currentPerson ? [currentPerson] : []),
+    [isAdmin, people, currentPerson]
+  )
   const cacheKey = 'dashboard:' + (currentPerson?.id ?? 'all')
   const [data, setData] = useState(() => cachePeek(cacheKey) || null)
   const [outreachRows, setOutreachRows] = useState([])
@@ -104,7 +121,7 @@ function Dashboard() {
           <span className="dashboard-date-label">{fmtDate(today)}</span>
         </div>
         <div className="today-outreach-grid">
-          {people.map(person => {
+          {visiblePeople.map(person => {
             const stats = personStats.get(person.id) || { todayCount: 0, weekCount: 0, weekReplies: 0 }
             const pct = Math.min(100, (stats.todayCount / DAILY_GOAL) * 100)
             const hit = stats.todayCount >= DAILY_GOAL
@@ -154,16 +171,21 @@ function Dashboard() {
             </div>
             <div className="week-stat-label">Reply Rate</div>
           </div>
-          <div className="week-stat-block">
-            <div className="week-stat-value">
-              {people.length > 0 ? Math.round(teamWeek.total / people.length) : 0}
+          {/* "Avg / Person" only makes sense when looking at the team —
+              hide it for non-admins who only see their own row. */}
+          {isAdmin && (
+            <div className="week-stat-block">
+              <div className="week-stat-value">
+                {visiblePeople.length > 0 ? Math.round(teamWeek.total / visiblePeople.length) : 0}
+              </div>
+              <div className="week-stat-label">Avg / Person</div>
             </div>
-            <div className="week-stat-label">Avg / Person</div>
-          </div>
+          )}
         </div>
 
-        {/* Per-person weekly breakdown */}
-        {people.length > 0 && (
+        {/* Per-person weekly breakdown — only shown for admins; non-admins
+            see their own numbers in the summary tiles above. */}
+        {isAdmin && visiblePeople.length > 0 && (
           <div className="week-person-table">
             <div className="week-person-header">
               <span>Person</span>
@@ -171,7 +193,7 @@ function Dashboard() {
               <span>Replies</span>
               <span>Rate</span>
             </div>
-            {people.map(person => {
+            {visiblePeople.map(person => {
               const s = personStats.get(person.id) || { weekCount: 0, weekReplies: 0 }
               const rate = s.weekCount > 0 ? Math.round((s.weekReplies / s.weekCount) * 100) : 0
               return (
