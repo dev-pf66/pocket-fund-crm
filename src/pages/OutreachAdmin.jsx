@@ -1054,7 +1054,7 @@ function OutreachAdmin() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            <Target size={24} /> Outreach Log
+            <Target size={24} /> Log
           </h1>
           <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
             {isAdmin

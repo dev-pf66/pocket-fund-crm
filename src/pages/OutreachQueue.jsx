@@ -175,7 +175,7 @@ function OutreachQueue() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            <Inbox size={24} /> Outreach Queue
+            <Inbox size={24} /> Queue
           </h1>
           <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
             Work through leads you haven't contacted yet.

@@ -162,7 +162,7 @@ function InvestorDetail() {
     return (
       <div>
         <div className="page-header"><h1>Investor Not Found</h1></div>
-        <Link to="/investors">Back to Investor Contacts</Link>
+        <Link to="/investors">Back to Investors</Link>
       </div>
     )
   }

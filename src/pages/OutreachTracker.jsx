@@ -372,7 +372,7 @@ function OutreachTracker() {
   return (
     <div>
       <div className="page-header">
-        <h1>Outreach Tracker</h1>
+        <h1>Tracker</h1>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             className="btn btn-secondary"

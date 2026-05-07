@@ -169,7 +169,7 @@ function Investors() {
   if (loading && investors.length === 0) {
     return (
       <div>
-        <div className="page-header"><h1>Investor Contacts</h1></div>
+        <div className="page-header"><h1>Investors</h1></div>
         <div className="loading">Loading investors...</div>
       </div>
     )
@@ -178,7 +178,7 @@ function Investors() {
   return (
     <div>
       <div className="page-header">
-        <h1>Investor Contacts</h1>
+        <h1>Investors</h1>
         <button className="btn btn-primary" onClick={() => { setEditingInvestor(null); setFormData(EMPTY_FORM); setShowForm(true) }}>
           <Plus size={18} />
           Add Investor

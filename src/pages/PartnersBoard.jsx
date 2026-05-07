@@ -370,7 +370,7 @@ function PartnersBoard() {
     <div className="page-container">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
-          <h1 style={{ margin: 0 }}>Potential Partners</h1>
+          <h1 style={{ margin: 0 }}>Partners</h1>
           <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>Personal pipeline for partnership outreach</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>

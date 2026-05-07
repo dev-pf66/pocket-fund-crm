@@ -419,7 +419,7 @@ function LeadsBoard() {
     return (
       <div>
         <div className="page-header">
-          <h1>Sales Pipeline</h1>
+          <h1>Pipeline</h1>
         </div>
         <div className="loading">Loading pipeline...</div>
       </div>
@@ -429,7 +429,7 @@ function LeadsBoard() {
   return (
     <div>
       <div className="page-header">
-        <h1>Sales Pipeline</h1>
+        <h1>Pipeline</h1>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             className="btn btn-secondary"

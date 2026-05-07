@@ -94,7 +94,7 @@ function EmailTemplates() {
   return (
     <div>
       <div className="page-header">
-        <h1>Email Templates</h1>
+        <h1>Templates</h1>
         <button
           className="btn btn-primary"
           onClick={() => {
