@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getOutreachLog, logOutreach, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead } from '../lib/crm-api'
+import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
@@ -213,7 +213,7 @@ function OutreachTracker() {
       }
       const headers = rows[0].map(h => h.trim().toLowerCase())
 
-      let imported = 0
+      const validRows = []
       let skipped = 0
       for (let i = 1; i < rows.length; i++) {
         const outreach = {}
@@ -258,16 +258,29 @@ function OutreachTracker() {
         if (!outreach.outreach_type) outreach.outreach_type = 'cold_email'
         if (!outreach.status) outreach.status = 'sent'
 
-        await logOutreach(outreach, currentPerson?.id, currentPerson?.name)
-        imported++
+        validRows.push(outreach)
       }
 
-      toast.success(skipped > 0
+      if (validRows.length === 0) {
+        toast.warn(skipped > 0
+          ? `All ${skipped} rows were skipped — no lead_name found`
+          : 'No valid rows found in CSV')
+        return
+      }
+
+      // Single batch insert instead of N sequential calls
+      const imported = await logOutreachBatch(validRows, currentPerson?.id)
+
+      const msg = skipped > 0
         ? `Imported ${imported} · skipped ${skipped} row${skipped === 1 ? '' : 's'} without a lead name`
-        : `Successfully imported ${imported} outreaches!`)
+        : `Imported ${imported} outreach entr${imported === 1 ? 'y' : 'ies'}`
+      toast.success(msg)
       setCsvFile(null)
       setShowCsvUpload(false)
-      await loadData()
+      // Switch to "all" view so imported entries are visible regardless of
+      // what date the CSV had — avoids the "upload succeeded but nothing
+      // appears" confusion when CSV dates aren't today.
+      setFilter(f => ({ ...f, view: 'all' }))
     } catch (error) {
       console.error('CSV upload failed:', error)
       toast.error('Failed to upload CSV: ' + error.message)

@@ -1551,6 +1551,27 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
 }
 
 /**
+ * Bulk-insert multiple outreach entries in a single DB round-trip.
+ * Used by the CSV uploader — avoids N sequential inserts (slow, fragile).
+ * Returns the number of rows actually inserted.
+ */
+export async function logOutreachBatch(rows, currentPersonId) {
+  if (!rows || rows.length === 0) return 0
+  const today = istDateStr()
+  const records = rows.map(r => ({
+    ...r,
+    logged_by: currentPersonId,
+    outreach_date: r.outreach_date || today,
+  }))
+  const { data, error } = await supabase
+    .from('crm_outreach_log')
+    .insert(records)
+    .select('id')
+  if (error) throw error
+  return (data || []).length
+}
+
+/**
  * Update outreach entry
  */
 export async function updateOutreach(id, updates) {
