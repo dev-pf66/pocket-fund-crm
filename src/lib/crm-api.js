@@ -333,17 +333,6 @@ export async function logActivity(leadId, activityData, currentPersonId) {
   return activity
 }
 
-/**
- * Delete activity
- */
-export async function deleteActivity(id) {
-  const { error } = await supabase
-    .from('crm_lead_activities')
-    .delete()
-    .eq('id', id)
-
-  if (error) throw error
-}
 
 // ============================================================================
 // SAMPLE DEALS API
@@ -367,19 +356,6 @@ export async function getSampleDeals(filters = {}) {
   return data || []
 }
 
-/**
- * Get sample deal by ID
- */
-export async function getSampleDealById(id) {
-  const { data, error } = await supabase
-    .from('crm_sample_deals')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) throw error
-  return data
-}
 
 /**
  * Create sample deal
@@ -428,32 +404,6 @@ export async function deleteSampleDeal(id) {
   return data
 }
 
-/**
- * Send sample deals to a lead
- */
-export async function sendSampleDeals(leadId, sampleDealIds, currentPersonId) {
-  // Log activity
-  await logActivity(leadId, {
-    activity_type: 'sample_sent',
-    activity_date: new Date().toISOString(),
-    notes: `Sent ${sampleDealIds.length} sample deals`,
-    sample_deals_sent: sampleDealIds
-  }, currentPersonId)
-
-  // Clear needs_sample_deals flag
-  await updateLead(leadId, {
-    needs_sample_deals: false
-  })
-
-  // Return the deals that were sent
-  const { data, error } = await supabase
-    .from('crm_sample_deals')
-    .select('*')
-    .in('id', sampleDealIds)
-
-  if (error) throw error
-  return data || []
-}
 
 // ============================================================================
 // SETTINGS API
@@ -484,22 +434,6 @@ export async function getCRMSettings() {
   return data
 }
 
-/**
- * Update CRM settings
- */
-export async function updateCRMSettings(updates) {
-  const { data, error } = await supabase
-    .from('crm_settings')
-    .update(updates)
-    .eq('id', 1)
-    .select()
-    .single()
-
-  if (error) throw error
-  _settingsCache = data
-  _settingsCacheTime = Date.now()
-  return data
-}
 
 // ============================================================================
 // DASHBOARD/ANALYTICS API
@@ -679,30 +613,6 @@ export async function getWeeklyStats(personId = null) {
   return stats
 }
 
-/**
- * Get conversion funnel stats
- */
-export async function getConversionFunnelStats() {
-  const { data, error } = await supabase
-    .from('crm_leads')
-    .select('stage')
-
-  if (error) throw error
-
-  const stages = data.reduce((acc, lead) => {
-    acc[lead.stage] = (acc[lead.stage] || 0) + 1
-    return acc
-  }, {})
-
-  return {
-    new_lead: stages.new_lead || 0,
-    cold_outreach: stages.cold_outreach || 0,
-    responded: stages.responded || 0,
-    warm_lead: stages.warm_lead || 0,
-    active_conversation: stages.active_conversation || 0,
-    client: stages.client || 0
-  }
-}
 
 /**
  * Get complete CRM dashboard data
@@ -746,15 +656,6 @@ export async function getCRMDashboardData(personId = null) {
   return result
 }
 
-/**
- * Get CRM heartbeat for Sage monitoring
- */
-export async function getCRMHeartbeat() {
-  const { data, error } = await supabase.rpc('get_crm_heartbeat')
-
-  if (error) throw error
-  return data
-}
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -804,39 +705,6 @@ export function calculateStaleness(lead, settings) {
   }
 }
 
-/**
- * Filter sample deals by lead criteria
- */
-export function filterSampleDealsByLead(sampleDeals, lead) {
-  if (!lead.deal_criteria && !lead.lead_type) return sampleDeals
-
-  return sampleDeals.filter(deal => {
-    let matches = false
-
-    // Match by lead type
-    if (lead.lead_type && deal.client_type === lead.lead_type) {
-      matches = true
-    }
-
-    // Match by deal criteria keywords
-    if (lead.deal_criteria) {
-      const criteria = lead.deal_criteria.toLowerCase()
-      const industry = deal.industry?.toLowerCase() || ''
-      const description = deal.description?.toLowerCase() || ''
-
-      if (industry && criteria.includes(industry)) {
-        matches = true
-      }
-      if (description && criteria.split(',').some(term =>
-        description.includes(term.trim())
-      )) {
-        matches = true
-      }
-    }
-
-    return matches
-  })
-}
 
 // ============================================================================
 // INVESTORS API
@@ -1044,59 +912,6 @@ export async function deletePartner(id) {
   if (error) throw error
 }
 
-export default {
-  // Leads
-  getLeads,
-  getLeadById,
-  createLead,
-  updateLead,
-  moveLead,
-  deleteLead,
-
-  // Activities
-  getLeadActivities,
-  logActivity,
-  deleteActivity,
-
-  // Sample Deals
-  getSampleDeals,
-  getSampleDealById,
-  createSampleDeal,
-  updateSampleDeal,
-  deleteSampleDeal,
-  sendSampleDeals,
-
-  // Settings
-  getCRMSettings,
-  updateCRMSettings,
-
-  // Dashboard
-  getStaleLeads,
-  getFollowUpsDueToday,
-  getLeadsNeedingSamples,
-  getActiveConversationsGoneStale,
-  getWeeklyCallCount,
-  getPipelineStats,
-  getWeeklyStats,
-  getConversionFunnelStats,
-  getCRMDashboardData,
-  getCRMHeartbeat,
-
-  // Investors
-  getInvestors,
-  getInvestorById,
-  createInvestor,
-  updateInvestor,
-  deleteInvestor,
-  getInvestorInteractions,
-  logInvestorInteraction,
-  deleteInvestorInteraction,
-
-  // Utilities
-  calculateStaleness,
-  filterSampleDealsByLead
-}
-
 // ============================================================================
 // Email Templates
 // ============================================================================
@@ -1149,106 +964,6 @@ export async function deleteEmailTemplate(id) {
 // Analytics
 // ============================================================================
 
-export async function getAnalytics(personId = null) {
-  let query = supabase
-    .from('crm_leads')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (personId) query = query.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
-
-  const { data: leads, error } = await query
-
-  if (error) throw error
-
-  // Conversion funnel
-  const stages = {
-    new_lead: leads.filter(l => l.stage === 'new_lead').length,
-    cold_outreach: leads.filter(l => l.stage === 'cold_outreach').length,
-    responded: leads.filter(l => l.stage === 'responded').length,
-    warm_lead: leads.filter(l => l.stage === 'warm_lead').length,
-    active_conversation: leads.filter(l => l.stage === 'active_conversation').length,
-    client: leads.filter(l => l.stage === 'client').length
-  }
-
-  const totalTop = stages.new_lead + stages.cold_outreach
-  const conversion = {
-    ...stages,
-    new_to_cold_rate: stages.new_lead > 0 ? Math.round((stages.cold_outreach / stages.new_lead) * 100) : 0,
-    cold_to_responded_rate: stages.cold_outreach > 0 ? Math.round((stages.responded / stages.cold_outreach) * 100) : 0,
-    responded_to_warm_rate: stages.responded > 0 ? Math.round((stages.warm_lead / stages.responded) * 100) : 0,
-    warm_to_active_rate: stages.warm_lead > 0 ? Math.round((stages.active_conversation / stages.warm_lead) * 100) : 0,
-    active_to_client_rate: stages.active_conversation > 0 ? Math.round((stages.client / stages.active_conversation) * 100) : 0,
-    overall_rate: totalTop > 0 ? Math.round((stages.client / totalTop) * 100) : 0
-  }
-
-  // Pipeline velocity (avg days in each stage)
-  function getAvgDaysInStage(stage) {
-    const stageLeads = leads.filter(l => l.stage === stage && l.created_at)
-    if (stageLeads.length === 0) return 0
-
-    const avgMs = stageLeads.reduce((sum, lead) => {
-      const days = (new Date() - new Date(lead.created_at)) / (1000 * 60 * 60 * 24)
-      return sum + days
-    }, 0) / stageLeads.length
-
-    return Math.round(avgMs)
-  }
-
-  const velocity = {
-    new_lead: getAvgDaysInStage('new_lead'),
-    cold_outreach: getAvgDaysInStage('cold_outreach'),
-    responded: getAvgDaysInStage('responded'),
-    warm_lead: getAvgDaysInStage('warm_lead'),
-    active_conversation: getAvgDaysInStage('active_conversation'),
-    total: Math.round((getAvgDaysInStage('new_lead') + getAvgDaysInStage('cold_outreach') + getAvgDaysInStage('responded') + getAvgDaysInStage('warm_lead') + getAvgDaysInStage('active_conversation')))
-  }
-
-  // Lead sources
-  const sourceMap = {}
-  leads.forEach(lead => {
-    const source = lead.lead_source || 'Unknown'
-    if (!sourceMap[source]) {
-      sourceMap[source] = { total: 0, clients: 0 }
-    }
-    sourceMap[source].total++
-    if (lead.stage === 'client') {
-      sourceMap[source].clients++
-    }
-  })
-
-  const sources = Object.entries(sourceMap)
-    .map(([source, data]) => ({
-      source,
-      total: data.total,
-      clients: data.clients,
-      conversion_rate: data.total > 0 ? Math.round((data.clients / data.total) * 100) : 0
-    }))
-    .sort((a, b) => b.conversion_rate - a.conversion_rate)
-
-  // Weekly trends (last 4 weeks)
-  const weekly = []
-  for (let i = 0; i < 4; i++) {
-    const weekStart = new Date()
-    weekStart.setDate(weekStart.getDate() - (i + 1) * 7)
-    const weekEnd = new Date()
-    weekEnd.setDate(weekEnd.getDate() - i * 7)
-
-    const weekLeads = leads.filter(l => {
-      const created = new Date(l.created_at)
-      return created >= weekStart && created < weekEnd
-    })
-
-    weekly.unshift({
-      new_leads: weekLeads.length,
-      moved_to_active: weekLeads.filter(l => l.stage === 'active_conversation' || l.stage === 'client').length,
-      closed: weekLeads.filter(l => l.stage === 'client').length
-    })
-  }
-
-  return { conversion, velocity, sources, weekly }
-}
-
 // ============================================================================
 // Transcripts
 // ============================================================================
@@ -1268,18 +983,6 @@ export async function createTranscript(transcriptData) {
   const { data, error } = await supabase
     .from('crm_transcripts')
     .insert([transcriptData])
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
-}
-
-export async function updateTranscript(id, updates) {
-  const { data, error } = await supabase
-    .from('crm_transcripts')
-    .update(updates)
-    .eq('id', id)
     .select()
     .single()
 
@@ -1308,26 +1011,6 @@ export async function getTags() {
 
   if (error) throw error
   return data || []
-}
-
-export async function createTag(tagData) {
-  const { data, error } = await supabase
-    .from('crm_tags')
-    .insert([tagData])
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
-}
-
-export async function deleteTag(id) {
-  const { error } = await supabase
-    .from('crm_tags')
-    .delete()
-    .eq('id', id)
-
-  if (error) throw error
 }
 
 export async function getLeadTags(leadId) {
@@ -1374,14 +1057,6 @@ export async function calculateLeadScore(leadId) {
 
   if (error) throw error
   return data
-}
-
-export async function recalculateAllLeadScores() {
-  const leads = await getLeads()
-  const results = await Promise.all(
-    leads.map(lead => calculateLeadScore(lead.id))
-  )
-  return results
 }
 
 // ============================================================================
@@ -1650,52 +1325,6 @@ export async function deleteOutreach(id) {
   if (error) throw error
 }
 
-/**
- * Get today's outreach count
- */
-export async function getTodaysOutreachCount() {
-  const { data, error } = await supabase.rpc('get_todays_outreach_count')
-
-  if (error) throw error
-  return data || 0
-}
-
-/**
- * Daily outreach statistics, scoped to a person when personId is provided.
- * Legacy RPC `get_daily_outreach_stats` was team-wide, so every user saw
- * everyone's numbers — this replaces it with a per-person client-side
- * aggregation.
- */
-export async function getDailyOutreachStats(daysBack = 30, personId = null) {
-  let q = supabase
-    .from('crm_outreach_log')
-    .select('outreach_date, status')
-    .gte('outreach_date', istAddDays(istDateStr(), -daysBack))
-  if (personId) q = q.eq('logged_by', personId)
-  const { data, error } = await q
-  if (error) throw error
-
-  const byDate = new Map()
-  for (const row of data || []) {
-    if (!byDate.has(row.outreach_date)) {
-      byDate.set(row.outreach_date, { outreach_date: row.outreach_date, total_outreaches: 0, replies: 0 })
-    }
-    const b = byDate.get(row.outreach_date)
-    b.total_outreaches += 1
-    if (row.status === 'replied') b.replies += 1
-  }
-  return Array.from(byDate.values()).sort((a, b) => a.outreach_date.localeCompare(b.outreach_date))
-}
-
-/**
- * Get outreach streak (consecutive days hitting 10+ goal)
- */
-export async function getOutreachStreak() {
-  const { data, error } = await supabase.rpc('get_outreach_streak')
-
-  if (error) throw error
-  return data || 0
-}
 
 /**
  * Per-person dashboard stats for the Outreach Tracker header. Legacy RPCs
@@ -1741,31 +1370,6 @@ export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGo
   return { todayCount, streak, dailyStats }
 }
 
-/**
- * Get outreach summary for today
- */
-export async function getTodaysOutreachSummary() {
-  const today = istDateStr()
-  const outreaches = await getOutreachLog({ outreach_date: today })
-
-  const summary = {
-    total: outreaches.length,
-    cold_email: 0,
-    linkedin_message: 0,
-    phone_call: 0,
-    other: 0,
-    replied: 0,
-    sent: 0,
-    no_response: 0
-  }
-
-  outreaches.forEach(o => {
-    summary[o.outreach_type] = (summary[o.outreach_type] || 0) + 1
-    summary[o.status] = (summary[o.status] || 0) + 1
-  })
-
-  return summary
-}
 
 // ============================================================================
 // LEAD ASSIGNMENT
@@ -1806,21 +1410,6 @@ export async function getAssignedLeads(personId) {
   return data || []
 }
 
-/**
- * Get unassigned leads
- */
-export async function getUnassignedLeads() {
-  const { data, error } = await supabase
-    .from('crm_leads')
-    .select('*')
-    .is('assigned_to', null)
-    .neq('stage', 'passed')
-    .neq('stage', 'client')
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-  return data || []
-}
 
 // ============================================================================
 // ACTIVITY FEED
@@ -1838,18 +1427,6 @@ export async function getRecentActivity(limit = 15) {
   return data || []
 }
 
-/**
- * Get activity for a specific user
- */
-export async function getUserActivity(userId, limit = 15) {
-  const { data, error } = await supabase.rpc('get_user_activity', {
-    p_user_id: userId,
-    limit_count: limit
-  })
-
-  if (error) throw error
-  return data || []
-}
 
 /**
  * Log activity manually (for actions not covered by triggers)
