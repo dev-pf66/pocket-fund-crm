@@ -47,14 +47,15 @@ function Dashboard() {
 
   useEffect(() => {
     loadData()
-  }, [currentPerson?.id])
+  }, [currentPerson?.id, isAdmin])
 
   async function loadData() {
     if (!currentPerson?.id) return
     try {
       const [dashboardData, rows] = await Promise.all([
         getCRMDashboardData(currentPerson.id),
-        getOutreachStatsByPerson(7).catch(() => [])
+        // Admins get all-team rows; non-admins only their own.
+        getOutreachStatsByPerson(7, isAdmin ? null : currentPerson.id).catch(() => [])
       ])
       setData(dashboardData)
       setOutreachRows(rows)
@@ -153,7 +154,7 @@ function Dashboard() {
       {/* This Week Summary */}
       <div className="card dashboard-card">
         <div className="dashboard-card-header">
-          <h2><Calendar size={20} /> This Week</h2>
+          <h2><Calendar size={20} /> {isAdmin ? 'This Week' : 'My Week'}</h2>
           <span className="dashboard-date-label">{fmtDate(weekStart)} – {fmtDate(today)}</span>
         </div>
         <div className="week-summary-grid">
