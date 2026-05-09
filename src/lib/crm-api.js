@@ -1983,6 +1983,26 @@ export async function getDemoLeadIds(personId = null) {
   return new Set((data || []).map(r => r.lead_id).filter(Boolean))
 }
 
+// ============================================================================
+// OUTREACH ANALYSIS
+// ============================================================================
+
+// Send outreach entries (must include message_content + status) to the
+// serverless AI analysis function. Returns { summary, observations,
+// avg_words_replied, avg_words_not_replied, low_data, total_analyzed,
+// replied_count, analyzed_at }.
+export async function analyzeOutreach(entries) {
+  const apiKey = import.meta.env.VITE_CRM_API_KEY
+  const response = await fetch('/api/analyze-outreach', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+    body: JSON.stringify({ entries })
+  })
+  const result = await response.json()
+  if (!response.ok || !result.success) throw new Error(result.error || 'Analysis failed')
+  return result.analysis
+}
+
 // Map<lead_id, latest_outreach_status> for every lead with any outreach
 // entry. Used by the Sales Pipeline's response-status filter so leads
 // can be sliced by 'replied' / 'no_response' / 'bounced' without the
