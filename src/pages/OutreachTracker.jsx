@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead } from '../lib/crm-api'
+import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead, getEmailTemplates } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
@@ -56,6 +56,7 @@ function OutreachTracker() {
   const locationOptions = useFieldOptions('location')
   const leadSourceOptions = useFieldOptions('lead_source')
   const [outreaches, setOutreaches] = useState([])
+  const [templates, setTemplates] = useState([])
   const [todayCount, setTodayCount] = useState(0)
   const [streak, setStreak] = useState(0)
   const [weeklyStats, setWeeklyStats] = useState([])
@@ -94,15 +95,17 @@ function OutreachTracker() {
     if (!currentPerson?.id) return
     setLoading(true)
     try {
-      const [dashStats, leadsData] = await Promise.all([
+      const [dashStats, leadsData, templateData] = await Promise.all([
         getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30 }),
-        getLeads({ stage: 'cold_outreach' }, currentPerson.id)
+        getLeads({ stage: 'cold_outreach' }, currentPerson.id),
+        getEmailTemplates().catch(() => [])
       ])
 
       setTodayCount(dashStats.todayCount)
       setStreak(dashStats.streak)
       setWeeklyStats(dashStats.dailyStats)
       setLeads(leadsData)
+      setTemplates(templateData)
 
       // Get outreaches based on filter
       const filters = {}
@@ -676,12 +679,28 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
             </div>
 
             <div className="form-group full-width">
-              <label>Message Content (What did you say?)</label>
+              <label>Message Sent</label>
+              {templates.length > 0 && (
+                <select
+                  style={{ marginBottom: '6px' }}
+                  defaultValue=""
+                  onChange={(e) => {
+                    const t = templates.find(t => String(t.id) === e.target.value)
+                    if (t) setNewOutreach({ ...newOutreach, message_content: t.body })
+                    e.target.value = ''
+                  }}
+                >
+                  <option value="">Use a template…</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              )}
               <textarea
                 value={newOutreach.message_content}
                 onChange={(e) => setNewOutreach({ ...newOutreach, message_content: e.target.value })}
-                placeholder="Copy/paste the actual message you sent..."
-                rows={4}
+                placeholder="Copy/paste or type the message you sent…"
+                rows={5}
               />
             </div>
 
@@ -1059,6 +1078,22 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
 
                   <div className="info-item full-width">
                     <label>Message Sent</label>
+                    {templates.length > 0 && (
+                      <select
+                        style={{ marginBottom: '6px' }}
+                        defaultValue=""
+                        onChange={(e) => {
+                          const t = templates.find(t => String(t.id) === e.target.value)
+                          if (t) setField('message_content', t.body)
+                          e.target.value = ''
+                        }}
+                      >
+                        <option value="">Use a template…</option>
+                        {templates.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    )}
                     <textarea
                       value={fv('message_content')}
                       onChange={(e) => setField('message_content', e.target.value)}
