@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../App'
-import { getOutreachStatsByPerson } from '../lib/crm-api'
+import { getOutreachStatsByPerson, getAllOutreachLogs, analyzeOutreach } from '../lib/crm-api'
 import { supabase } from '../lib/supabase'
-import { Send, MessageSquare, Calendar, TrendingUp } from 'lucide-react'
+import { Send, MessageSquare, Calendar, TrendingUp, Sparkles } from 'lucide-react'
 import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 
 // fromOffset = days back for range start, toOffset = days back for range end.
@@ -46,6 +46,9 @@ function Analytics() {
   const [personFilter, setPersonFilter] = useState(() =>
     isAdmin ? 'all' : (currentPerson?.id ? String(currentPerson.id) : 'all')
   )
+  const [insightLoading, setInsightLoading] = useState(false)
+  const [insight, setInsight] = useState(null)
+  const [insightError, setInsightError] = useState(null)
 
   // If currentPerson resolves after first render (auth race), backfill the
   // filter so non-admins don't briefly see 'all'.
@@ -166,6 +169,32 @@ function Analytics() {
   const weeksInWindow = Math.max(1, Math.ceil(days / 7))
   const annualProjection = Math.round((totalMeetings / weeksInWindow) * 52)
   const maxMeetingsWeek = Math.max(1, ...Object.values(meetingsByWeek))
+
+  async function runAnalysis() {
+    setInsightLoading(true)
+    setInsightError(null)
+    setInsight(null)
+    try {
+      const logs = await getAllOutreachLogs({
+        days_back: timeWin.fromOffset + 1,
+        logged_by: personFilter !== 'all' ? personFilter : undefined
+      })
+      const withText = logs.filter(e => e.message_content && String(e.message_content).trim().length > 10)
+      if (withText.length < 3) {
+        setInsightError(
+          `Only ${withText.length} message${withText.length === 1 ? '' : 's'} with text found in this window — need at least 3. ` +
+          'Add message text when logging outreach to enable this.'
+        )
+        return
+      }
+      const result = await analyzeOutreach(withText)
+      setInsight(result)
+    } catch (err) {
+      setInsightError(err.message)
+    } finally {
+      setInsightLoading(false)
+    }
+  }
 
   if (loading) {
     return <div className="loading">Loading analytics...</div>
@@ -386,6 +415,85 @@ function Analytics() {
             <div style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-500)' }}>No meeting data</div>
           )}
         </div>
+      </div>
+
+      {/* Message Insights */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+          <div>
+            <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={18} /> Message Insights
+            </h2>
+            <p style={{ color: 'var(--gray-500)', fontSize: '14px', margin: 0 }}>
+              AI analysis of which outreach messages get replies — uses the current window and person filter.
+            </p>
+          </div>
+          <button
+            className="btn btn-secondary"
+            onClick={runAnalysis}
+            disabled={insightLoading}
+            style={{ whiteSpace: 'nowrap', marginLeft: '16px', flexShrink: 0 }}
+          >
+            {insightLoading ? 'Analyzing…' : 'Run Analysis'}
+          </button>
+        </div>
+
+        {insightError && (
+          <div style={{ padding: '12px 16px', background: '#fee2e2', borderRadius: '8px', color: '#991b1b', fontSize: '14px', marginTop: '16px' }}>
+            {insightError}
+          </div>
+        )}
+
+        {insight && !insightLoading && (
+          <div style={{ marginTop: '20px' }}>
+            <div style={{ padding: '12px 16px', background: 'var(--gray-50)', borderRadius: '8px', marginBottom: '16px', fontSize: '14px', color: 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>{insight.summary}</span>
+              {insight.low_data && (
+                <span style={{ flexShrink: 0, fontSize: '12px', color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: '4px' }}>
+                  Small sample
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ textAlign: 'center', padding: '14px', background: '#dcfce7', borderRadius: '8px' }}>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: '#166534' }}>{insight.avg_words_replied}</div>
+                <div style={{ fontSize: '12px', color: '#166534', marginTop: '3px' }}>avg words — got reply</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '14px', background: '#fee2e2', borderRadius: '8px' }}>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: '#991b1b' }}>{insight.avg_words_not_replied}</div>
+                <div style={{ fontSize: '12px', color: '#991b1b', marginTop: '3px' }}>avg words — no reply</div>
+              </div>
+            </div>
+
+            {insight.observations.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {insight.observations.map((obs, i) => (
+                  <div key={i} style={{ padding: '12px 16px', border: '1px solid var(--gray-200)', borderRadius: '8px' }}>
+                    <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: obs.evidence ? '4px' : 0 }}>
+                      {obs.insight}
+                    </div>
+                    {obs.evidence && (
+                      <div style={{ fontSize: '13px', color: 'var(--gray-500)', fontStyle: 'italic' }}>
+                        e.g. "{obs.evidence}"
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginTop: '14px', fontSize: '12px', color: 'var(--gray-400)' }}>
+              Based on {insight.total_analyzed} messages with text ({insight.replied_count} replied) · {new Date(insight.analyzed_at).toLocaleString()}
+            </div>
+          </div>
+        )}
+
+        {!insight && !insightLoading && !insightError && (
+          <div style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-400)', fontSize: '14px' }}>
+            Click "Run Analysis" to surface patterns in your outreach messages for the selected window.
+          </div>
+        )}
       </div>
 
       {/* Daily heatmap — shown when a single person is selected */}
