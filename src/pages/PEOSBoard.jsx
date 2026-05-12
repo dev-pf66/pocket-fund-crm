@@ -102,10 +102,31 @@ function fromLocalIstInput(local) {
   return new Date(Date.UTC(y, m - 1, d, hh, mm) - 5.5 * 60 * 60 * 1000).toISOString()
 }
 
+// Mirrors the helper in Layout.jsx.
+const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
+function isAdminUser(person) {
+  if (!person) return false
+  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
+
 function PEOSBoard() {
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const { toast } = useToast()
   const isMobile = useIsMobileDevice()
+  const isAdmin = isAdminUser(currentPerson)
+
+  // Admin-only viewing scope. 'me' = own demos, 'all' = whole team
+  // (admin default so they land on the team view immediately), otherwise
+  // a specific person.id. Non-admins ignore this and stay scoped to
+  // themselves via the RLS belt-and-braces.
+  const [viewing, setViewing] = useSessionState('peos:viewing', 'all')
+  const viewingPersonId = !isAdmin
+    ? currentPerson?.id ?? null
+    : viewing === 'me'
+      ? currentPerson?.id ?? null
+      : viewing === 'all'
+        ? null
+        : viewing
   const [demos, setDemos] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingDemo, setEditingDemo] = useState(null)
@@ -116,13 +137,16 @@ function PEOSBoard() {
 
   useEffect(() => {
     loadDemos()
-  }, [currentPerson?.id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPerson?.id, viewing, isAdmin])
 
   async function loadDemos() {
     if (!currentPerson?.id) return
     setLoading(true)
     try {
-      const data = await getDemos(currentPerson.id)
+      // viewingPersonId is null when an admin selects 'Everyone' — getDemos
+      // with no person filter returns all rows RLS permits.
+      const data = await getDemos(viewingPersonId)
       setDemos(data)
     } catch (err) {
       console.error('Failed to load demos:', err)
@@ -222,12 +246,40 @@ function PEOSBoard() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <h1 style={{ margin: 0 }}>PE OS</h1>
-          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>Demo calls for the PE OS product</p>
+          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>
+            {isAdmin
+              ? 'Demo calls for the PE OS product (admin can view any teammate)'
+              : 'Demo calls for the PE OS product'}
+          </p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
           <Plus size={16} /> Add Demo
         </button>
       </div>
+
+      {/* Admin-only team switcher. Matches the Outreach Log pattern. */}
+      {isAdmin && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+            Viewing
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <ViewPill active={viewing === 'all'} onClick={() => setViewing('all')}>Everyone</ViewPill>
+            <ViewPill active={viewing === 'me'} onClick={() => setViewing('me')}>Me</ViewPill>
+            {(people || [])
+              .filter(p => p.id !== currentPerson?.id)
+              .map(p => (
+                <ViewPill
+                  key={p.id}
+                  active={String(viewing) === String(p.id)}
+                  onClick={() => setViewing(p.id)}
+                >
+                  {p.name}
+                </ViewPill>
+              ))}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
@@ -255,6 +307,7 @@ function PEOSBoard() {
         <MobileDemoList
           stages={STAGES}
           demosInStage={demosInStage}
+          showCreator={isAdmin && viewing === 'all'}
           onEdit={setEditingDemo}
           onDelete={handleDelete}
           onStageChange={handleStageChange}
@@ -287,6 +340,7 @@ function PEOSBoard() {
                     <DemoCard
                       key={d.id}
                       demo={d}
+                      showCreator={isAdmin && viewing === 'all'}
                       onEdit={() => setEditingDemo(d)}
                       onDelete={() => handleDelete(d.id)}
                       onDragStart={handleDragStart}
@@ -333,7 +387,7 @@ function PEOSBoard() {
   )
 }
 
-function DemoCard({ demo, onEdit, onDelete, onDragStart }) {
+function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart }) {
   return (
     <div
       draggable
@@ -363,6 +417,11 @@ function DemoCard({ demo, onEdit, onDelete, onDragStart }) {
           )}
           {demo.lead?.firm_name && (
             <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{demo.lead.firm_name}</div>
+          )}
+          {showCreator && demo.created_by_person?.name && (
+            <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px', fontStyle: 'italic' }}>
+              by {demo.created_by_person.name}
+            </div>
           )}
         </div>
         <button
@@ -420,7 +479,7 @@ function DemoCard({ demo, onEdit, onDelete, onDragStart }) {
   )
 }
 
-function MobileDemoList({ stages, demosInStage, onEdit, onDelete, onStageChange }) {
+function MobileDemoList({ stages, demosInStage, showCreator = false, onEdit, onDelete, onStageChange }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {stages.map(stage => {
@@ -439,6 +498,7 @@ function MobileDemoList({ stages, demosInStage, onEdit, onDelete, onStageChange 
                   key={d.id}
                   demo={d}
                   stages={stages}
+                  showCreator={showCreator}
                   onEdit={() => onEdit(d)}
                   onDelete={() => onDelete(d.id)}
                   onStageChange={(newStage) => onStageChange(d, newStage)}
@@ -452,7 +512,7 @@ function MobileDemoList({ stages, demosInStage, onEdit, onDelete, onStageChange 
   )
 }
 
-function MobileDemoCard({ demo, stages, onEdit, onDelete, onStageChange }) {
+function MobileDemoCard({ demo, stages, showCreator = false, onEdit, onDelete, onStageChange }) {
   return (
     <div
       onClick={onEdit}
@@ -479,6 +539,11 @@ function MobileDemoCard({ demo, stages, onEdit, onDelete, onStageChange }) {
           )}
           {demo.lead?.firm_name && (
             <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{demo.lead.firm_name}</div>
+          )}
+          {showCreator && demo.created_by_person?.name && (
+            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px', fontStyle: 'italic' }}>
+              by {demo.created_by_person.name}
+            </div>
           )}
         </div>
         <button
@@ -900,6 +965,27 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
         </form>
       </div>
     </div>
+  )
+}
+
+function ViewPill({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '6px 14px',
+        borderRadius: '999px',
+        border: active ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
+        background: active ? '#eff6ff' : 'white',
+        color: active ? '#1d4ed8' : '#111827',
+        fontSize: '13px',
+        fontWeight: active ? 600 : 500,
+        cursor: 'pointer',
+        transition: 'border-color 0.12s, background 0.12s'
+      }}
+    >
+      {children}
+    </button>
   )
 }
 

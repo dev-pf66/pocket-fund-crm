@@ -1563,6 +1563,434 @@ export async function analyzeOutreach(entries) {
 //
 // "Latest" is by outreach_date descending — replies override an earlier
 // 'sent' on the same lead, which is the behavior we want.
+// ============================================================================
+// GOALS SYSTEM
+// ============================================================================
+// Restored after the cleanup commit. The Goals page + the dashboard's
+// per-period progress counters depend on these.
+
+function getWeekStartDate(date = new Date()) {
+  return istWeekStart(istDateStr(date.getTime()))
+}
+
+/**
+ * Period-start (YYYY-MM-DD) for a given frequency.
+ * - daily:   today in IST
+ * - weekly:  Monday of this IST week
+ * - monthly: first day of this IST month
+ */
+export function getPeriodStart(frequency, date = new Date()) {
+  const d = new Date(date)
+  const istDate = istDateStr(d.getTime())
+  if (frequency === 'daily') return istDate
+  if (frequency === 'weekly') return istWeekStart(istDate)
+  if (frequency === 'monthly') return istDate.slice(0, 7) + '-01'
+  throw new Error(`Unknown frequency: ${frequency}`)
+}
+
+export async function getGoals(personId) {
+  const { data: goals, error } = await supabase
+    .from('crm_goals')
+    .select('*')
+    .eq('person_id', personId)
+    .eq('is_active', true)
+    .order('goal_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  if (!goals || goals.length === 0) return []
+
+  const goalIds = goals.map(g => g.id)
+  const { data: progressRows, error: progError } = await supabase
+    .from('crm_goal_progress')
+    .select('*')
+    .in('goal_id', goalIds)
+  if (progError) throw progError
+
+  return goals.map(goal => {
+    const periodStart = getPeriodStart(goal.frequency)
+    const row = progressRows?.find(p => p.goal_id === goal.id && p.period_start === periodStart)
+    return { ...goal, current_count: row?.count || 0, period_start: periodStart }
+  })
+}
+
+export async function createGoal(goalData) {
+  const { data, error } = await supabase
+    .from('crm_goals')
+    .insert([goalData])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateGoal(id, updates) {
+  const { data, error } = await supabase
+    .from('crm_goals')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteGoal(id) {
+  const { error } = await supabase
+    .from('crm_goals')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+/**
+ * Add `delta` (default +1) to the current period's progress row for a goal.
+ * Creates the row if missing. Floors the count at 0. Returns the new count.
+ */
+export async function incrementGoalProgress(goalId, delta = 1) {
+  const { data: goal, error: goalError } = await supabase
+    .from('crm_goals')
+    .select('frequency')
+    .eq('id', goalId)
+    .single()
+  if (goalError) throw goalError
+
+  const periodStart = getPeriodStart(goal.frequency)
+
+  const { data: existing, error: selError } = await supabase
+    .from('crm_goal_progress')
+    .select('id, count')
+    .eq('goal_id', goalId)
+    .eq('period_start', periodStart)
+    .maybeSingle()
+  if (selError) throw selError
+
+  if (existing) {
+    const newCount = Math.max(0, existing.count + delta)
+    const { data, error } = await supabase
+      .from('crm_goal_progress')
+      .update({ count: newCount })
+      .eq('id', existing.id)
+      .select()
+      .single()
+    if (error) throw error
+    return data.count
+  }
+
+  const initialCount = Math.max(0, delta)
+  const { data, error } = await supabase
+    .from('crm_goal_progress')
+    .insert([{ goal_id: goalId, period_start: periodStart, count: initialCount }])
+    .select()
+    .single()
+  if (error) throw error
+  return data.count
+}
+
+// ============================================================================
+// OUTREACH QUEUE API
+// ============================================================================
+
+// Bulk-create leads from a list of LinkedIn URLs. Dedupes against existing
+// leads (by normalized URL) and within the input itself. All new rows share
+// the same import_batch_id so the queue UI can group them. assigneeIds is
+// an optional array of person ids — leads round-robin across them; falls
+// back to the uploader when omitted.
+export async function bulkCreateLeads(urls, batchLabel, currentPersonId, assigneeIds = null) {
+  const cleaned = (urls || [])
+    .map(u => (u || '').trim())
+    .filter(u => u && normalizeLinkedInUrl(u))
+  if (cleaned.length === 0) {
+    return { added: 0, skipped: 0, batchId: null, batchLabel: null, leads: [] }
+  }
+
+  const seen = new Set()
+  const uniqueUrls = []
+  for (const url of cleaned) {
+    const norm = normalizeLinkedInUrl(url)
+    if (seen.has(norm)) continue
+    seen.add(norm)
+    uniqueUrls.push(url)
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from('crm_leads')
+    .select('linkedin_url')
+    .not('linkedin_url', 'is', null)
+  if (existingError) throw existingError
+  const existingNormalized = new Set(
+    (existing || []).map(l => normalizeLinkedInUrl(l.linkedin_url)).filter(Boolean)
+  )
+
+  const toInsert = uniqueUrls.filter(url => !existingNormalized.has(normalizeLinkedInUrl(url)))
+  const skipped = cleaned.length - toInsert.length
+
+  if (toInsert.length === 0) {
+    return { added: 0, skipped, batchId: null, batchLabel: null, leads: [] }
+  }
+
+  const batchId = crypto.randomUUID()
+  const label = (batchLabel || '').trim() || null
+  const now = new Date().toISOString()
+
+  const validAssignees = (assigneeIds || []).filter(Boolean)
+  const pool = validAssignees.length > 0 ? validAssignees : [currentPersonId]
+
+  const rows = toInsert.map((url, i) => ({
+    name: nameFromLinkedInUrl(url) || 'Unknown',
+    linkedin_url: url,
+    stage: 'new_lead',
+    lead_source: 'Bulk Import',
+    created_by: currentPersonId,
+    assigned_to: pool[i % pool.length],
+    last_activity_date: now,
+    last_activity_type: 'created',
+    import_batch_id: batchId,
+    import_batch_label: label
+  }))
+
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .insert(rows)
+    .select()
+  if (error) throw error
+
+  cacheClear('leads')
+  cacheClear('dashboard')
+
+  return { added: data.length, skipped, batchId, batchLabel: label, leads: data }
+}
+
+export async function getOutreachQueue(currentPersonId) {
+  if (!currentPersonId) return { leads: [], batchStats: {} }
+  const { data: queue, error } = await supabase
+    .from('crm_leads')
+    .select('*')
+    .eq('assigned_to', currentPersonId)
+    .eq('stage', 'new_lead')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+
+  const batchIds = [...new Set((queue || []).map(l => l.import_batch_id).filter(Boolean))]
+  const batchStats = {}
+  if (batchIds.length > 0) {
+    const { data: batchLeads, error: statsError } = await supabase
+      .from('crm_leads')
+      .select('import_batch_id, stage')
+      .eq('assigned_to', currentPersonId)
+      .in('import_batch_id', batchIds)
+    if (statsError) throw statsError
+    for (const row of batchLeads || []) {
+      const id = row.import_batch_id
+      if (!batchStats[id]) batchStats[id] = { total: 0, contacted: 0 }
+      batchStats[id].total += 1
+      if (row.stage !== 'new_lead') batchStats[id].contacted += 1
+    }
+  }
+  return { leads: queue || [], batchStats }
+}
+
+// Mark a queued lead as reached out: logs a LinkedIn outreach entry and
+// transitions the lead to 'cold_outreach' so it drops out of the queue.
+export async function markLeadReachedOut(lead, currentPersonId, currentPersonName) {
+  await logOutreach({
+    lead_id: lead.id,
+    lead_name: lead.name,
+    firm_name: lead.firm_name || '',
+    outreach_type: 'linkedin_message',
+    status: 'sent',
+    platform_details: lead.linkedin_url || ''
+  }, currentPersonId, currentPersonName)
+
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .update({
+      stage: 'cold_outreach',
+      last_activity_date: new Date().toISOString(),
+      last_activity_type: 'outreach'
+    })
+    .eq('id', lead.id)
+    .select()
+    .single()
+  if (error) throw error
+
+  cacheClear('leads')
+  cacheClear('dashboard')
+  return data
+}
+
+// ============================================================================
+// PE OS DEMOS
+// ============================================================================
+// Restored after a cleanup commit briefly dropped them. The PE OS page and
+// the Sales Pipeline's "PE OS" filter pill both depend on these.
+
+// Fetch demos with the linked lead's basic fields embedded (so kanban cards
+// can show name + firm without a follow-up query) and the creator's basic
+// person row (so admin team views can show 'by Gaurav' on each card).
+// When personId is provided, scopes to that person's demos; admins pass
+// null to see everything RLS permits.
+export async function getDemos(personId = null) {
+  let q = supabase
+    .from('crm_demos')
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, email, linkedin_url, stage),
+      created_by_person:created_by(id, name, email)
+    `)
+    .order('updated_at', { ascending: false })
+  if (personId) q = q.eq('created_by', personId)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+
+export async function createDemo(demoData, currentPersonId) {
+  const { data, error } = await supabase
+    .from('crm_demos')
+    .insert([{ ...demoData, created_by: currentPersonId }])
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, email, linkedin_url, stage),
+      created_by_person:created_by(id, name, email)
+    `)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateDemo(id, updates) {
+  const cleanUpdates = {}
+  Object.keys(updates).forEach(key => {
+    if (['id', 'created_at', 'updated_at', 'created_by', 'lead', 'created_by_person'].includes(key)) return
+    if (updates[key] !== undefined) cleanUpdates[key] = updates[key]
+  })
+  const { data, error } = await supabase
+    .from('crm_demos')
+    .update(cleanUpdates)
+    .eq('id', id)
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, email, linkedin_url, stage),
+      created_by_person:created_by(id, name, email)
+    `)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function moveDemo(id, stage) {
+  const { data, error } = await supabase
+    .from('crm_demos')
+    .update({ stage })
+    .eq('id', id)
+    .select(`
+      *,
+      lead:crm_leads(id, name, firm_name, email, linkedin_url, stage),
+      created_by_person:created_by(id, name, email)
+    `)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteDemo(id) {
+  const { error } = await supabase
+    .from('crm_demos')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+// Distinct lead_ids that appear in crm_demos. Feeds the Sales Pipeline's
+// "PE OS" filter pill so leads with at least one demo can be surfaced
+// without loading the full demo rows.
+export async function getDemoLeadIds(personId = null) {
+  let q = supabase.from('crm_demos').select('lead_id')
+  if (personId) q = q.eq('created_by', personId)
+  const { data, error } = await q
+  if (error) throw error
+  return new Set((data || []).map(r => r.lead_id).filter(Boolean))
+}
+
+// ============================================================================
+// GENERIC FIELD OPTIONS (industry, deal_size, location, lead_source)
+// ============================================================================
+// Restored after the cleanup commit dropped them. useFieldOptions and
+// useLeadTypes still import these so dropdowns across the app depend on
+// them.
+
+export async function getFieldOptions(fieldName) {
+  const cacheKey = `field_options:${fieldName}`
+  const cached = cacheGet(cacheKey, 60000)
+  if (cached) return cached
+  const { data, error } = await supabase
+    .from('crm_field_options')
+    .select('*')
+    .eq('field_name', fieldName)
+    .order('sort_order', { ascending: true })
+    .order('value', { ascending: true })
+  if (error) throw error
+  cacheSet(cacheKey, data)
+  return data
+}
+
+export async function addFieldOption(fieldName, value) {
+  const { data, error } = await supabase
+    .from('crm_field_options')
+    .insert([{ field_name: fieldName, value: value.trim(), sort_order: 999 }])
+    .select()
+    .single()
+  if (error) throw error
+  cacheClear(`field_options:${fieldName}`)
+  return data
+}
+
+export async function deleteFieldOption(id, fieldName) {
+  const { error } = await supabase
+    .from('crm_field_options')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+  cacheClear(`field_options:${fieldName}`)
+}
+
+// ============================================================================
+// LEAD TYPE OPTIONS
+// ============================================================================
+
+export async function getLeadTypeOptions() {
+  const cached = cacheGet('lead_type_options', 60000)
+  if (cached) return cached
+  const { data, error } = await supabase
+    .from('crm_lead_type_options')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true })
+  if (error) throw error
+  cacheSet('lead_type_options', data)
+  return data
+}
+
+export async function addLeadTypeOption(name) {
+  const { data, error } = await supabase
+    .from('crm_lead_type_options')
+    .insert([{ name: name.trim(), sort_order: 999 }])
+    .select()
+    .single()
+  if (error) throw error
+  cacheClear('lead_type_options')
+  return data
+}
+
+export async function deleteLeadTypeOption(id) {
+  const { error } = await supabase
+    .from('crm_lead_type_options')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+  cacheClear('lead_type_options')
+}
+
 export async function getLeadLatestOutreachStatus(personId = null) {
   let q = supabase
     .from('crm_outreach_log')
