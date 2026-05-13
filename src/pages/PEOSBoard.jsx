@@ -54,6 +54,36 @@ function keennessColor(v) {
   return '#9ca3af'
 }
 
+// B2B sales context: what the firm already runs, when they'd decide, how
+// much budget they have. Stored as raw strings / arrays — the UI maps to
+// labels but the DB stays flexible so we can extend without a migration.
+const CURRENT_TOOLS_OPTIONS = [
+  'Excel', 'Affinity', 'DealCloud', 'Dynamo',
+  'Salesforce', 'HubSpot', 'Notion', 'Airtable',
+  'Custom', 'None', 'Other'
+]
+
+const DECISION_TIMELINE_OPTIONS = [
+  { value: 'now',          label: 'Now',           color: '#dc2626' },
+  { value: 'next_quarter', label: 'Next quarter',  color: '#d97706' },
+  { value: 'next_6mo',     label: 'Next 6 months', color: '#ca8a04' },
+  { value: 'no_rush',      label: 'No rush',       color: '#6b7280' }
+]
+const DECISION_TIMELINE_BY_VALUE = Object.fromEntries(
+  DECISION_TIMELINE_OPTIONS.map(o => [o.value, o])
+)
+
+const BUDGET_SIGNAL_OPTIONS = [
+  { value: 'no_budget',  label: 'No budget',  color: '#9ca3af' },
+  { value: 'small',      label: 'Small',      color: '#60a5fa' },
+  { value: 'mid',        label: 'Mid',        color: '#10b981' },
+  { value: 'enterprise', label: 'Enterprise', color: '#16a34a' },
+  { value: 'unknown',    label: 'Unknown',    color: '#9ca3af' }
+]
+const BUDGET_SIGNAL_BY_VALUE = Object.fromEntries(
+  BUDGET_SIGNAL_OPTIONS.map(o => [o.value, o])
+)
+
 function fmtDate(dateStr) {
   if (!dateStr) return null
   const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00')
@@ -443,6 +473,18 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart }) 
             <Calendar size={11} /> {fmtDate(demo.demo_date)}
           </span>
         ) : null}
+        {demo.calendar_invite_url && (
+          <a
+            href={demo.calendar_invite_url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title="Open calendar invite"
+            style={{ color: '#1d4ed8', display: 'inline-flex' }}
+          >
+            <ExternalLink size={11} />
+          </a>
+        )}
         {demo.keenness && (
           <span
             title={`Keenness: ${KEENNESS_OPTIONS.find(o => o.value === demo.keenness)?.label || demo.keenness}/5`}
@@ -454,6 +496,21 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart }) 
             }}
           >
             {demo.keenness}/5
+          </span>
+        )}
+        {/* Only urgent decision-timeline values get a card pill — the
+            non-urgent ones (next_6mo / no_rush) would just be noise. */}
+        {(demo.decision_timeline === 'now' || demo.decision_timeline === 'next_quarter') && (
+          <span
+            title={`Decision timeline: ${DECISION_TIMELINE_BY_VALUE[demo.decision_timeline].label}`}
+            style={{
+              fontSize: '10px', fontWeight: 600,
+              padding: '1px 6px', borderRadius: '999px',
+              background: DECISION_TIMELINE_BY_VALUE[demo.decision_timeline].color + '22',
+              color: DECISION_TIMELINE_BY_VALUE[demo.decision_timeline].color
+            }}
+          >
+            {DECISION_TIMELINE_BY_VALUE[demo.decision_timeline].label}
           </span>
         )}
         {demo.firm_size && (
@@ -620,6 +677,13 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
     team_size: demo?.team_size || '',
     firm_size: demo?.firm_size || '',
     keenness: demo?.keenness ?? '',
+    // B2B sales context
+    current_tools: Array.isArray(demo?.current_tools) ? demo.current_tools : [],
+    decision_timeline: demo?.decision_timeline || '',
+    budget_signal: demo?.budget_signal || '',
+    integrations_needed: demo?.integrations_needed || '',
+    objections: demo?.objections || '',
+    calendar_invite_url: demo?.calendar_invite_url || '',
     use_case: demo?.use_case || '',
     feedback: demo?.feedback || '',
     transcript: demo?.transcript || '',
@@ -716,6 +780,12 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
         : Number(payload.keenness)
       if (!payload.firm_size) payload.firm_size = null
       if (!payload.team_size) payload.team_size = null
+      if (!payload.decision_timeline) payload.decision_timeline = null
+      if (!payload.budget_signal) payload.budget_signal = null
+      if (!payload.integrations_needed) payload.integrations_needed = null
+      if (!payload.objections) payload.objections = null
+      if (!payload.calendar_invite_url) payload.calendar_invite_url = null
+      if (!Array.isArray(payload.current_tools)) payload.current_tools = []
       // lead_id can't change on edit — strip it to avoid sending to update.
       if (isEdit) delete payload.lead_id
       await onSave(payload)
@@ -900,6 +970,83 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
             </div>
           </div>
 
+          {/* B2B sales context — what they're using, how soon, how much,
+              what would need to integrate, and reasons they couldn't sign. */}
+          <div className="form-group">
+            <label>Current Tools</label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {CURRENT_TOOLS_OPTIONS.map(tool => {
+                const selected = (form.current_tools || []).includes(tool)
+                return (
+                  <button
+                    key={tool}
+                    type="button"
+                    onClick={() => {
+                      const cur = form.current_tools || []
+                      update('current_tools', selected ? cur.filter(t => t !== tool) : [...cur, tool])
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      border: selected ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
+                      background: selected ? '#eff6ff' : 'white',
+                      color: selected ? '#1d4ed8' : '#374151',
+                      fontSize: '12px',
+                      fontWeight: selected ? 600 : 500,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {tool}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
+              Pick everything they mentioned — multi-select.
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Decision Timeline</label>
+              <select value={form.decision_timeline} onChange={e => update('decision_timeline', e.target.value)}>
+                <option value="">—</option>
+                {DECISION_TIMELINE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Budget Signal</label>
+              <select value={form.budget_signal} onChange={e => update('budget_signal', e.target.value)}>
+                <option value="">—</option>
+                {BUDGET_SIGNAL_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Integrations Needed</label>
+            <textarea
+              value={form.integrations_needed}
+              onChange={e => update('integrations_needed', e.target.value)}
+              placeholder="What systems do they need PE OS to talk to? (CRM, data providers, accounting, etc.)"
+              rows={2}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Calendar Invite Link</label>
+            <input
+              type="url"
+              value={form.calendar_invite_url}
+              onChange={e => update('calendar_invite_url', e.target.value)}
+              placeholder="https://calendar.google.com/event?..."
+            />
+          </div>
+
           <div className="form-group">
             <label>Use Case</label>
             <textarea
@@ -915,7 +1062,17 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
             <textarea
               value={form.feedback}
               onChange={e => update('feedback', e.target.value)}
-              placeholder="What they liked, didn't like, objections…"
+              placeholder="What they liked, what resonated, general reaction…"
+              rows={3}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Objections</label>
+            <textarea
+              value={form.objections}
+              onChange={e => update('objections', e.target.value)}
+              placeholder="Specific reasons they couldn't sign — pricing, integrations, internal politics, etc. Keeps deal blockers separate from general feedback."
               rows={3}
             />
           </div>
