@@ -76,6 +76,34 @@ export async function setUserAdmin(id, isAdmin) {
   return data[0]
 }
 
+// Generate a share-friendly temporary password. Avoids look-alike
+// characters (0/O, 1/l/I) so admins can read it over chat without typos.
+export function generateTempPassword(len = 16) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  const arr = new Uint8Array(len)
+  crypto.getRandomValues(arr)
+  return Array.from(arr, b => chars[b % chars.length]).join('')
+}
+
+// Admin-only: hard-set a teammate's password without involving email.
+// Routes through /api/admin/reset-password which uses the service role.
+// Caller must be signed in as an admin; the endpoint re-verifies.
+export async function adminSetUserPassword(targetEmail, newPassword) {
+  if (!targetEmail) throw new Error('email is required')
+  if (!newPassword || newPassword.length < 8) throw new Error('Password must be at least 8 characters')
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not signed in')
+  const res = await fetch('/api/admin/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ target_email: targetEmail, new_password: newPassword })
+  })
+  let body = null
+  try { body = await res.json() } catch { /* empty body */ }
+  if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`)
+  return body
+}
+
 // Trigger Supabase's password-recovery email for a teammate. The link in
 // the email lands on /reset-password where they set a new password
 // (existing PASSWORD_RECOVERY handler in ResetPassword.jsx). redirectTo

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
-import { getPeople, setUserAdmin, deleteUser, sendPasswordResetEmail } from '../lib/supabase'
+import { getPeople, setUserAdmin, deleteUser, sendPasswordResetEmail, adminSetUserPassword, generateTempPassword } from '../lib/supabase'
 import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
 import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound } from 'lucide-react'
@@ -112,6 +112,11 @@ function Admin() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [actingId, setActingId] = useState(null)
+  // Reset-password modal: { user, password, saving, applied }
+  const [resetTarget, setResetTarget] = useState(null)
+  const [resetPasswordValue, setResetPasswordValue] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [resetApplied, setResetApplied] = useState(false)
 
   // Lead type state
   const [leadTypes, setLeadTypes] = useState([])
@@ -170,24 +175,53 @@ function Admin() {
     }
   }
 
-  async function handleResetPassword(user) {
+  function openResetPasswordModal(user) {
     const label = user.name || user.email
     if (!user.email) {
-      toast.error(`No email on file for ${label} — can't send a reset link.`)
+      toast.error(`No email on file for ${label} — can't reset password.`)
       return
     }
-    if (!confirm(`Send a password-reset email to ${user.email}? They'll get a link to set a new password.`)) return
-
-    setActingId(user.id)
-    try {
-      await sendPasswordResetEmail(user.email)
-      toast.success(`Reset link sent to ${user.email}`)
-    } catch (err) {
-      console.error('Failed to send reset email:', err)
-      toast.error(`Failed to send reset link: ${err.message}`)
-    } finally {
-      setActingId(null)
+    if (currentPerson?.id === user.id) {
+      toast.warn("Use your own account settings to change your password.")
+      return
     }
+    setResetTarget(user)
+    setResetPasswordValue(generateTempPassword(16))
+    setResetApplied(false)
+  }
+
+  function closeResetPasswordModal() {
+    setResetTarget(null)
+    setResetPasswordValue('')
+    setResetApplied(false)
+    setResetting(false)
+  }
+
+  async function handleApplyResetPassword() {
+    if (!resetTarget?.email) return
+    if (resetPasswordValue.length < 8) {
+      toast.warn('Password must be at least 8 characters.')
+      return
+    }
+    setResetting(true)
+    try {
+      await adminSetUserPassword(resetTarget.email, resetPasswordValue)
+      setResetApplied(true)
+      toast.success(`Password set for ${resetTarget.email}`)
+    } catch (err) {
+      console.error('Failed to reset password:', err)
+      toast.error(`Failed to reset: ${err.message}`)
+    } finally {
+      setResetting(false)
+    }
+  }
+
+  function copyResetPassword() {
+    if (!resetPasswordValue) return
+    navigator.clipboard?.writeText(resetPasswordValue).then(
+      () => toast.success('Password copied'),
+      () => toast.warn('Copy failed — select the password and copy manually')
+    )
   }
 
   async function handleRemove(user) {
@@ -409,9 +443,13 @@ function Admin() {
                           </button>
                           <button
                             className="btn btn-sm"
-                            onClick={() => handleResetPassword(u)}
-                            disabled={busy || !u.email}
-                            title={u.email ? `Send a password-reset email to ${u.email}` : 'No email on file'}
+                            onClick={() => openResetPasswordModal(u)}
+                            disabled={busy || !u.email || isSelf}
+                            title={
+                              isSelf ? "Use your own account settings to change your password"
+                              : u.email ? `Set a new password for ${u.email}`
+                              : 'No email on file'
+                            }
                           >
                             <KeyRound size={14} /> Reset password
                           </button>
@@ -434,6 +472,89 @@ function Admin() {
           </div>
         )}
       </div>
+
+      {resetTarget && (
+        <div
+          onClick={closeResetPasswordModal}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '10px', padding: '24px',
+              width: '90%', maxWidth: '460px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+            }}
+          >
+            <h2 style={{ margin: '0 0 6px', fontSize: '18px' }}>
+              {resetApplied ? 'Password set' : 'Reset password'}
+            </h2>
+            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+              {resetTarget.name || resetTarget.email}
+              <span style={{ color: '#9ca3af' }}> · {resetTarget.email}</span>
+            </div>
+
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+              New password
+            </label>
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+              <input
+                type="text"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+                disabled={resetting}
+                style={{
+                  flex: 1, padding: '10px 12px',
+                  border: '1px solid #d1d5db', borderRadius: '6px',
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                  fontSize: '14px'
+                }}
+              />
+              <button
+                className="btn btn-sm"
+                onClick={() => setResetPasswordValue(generateTempPassword(16))}
+                disabled={resetting}
+                title="Generate a new random password"
+              >
+                Regenerate
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={copyResetPassword}
+                disabled={!resetPasswordValue}
+              >
+                Copy
+              </button>
+            </div>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '20px' }}>
+              {resetApplied ? (
+                <>Password applied. Copy and share it with {resetTarget.name || resetTarget.email} — they can change it after signing in.</>
+              ) : (
+                <>Share this password with them after you save. They can change it from their account once signed in.</>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="btn btn-secondary" onClick={closeResetPasswordModal} disabled={resetting}>
+                {resetApplied ? 'Close' : 'Cancel'}
+              </button>
+              {!resetApplied && (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleApplyResetPassword}
+                  disabled={resetting || resetPasswordValue.length < 8}
+                >
+                  {resetting ? 'Saving…' : 'Set password'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
