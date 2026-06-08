@@ -117,23 +117,44 @@ export async function sendPasswordResetEmail(email) {
 }
 
 export async function deleteUser(id) {
-  // Null out all FK references to this person before deleting.
-  // The supabase-migration-admin-rls.sql migration adds ON DELETE SET NULL
-  // to these constraints, but we do it explicitly here as a safe fallback
-  // in case that migration hasn't been applied.
+  // Null out FK references to this person before deleting them.
+  // supabase-migration-admin-rls.sql adds ON DELETE SET NULL to these
+  // constraints, but we do it explicitly here as a fallback. Each null-out
+  // is tolerant of missing tables/columns — e.g. if a project never created
+  // crm_email_templates, we shouldn't block the user-removal because of it.
+  //
+  // Postgres error codes:
+  //   42P01 — undefined_table (table doesn't exist)
+  //   42703 — undefined_column (column doesn't exist)
+  // PostgREST also surfaces these as "PGRST205 / PGRST204" with the same
+  // message about schema cache, so we match on both.
+  function isMissingSchemaError(error) {
+    if (!error) return false
+    if (error.code === '42P01' || error.code === '42703') return true
+    if (error.code === 'PGRST205' || error.code === 'PGRST204') return true
+    const msg = String(error.message || '').toLowerCase()
+    return msg.includes('schema cache') || msg.includes('does not exist')
+  }
+
   const nullOuts = [
-    supabase.from('crm_leads').update({ created_by: null }).eq('created_by', id),
-    supabase.from('crm_leads').update({ assigned_to: null }).eq('assigned_to', id),
-    supabase.from('crm_leads').update({ assigned_by: null }).eq('assigned_by', id),
-    supabase.from('crm_lead_activities').update({ logged_by: null }).eq('logged_by', id),
-    supabase.from('crm_outreach_log').update({ logged_by: null }).eq('logged_by', id),
-    supabase.from('crm_sample_deals').update({ created_by: null }).eq('created_by', id),
-    supabase.from('crm_email_templates').update({ created_by: null }).eq('created_by', id),
-    supabase.from('crm_transcripts').update({ created_by: null }).eq('created_by', id),
+    ['crm_leads', 'created_by'],
+    ['crm_leads', 'assigned_to'],
+    ['crm_leads', 'assigned_by'],
+    ['crm_lead_activities', 'logged_by'],
+    ['crm_outreach_log', 'logged_by'],
+    ['crm_sample_deals', 'created_by'],
+    ['crm_email_templates', 'created_by'],
+    ['crm_transcripts', 'created_by']
   ]
-  const results = await Promise.all(nullOuts)
-  for (const { error } of results) {
-    if (error) throw error
+
+  for (const [table, column] of nullOuts) {
+    const { error } = await supabase.from(table).update({ [column]: null }).eq(column, id)
+    if (!error) continue
+    if (isMissingSchemaError(error)) {
+      console.warn(`deleteUser: skipping ${table}.${column} — ${error.message}`)
+      continue
+    }
+    throw error
   }
 
   const { data, error } = await supabase
