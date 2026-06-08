@@ -76,6 +76,18 @@ export async function setUserAdmin(id, isAdmin) {
   return data[0]
 }
 
+// Trigger Supabase's password-recovery email for a teammate. The link in
+// the email lands on /reset-password where they set a new password
+// (existing PASSWORD_RECOVERY handler in ResetPassword.jsx). redirectTo
+// derives from window.location.origin so prod, previews, and local dev
+// all route correctly.
+export async function sendPasswordResetEmail(email) {
+  if (!email) throw new Error('email is required')
+  const redirectTo = `${window.location.origin}/reset-password`
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+  if (error) throw error
+}
+
 export async function deleteUser(id) {
   // Null out all FK references to this person before deleting.
   // The supabase-migration-admin-rls.sql migration adds ON DELETE SET NULL

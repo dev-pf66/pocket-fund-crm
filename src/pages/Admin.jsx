@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
-import { getPeople, setUserAdmin, deleteUser } from '../lib/supabase'
+import { getPeople, setUserAdmin, deleteUser, sendPasswordResetEmail } from '../lib/supabase'
 import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
-import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List } from 'lucide-react'
+import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound } from 'lucide-react'
 
 // Fallback bootstrap admin — used until the is_admin column is populated.
 // Once the migration seeds is_admin=true for this email, this is moot.
@@ -165,6 +165,26 @@ function Admin() {
     } catch (err) {
       console.error('Failed to toggle admin:', err)
       toast.error('Failed to update admin status')
+    } finally {
+      setActingId(null)
+    }
+  }
+
+  async function handleResetPassword(user) {
+    const label = user.name || user.email
+    if (!user.email) {
+      toast.error(`No email on file for ${label} — can't send a reset link.`)
+      return
+    }
+    if (!confirm(`Send a password-reset email to ${user.email}? They'll get a link to set a new password.`)) return
+
+    setActingId(user.id)
+    try {
+      await sendPasswordResetEmail(user.email)
+      toast.success(`Reset link sent to ${user.email}`)
+    } catch (err) {
+      console.error('Failed to send reset email:', err)
+      toast.error(`Failed to send reset link: ${err.message}`)
     } finally {
       setActingId(null)
     }
@@ -386,6 +406,14 @@ function Admin() {
                           >
                             {u.is_admin ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
                             {u.is_admin ? 'Demote' : 'Make admin'}
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => handleResetPassword(u)}
+                            disabled={busy || !u.email}
+                            title={u.email ? `Send a password-reset email to ${u.email}` : 'No email on file'}
+                          >
+                            <KeyRound size={14} /> Reset password
                           </button>
                           <button
                             className="btn btn-sm"
