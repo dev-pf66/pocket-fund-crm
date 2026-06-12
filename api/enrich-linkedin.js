@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { isAuthorized } from './_auth.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -8,12 +9,6 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 })
-
-function authenticate(req) {
-  const apiKey = req.headers['x-api-key'] || req.query.api_key
-  const validKey = process.env.CRM_API_KEY
-  return apiKey === validKey
-}
 
 function isValidLinkedInUrl(url) {
   try {
@@ -29,7 +24,7 @@ function isValidLinkedInUrl(url) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, Authorization')
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
@@ -39,8 +34,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  if (!authenticate(req)) {
-    return res.status(401).json({ error: 'Unauthorized. Provide valid x-api-key header.' })
+  if (!(await isAuthorized(req))) {
+    return res.status(401).json({ error: 'Unauthorized. Sign in or provide a valid x-api-key header.' })
   }
 
   const { leadId, linkedinUrl, context } = req.body

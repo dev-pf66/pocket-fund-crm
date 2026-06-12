@@ -1075,14 +1075,15 @@ export async function enrichLeadFromLinkedIn(leadId, linkedinUrl) {
     enrichment_status: 'enriching'
   })
 
-  const apiKey = import.meta.env.VITE_CRM_API_KEY || 'your-secret-api-key-here'
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not signed in')
 
   try {
     const response = await fetch('/api/enrich-linkedin', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey
+        Authorization: `Bearer ${session.access_token}`
       },
       body: JSON.stringify({
         leadId,
@@ -1114,12 +1115,13 @@ export async function enrichLeadFromLinkedIn(leadId, linkedinUrl) {
  * Returns { suggested_name, suggested_lead_type, linkedin_headline, current_position, past_experience, education, enrichment_notes }.
  */
 export async function previewLinkedInEnrichment(linkedinUrl, context = {}) {
-  const apiKey = import.meta.env.VITE_CRM_API_KEY
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not signed in')
   const response = await fetch('/api/enrich-linkedin', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey
+      Authorization: `Bearer ${session.access_token}`
     },
     body: JSON.stringify({ linkedinUrl, context })
   })
@@ -1455,13 +1457,14 @@ export async function logActivityManual(activityData) {
  * Returns the analysis object or throws on failure.
  */
 export async function analyzeTranscript(transcriptId, transcriptText) {
-  const apiKey = import.meta.env.VITE_CRM_API_KEY || 'your-secret-api-key-here'
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not signed in')
 
   const response = await fetch('/api/analyze-transcript', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey
+      Authorization: `Bearer ${session.access_token}`
     },
     body: JSON.stringify({
       transcript_id: transcriptId,
@@ -1545,10 +1548,11 @@ export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
 // avg_words_replied, avg_words_not_replied, low_data, total_analyzed,
 // replied_count, analyzed_at }.
 export async function analyzeOutreach(entries) {
-  const apiKey = import.meta.env.VITE_CRM_API_KEY
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not signed in')
   const response = await fetch('/api/analyze-outreach', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify({ entries })
   })
   const result = await response.json()

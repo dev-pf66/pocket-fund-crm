@@ -1,11 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { isAuthorized } from './_auth.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-function authenticate(req) {
-  const apiKey = req.headers['x-api-key'] || req.query.api_key
-  return apiKey === process.env.CRM_API_KEY
-}
 
 function wordCount(text) {
   return String(text || '').trim().split(/\s+/).filter(Boolean).length
@@ -19,10 +15,10 @@ function avgWords(arr) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  if (!authenticate(req)) return res.status(401).json({ error: 'Unauthorized' })
+  if (!(await isAuthorized(req))) return res.status(401).json({ error: 'Unauthorized' })
 
   const { entries } = req.body
   if (!Array.isArray(entries) || entries.length === 0) {
