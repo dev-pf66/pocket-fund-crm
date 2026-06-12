@@ -94,11 +94,18 @@ function LeadForm({ onClose, onSave, lead = null }) {
 
     setLoading(true)
     try {
+      // outreach_stage has a DB CHECK constraint that only allows specific
+      // values or NULL — the "Not set" option sends '' which violates it.
+      // Coerce empty string to null so the row inserts cleanly.
+      const payload = {
+        ...formData,
+        outreach_stage: formData.outreach_stage || null
+      }
       let saved
       if (lead?.id) {
-        saved = await updateLead(lead.id, formData)
+        saved = await updateLead(lead.id, payload)
       } else {
-        saved = await createLead(formData, currentPerson.id)
+        saved = await createLead(payload, currentPerson.id)
       }
       clearFormData()
       onSave(saved)

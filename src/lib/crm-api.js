@@ -149,10 +149,15 @@ export async function findLeadByLinkedInUrl(linkedinUrl) {
 }
 
 export async function createLead(leadData, currentPersonId) {
+  // outreach_stage has a CHECK constraint allowing only specific values or
+  // NULL; coerce an empty string ('Not set') to null so the insert passes.
+  const clean = { ...leadData }
+  if (clean.outreach_stage === '') clean.outreach_stage = null
+
   const { data, error } = await supabase
     .from('crm_leads')
     .insert([{
-      ...leadData,
+      ...clean,
       created_by: currentPersonId,
       last_activity_date: new Date().toISOString(),
       last_activity_type: 'created'
@@ -190,6 +195,10 @@ export async function updateLead(id, updates) {
       cleanUpdates[key] = updates[key]
     }
   })
+
+  // outreach_stage has a CHECK constraint (specific values or NULL); an
+  // empty string from a "Not set" dropdown would violate it.
+  if (cleanUpdates.outreach_stage === '') cleanUpdates.outreach_stage = null
 
   // If a stage change is in the updates, grab the prior stage so we can
   // fire lead_stage_changed with oldStage when it actually moves. Only
