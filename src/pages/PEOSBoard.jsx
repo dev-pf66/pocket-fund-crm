@@ -159,8 +159,13 @@ function toLocalIstInput(ts) {
   if (!ts) return ''
   const d = new Date(ts)
   if (Number.isNaN(d.getTime())) return ''
-  // Shift into IST then format. Don't use toISOString because that's UTC.
-  const ist = new Date(d.getTime() + (5.5 * 60 * 60 * 1000) - (d.getTimezoneOffset() * 60 * 1000))
+  // Shift the UTC instant forward into IST wall-clock, then read the digits
+  // off toISOString (which always formats in UTC, so the digits ARE the IST
+  // wall time). Do NOT subtract getTimezoneOffset — toISOString already
+  // ignores the browser's local zone, and including it double-shifted the
+  // value on non-UTC machines (e.g. +5.5h on an IST browser), which drifted
+  // the saved time on every edit.
+  const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000)
   return ist.toISOString().slice(0, 16)
 }
 
@@ -246,6 +251,9 @@ function PEOSBoard() {
       return (
         name.toLowerCase().includes(q) ||
         firm.toLowerCase().includes(q) ||
+        (d.contact_name || '').toLowerCase().includes(q) ||
+        (d.contact_firm || '').toLowerCase().includes(q) ||
+        (d.designation || '').toLowerCase().includes(q) ||
         (d.use_case || '').toLowerCase().includes(q) ||
         (d.feedback || '').toLowerCase().includes(q) ||
         (d.next_steps || '').toLowerCase().includes(q)
@@ -538,11 +546,19 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart }) 
             >
               {demo.lead.name}
             </Link>
+          ) : demo.contact_name ? (
+            <div style={{ color: '#111827', fontWeight: 600, fontSize: '13px', lineHeight: 1.3 }}>{demo.contact_name}</div>
           ) : (
             <div style={{ color: '#9ca3af', fontWeight: 600, fontSize: '13px' }}>No lead linked</div>
           )}
-          {demo.lead?.firm_name && (
-            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{demo.lead.firm_name}</div>
+          {(demo.contact_firm || demo.lead?.firm_name) && (
+            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{demo.contact_firm || demo.lead.firm_name}</div>
+          )}
+          {(demo.designation || (demo.contact_name && demo.lead && demo.contact_name !== demo.lead.name)) && (
+            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+              {[demo.contact_name && demo.lead && demo.contact_name !== demo.lead.name ? demo.contact_name : null, demo.designation]
+                .filter(Boolean).join(' · ')}
+            </div>
           )}
           {showCreator && demo.created_by_person?.name && (
             <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px', fontStyle: 'italic' }}>
@@ -687,11 +703,19 @@ function MobileDemoCard({ demo, stages, showCreator = false, onEdit, onDelete, o
             >
               {demo.lead.name}
             </Link>
+          ) : demo.contact_name ? (
+            <span style={{ color: '#111827', fontWeight: 600, fontSize: '15px' }}>{demo.contact_name}</span>
           ) : (
             <span style={{ color: '#9ca3af', fontWeight: 600, fontSize: '15px' }}>No lead linked</span>
           )}
-          {demo.lead?.firm_name && (
-            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{demo.lead.firm_name}</div>
+          {(demo.contact_firm || demo.lead?.firm_name) && (
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{demo.contact_firm || demo.lead.firm_name}</div>
+          )}
+          {(demo.designation || (demo.contact_name && demo.lead && demo.contact_name !== demo.lead.name)) && (
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+              {[demo.contact_name && demo.lead && demo.contact_name !== demo.lead.name ? demo.contact_name : null, demo.designation]
+                .filter(Boolean).join(' · ')}
+            </div>
           )}
           {showCreator && demo.created_by_person?.name && (
             <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px', fontStyle: 'italic' }}>
@@ -766,6 +790,11 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
 
   const [form, setForm] = useState({
     lead_id: demo?.lead_id || demo?.lead?.id || null,
+    // The person actually on the call. Seeded from the linked lead on a
+    // fresh demo but editable — the attendee may differ from the lead.
+    contact_name: demo?.contact_name || demo?.lead?.name || '',
+    contact_firm: demo?.contact_firm || demo?.lead?.firm_name || '',
+    designation: demo?.designation || '',
     stage: demo?.stage || 'scheduled',
     demo_date: demo?.demo_date || '',
     demo_datetime_local: toLocalIstInput(demo?.demo_datetime),
@@ -818,7 +847,14 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
 
   function pickLead(lead) {
     setPickedLead(lead)
-    update('lead_id', lead.id)
+    setForm(prev => ({
+      ...prev,
+      lead_id: lead.id,
+      // Prefill contact fields from the lead only when blank, so we don't
+      // clobber anything the user already typed.
+      contact_name: prev.contact_name || lead.name || '',
+      contact_firm: prev.contact_firm || lead.firm_name || ''
+    }))
   }
 
   async function resolveLinkedInUrl() {
@@ -881,6 +917,9 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
       if (!payload.integrations_needed) payload.integrations_needed = null
       if (!payload.objections) payload.objections = null
       if (!payload.calendar_invite_url) payload.calendar_invite_url = null
+      if (!payload.contact_name) payload.contact_name = null
+      if (!payload.contact_firm) payload.contact_firm = null
+      if (!payload.designation) payload.designation = null
       if (!Array.isArray(payload.current_tools)) payload.current_tools = []
       // lead_id can't change on edit — strip it to avoid sending to update.
       if (isEdit) delete payload.lead_id
@@ -991,6 +1030,38 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
               )}
             </div>
           )}
+
+          {/* Who's actually on the call — may differ from the linked lead. */}
+          <div className="form-row">
+            <div className="form-group">
+              <label>Name</label>
+              <input
+                type="text"
+                value={form.contact_name}
+                onChange={e => update('contact_name', e.target.value)}
+                placeholder="Person on the demo call"
+              />
+            </div>
+            <div className="form-group">
+              <label>Firm Name</label>
+              <input
+                type="text"
+                value={form.contact_firm}
+                onChange={e => update('contact_firm', e.target.value)}
+                placeholder="Their firm"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Designation</label>
+            <input
+              type="text"
+              value={form.designation}
+              onChange={e => update('designation', e.target.value)}
+              placeholder="e.g. Managing Partner, Principal, Analyst"
+            />
+          </div>
 
           <div className="form-row">
             <div className="form-group">
