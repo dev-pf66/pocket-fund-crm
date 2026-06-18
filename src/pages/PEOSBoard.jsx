@@ -10,6 +10,53 @@ import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, X } from 'lucide-react'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
+import { istToday, istAddDays } from '../lib/dateUtils'
+
+// Effective YYYY-MM-DD (IST) for a demo. Prefers the timed datetime,
+// falls back to the date-only field. en-CA locale yields YYYY-MM-DD.
+function demoDateStr(demo) {
+  if (demo.demo_datetime) {
+    const d = new Date(demo.demo_datetime)
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+    }
+  }
+  if (demo.demo_date) return String(demo.demo_date).slice(0, 10)
+  return null
+}
+
+const DATE_PRESETS = [
+  { value: 'all',        label: 'All dates' },
+  { value: 'today',      label: 'Today' },
+  { value: 'upcoming',   label: 'Upcoming' },
+  { value: 'next_7',     label: 'Next 7 days' },
+  { value: 'this_month', label: 'This month' },
+  { value: 'last_7',     label: 'Last 7 days' },
+  { value: 'last_30',    label: 'Last 30 days' },
+  { value: 'custom',     label: 'Custom range' }
+]
+
+// Does a demo's effective date fall within the selected preset / range?
+// Demos with no date are excluded whenever a date filter is active.
+function demoMatchesDateFilter(demo, filter, from, to) {
+  if (filter === 'all') return true
+  const ds = demoDateStr(demo)
+  if (!ds) return false
+  const today = istToday()
+  switch (filter) {
+    case 'today':      return ds === today
+    case 'upcoming':   return ds >= today
+    case 'next_7':     return ds >= today && ds <= istAddDays(today, 7)
+    case 'this_month': return ds.slice(0, 7) === today.slice(0, 7)
+    case 'last_7':     return ds >= istAddDays(today, -7) && ds <= today
+    case 'last_30':    return ds >= istAddDays(today, -30) && ds <= today
+    case 'custom':
+      if (from && ds < from) return false
+      if (to && ds > to) return false
+      return true
+    default: return true
+  }
+}
 
 const STAGES = [
   { key: 'scheduled',  label: 'Scheduled',  color: '#a78bfa' },
@@ -164,6 +211,9 @@ function PEOSBoard() {
   const [draggedDemo, setDraggedDemo] = useState(null)
 
   const [searchQuery, setSearchQuery] = useSessionState('peos:searchQuery', '')
+  const [dateFilter, setDateFilter] = useSessionState('peos:dateFilter', 'all')
+  const [customFrom, setCustomFrom] = useSessionState('peos:customFrom', '')
+  const [customTo, setCustomTo] = useSessionState('peos:customTo', '')
 
   useEffect(() => {
     loadDemos()
@@ -188,8 +238,9 @@ function PEOSBoard() {
 
   const filteredDemos = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
-    if (!q) return demos
     return demos.filter(d => {
+      if (!demoMatchesDateFilter(d, dateFilter, customFrom, customTo)) return false
+      if (!q) return true
       const name = d.lead?.name || ''
       const firm = d.lead?.firm_name || ''
       return (
@@ -200,7 +251,7 @@ function PEOSBoard() {
         (d.next_steps || '').toLowerCase().includes(q)
       )
     })
-  }, [demos, searchQuery])
+  }, [demos, searchQuery, dateFilter, customFrom, customTo])
 
   function demosInStage(stage) {
     const items = filteredDemos.filter(d => d.stage === stage)
@@ -323,6 +374,51 @@ function PEOSBoard() {
             style={{ paddingLeft: '34px', fontSize: '13px' }}
           />
         </div>
+
+        <select
+          value={dateFilter}
+          onChange={e => setDateFilter(e.target.value)}
+          className="form-control"
+          style={{ width: 'auto', fontSize: '13px' }}
+          title="Filter demos by date"
+        >
+          {DATE_PRESETS.map(p => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </select>
+
+        {dateFilter === 'custom' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <input
+              type="date"
+              value={customFrom}
+              onChange={e => setCustomFrom(e.target.value)}
+              className="form-control"
+              style={{ width: 'auto', fontSize: '13px' }}
+              title="From date"
+            />
+            <span style={{ color: '#9ca3af', fontSize: '12px' }}>–</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={e => setCustomTo(e.target.value)}
+              className="form-control"
+              style={{ width: 'auto', fontSize: '13px' }}
+              title="To date"
+            />
+          </div>
+        )}
+
+        {(dateFilter !== 'all' || searchQuery) && (
+          <button
+            className="btn btn-sm"
+            onClick={() => { setDateFilter('all'); setCustomFrom(''); setCustomTo(''); setSearchQuery('') }}
+            title="Clear filters"
+          >
+            Clear
+          </button>
+        )}
+
         <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
           <strong style={{ color: '#111827' }}>{filteredDemos.length}</strong> shown
         </div>
