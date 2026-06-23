@@ -76,6 +76,21 @@ export async function setUserAdmin(id, isAdmin) {
   return data[0]
 }
 
+// Archive / unarchive a teammate. Archived users keep all their data but
+// are hidden from leaderboards and blocked from the app (see App.jsx).
+export async function setUserArchived(id, archived) {
+  const { data, error } = await supabase
+    .from('people')
+    .update({ is_archived: archived })
+    .eq('id', id)
+    .select()
+  if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error('No rows updated — RLS may be blocking this action. Run supabase-migration-admin-rls.sql.')
+  }
+  return data[0]
+}
+
 // Generate a share-friendly temporary password. Avoids look-alike
 // characters (0/O, 1/l/I) so admins can read it over chat without typos.
 export function generateTempPassword(len = 16) {

@@ -73,10 +73,13 @@ function isAdminUser(person) {
 }
 
 function AppContent() {
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const { user, loading: authLoading, isAuthenticated, signOut } = useAuth()
   const [currentPerson, setCurrentPerson] = useState(null)
   const [people, setPeople] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
+  // True when the signed-in account has been archived by an admin — we keep
+  // their data but bounce them out of the app.
+  const [archivedBlocked, setArchivedBlocked] = useState(false)
   const isAdmin = isAdminUser(currentPerson)
 
   useEffect(() => {
@@ -89,7 +92,6 @@ function AppContent() {
     setDataLoading(true)
     try {
       const allPeople = await getPeople()
-      setPeople(allPeople)
 
       let person = allPeople.find(p => p.email === email)
 
@@ -102,10 +104,23 @@ function AppContent() {
 
         if (!error && newPerson) {
           person = newPerson
-          setPeople([...allPeople, newPerson])
+          allPeople.push(newPerson)
         }
       }
 
+      // Archived accounts keep their data but can't use the app.
+      if (person?.is_archived) {
+        setArchivedBlocked(true)
+        setCurrentPerson(null)
+        setPeople([])
+        return
+      }
+
+      setArchivedBlocked(false)
+      // Archived teammates are hidden everywhere the people list drives a
+      // leaderboard / switcher / assignee picker. Admins manage them from
+      // the Admin page, which fetches its own unfiltered list.
+      setPeople(allPeople.filter(p => !p.is_archived))
       setCurrentPerson(person)
     } catch (err) {
       console.error('Failed to load data:', err)
@@ -128,6 +143,20 @@ function AppContent() {
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
+    )
+  }
+
+  // Archived account — keep them signed out of the app entirely.
+  if (archivedBlocked) {
+    return (
+      <div className="loading-screen" style={{ flexDirection: 'column', gap: '16px', textAlign: 'center', padding: '24px' }}>
+        <h2 style={{ margin: 0 }}>Account archived</h2>
+        <p style={{ color: '#6b7280', maxWidth: '420px', margin: 0 }}>
+          This account has been archived and can no longer access the CRM.
+          Your data is retained. Contact an admin if you think this is a mistake.
+        </p>
+        <button className="btn btn-primary" onClick={() => signOut()}>Sign out</button>
+      </div>
     )
   }
 

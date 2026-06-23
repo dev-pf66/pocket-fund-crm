@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
-import { getPeople, setUserAdmin, deleteUser, sendPasswordResetEmail, adminSetUserPassword, generateTempPassword } from '../lib/supabase'
+import { getPeople, setUserAdmin, deleteUser, sendPasswordResetEmail, adminSetUserPassword, generateTempPassword, setUserArchived } from '../lib/supabase'
 import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
-import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound } from 'lucide-react'
+import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound, Archive, ArchiveRestore } from 'lucide-react'
 
 // Fallback bootstrap admin — used until the is_admin column is populated.
 // Once the migration seeds is_admin=true for this email, this is moot.
@@ -170,6 +170,28 @@ function Admin() {
     } catch (err) {
       console.error('Failed to toggle admin:', err)
       toast.error('Failed to update admin status')
+    } finally {
+      setActingId(null)
+    }
+  }
+
+  async function handleToggleArchive(user) {
+    const nextValue = !user.is_archived
+    const label = user.name || user.email
+    const msg = nextValue
+      ? `Archive ${label}? Their data is kept, but they'll be removed from leaderboards and can't sign in until you unarchive them.`
+      : `Unarchive ${label}? They'll be able to sign in and appear on leaderboards again.`
+    if (!confirm(msg)) return
+
+    setActingId(user.id)
+    try {
+      const updated = await setUserArchived(user.id, nextValue)
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, ...updated } : u))
+      toast.success(`${label} ${nextValue ? 'archived' : 'unarchived'}`)
+      refreshPeople?.()
+    } catch (err) {
+      console.error('Failed to toggle archive:', err)
+      toast.error(`Failed to ${nextValue ? 'archive' : 'unarchive'}: ${err.message}`)
     } finally {
       setActingId(null)
     }
@@ -409,11 +431,16 @@ function Admin() {
                   const busy = actingId === u.id
                   return (
                     <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '10px 8px', color: '#111827', fontWeight: '500' }}>
+                      <td style={{ padding: '10px 8px', color: u.is_archived ? '#9ca3af' : '#111827', fontWeight: '500' }}>
                         {u.name || <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>No name</span>}
                         {isSelf && (
                           <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: '600', color: '#1d4ed8', padding: '2px 6px', background: '#eff6ff', borderRadius: '10px' }}>
                             you
+                          </span>
+                        )}
+                        {u.is_archived && (
+                          <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: '600', color: '#92400e', padding: '2px 6px', background: '#fef3c7', borderRadius: '10px' }}>
+                            archived
                           </span>
                         )}
                       </td>
@@ -452,6 +479,20 @@ function Admin() {
                             }
                           >
                             <KeyRound size={14} /> Reset password
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => handleToggleArchive(u)}
+                            disabled={busy || isSelf}
+                            title={
+                              isSelf ? "Can't archive yourself"
+                              : u.is_archived ? 'Unarchive — restore access + leaderboards'
+                              : 'Archive — keep data, hide from leaderboards, block login'
+                            }
+                          >
+                            {u.is_archived
+                              ? <><ArchiveRestore size={14} /> Unarchive</>
+                              : <><Archive size={14} /> Archive</>}
                           </button>
                           <button
                             className="btn btn-sm"
