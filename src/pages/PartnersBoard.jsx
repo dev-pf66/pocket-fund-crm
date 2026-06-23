@@ -269,6 +269,8 @@ function PartnersBoard() {
       return (
         (p.name || '').toLowerCase().includes(q) ||
         (p.handle || '').toLowerCase().includes(q) ||
+        (p.company_name || '').toLowerCase().includes(q) ||
+        (p.industry || '').toLowerCase().includes(q) ||
         (p.notes || '').toLowerCase().includes(q)
       )
     })
@@ -662,6 +664,12 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
         <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>{partner.handle}</div>
       )}
 
+      {(partner.company_name || partner.industry) && (
+        <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+          {[partner.company_name, partner.industry].filter(Boolean).join(' · ')}
+        </div>
+      )}
+
       {followUp && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px',
           fontSize: '10px', fontWeight: 600,
@@ -692,18 +700,32 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
         {partner.audience_size && (
           <span style={{ fontSize: '10px', color: '#6b7280', marginLeft: '2px' }}>{partner.audience_size}</span>
         )}
-        {partner.url && (
-          <a
-            href={partner.url}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            style={{ marginLeft: 'auto', color: '#6b7280' }}
-            title={partner.url}
-          >
-            <ExternalLink size={11} />
-          </a>
-        )}
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          {partner.linkedin_url && (
+            <a
+              href={partner.linkedin_url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: '#0a66c2' }}
+              title={partner.linkedin_url}
+            >
+              <Linkedin size={11} />
+            </a>
+          )}
+          {partner.url && (
+            <a
+              href={partner.url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: '#6b7280' }}
+              title={partner.url}
+            >
+              <ExternalLink size={11} />
+            </a>
+          )}
+        </span>
       </div>
     </div>
   )
@@ -847,6 +869,9 @@ function PartnerForm({ partner, onClose, onSave, availableCategories, onAddCusto
       : ['creator'],
     stage: partner?.stage || 'potential',
     handle: partner?.handle || '',
+    company_name: partner?.company_name || '',
+    industry: partner?.industry || '',
+    linkedin_url: partner?.linkedin_url || '',
     url: partner?.url || '',
     email: partner?.email || '',
     audience_size: partner?.audience_size || '',
@@ -921,6 +946,37 @@ function PartnerForm({ partner, onClose, onSave, availableCategories, onAddCusto
                 <option key={s.key} value={s.key}>{s.label}</option>
               ))}
             </select>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Company Name</label>
+              <input
+                type="text"
+                value={form.company_name}
+                onChange={e => update('company_name', e.target.value)}
+                placeholder="Company / org name"
+              />
+            </div>
+            <div className="form-group">
+              <label>Industry</label>
+              <input
+                type="text"
+                value={form.industry}
+                onChange={e => update('industry', e.target.value)}
+                placeholder="e.g. Fintech, Media, SaaS"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>LinkedIn</label>
+            <input
+              type="url"
+              value={form.linkedin_url}
+              onChange={e => update('linkedin_url', e.target.value)}
+              placeholder="https://linkedin.com/in/..."
+            />
           </div>
 
           <div className="form-row">
