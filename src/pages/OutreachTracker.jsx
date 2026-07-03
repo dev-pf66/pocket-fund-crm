@@ -36,6 +36,7 @@ const EMPTY_OUTREACH = {
   lead_id: null,
   lead_name: '',
   firm_name: '',
+  linkedin_url: '',
   outreach_type: 'cold_email',
   status: 'sent',
   notes: '',
@@ -230,6 +231,7 @@ function OutreachTracker() {
           // specific headers (deal + size, lead + name) before generic ones.
           if (header.includes('lead') && header.includes('name')) outreach.lead_name = value
           else if (header.includes('firm') || header.includes('company')) outreach.firm_name = value
+          else if (header.includes('linkedin')) outreach.linkedin_url = value
           else if (header.includes('type') || header.includes('channel')) {
             const t = normalizeOutreachType(value)
             if (t) outreach.outreach_type = t
@@ -550,9 +552,9 @@ function OutreachTracker() {
           <details style={{ marginTop: '16px', padding: '12px', background: 'white', borderRadius: '8px' }}>
             <summary style={{ cursor: 'pointer', fontWeight: '600' }}>Example CSV Format</summary>
             <pre style={{ marginTop: '8px', fontSize: '12px', overflow: 'auto' }}>
-{`lead_name,firm_name,type,status,fit_score,industry,message_content
-John Smith,Acme Capital,cold_email,sent,5,SaaS,Sent intro email about our services
-Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM - she's interested!`}
+{`lead_name,firm_name,linkedin,type,status,fit_score,industry,message_content
+John Smith,Acme Capital,https://linkedin.com/in/johnsmith,cold_email,sent,5,SaaS,Sent intro email about our services
+Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahj,linkedin_message,replied,4,E-commerce,LinkedIn DM - she's interested!`}
             </pre>
           </details>
         </div>
@@ -956,6 +958,16 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                       value={fv('firm_name')}
                       onChange={(e) => setField('firm_name', e.target.value)}
                       placeholder="Firm / company"
+                    />
+                  </div>
+
+                  <div className="info-item">
+                    <label>LinkedIn</label>
+                    <input
+                      type="url"
+                      value={fv('linkedin_url')}
+                      onChange={(e) => setField('linkedin_url', e.target.value)}
+                      placeholder="https://linkedin.com/in/..."
                     />
                   </div>
 
