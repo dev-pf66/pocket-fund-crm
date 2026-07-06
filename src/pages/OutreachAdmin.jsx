@@ -283,8 +283,8 @@ function WeeklyBar({ value, goal }) {
   )
 }
 
-function Nudge({ todayCount, streak, thisWeekCount, bestDay }) {
-  const remaining = DAILY_GOAL - todayCount
+function Nudge({ todayCount, streak, thisWeekCount, bestDay, dailyGoal = DAILY_GOAL }) {
+  const remaining = dailyGoal - todayCount
   let text, tone
   if (todayCount === 0) {
     text = 'Log your first outreach to get on the board today.'
@@ -320,7 +320,7 @@ function Nudge({ todayCount, streak, thisWeekCount, bestDay }) {
   )
 }
 
-function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartRangeChange, showChartDetails, onToggleChartDetails }) {
+function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartRangeChange, showChartDetails, onToggleChartDetails, dailyGoal = DAILY_GOAL, weeklyGoal = WEEKLY_GOAL }) {
   const { todayCount, streak, thisWeekCount, bestDay, bestWeek } = metrics
   return (
     <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
@@ -351,7 +351,7 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
         alignItems: 'center',
         marginBottom: '18px'
       }}>
-        <ProgressRing value={todayCount} goal={DAILY_GOAL} />
+        <ProgressRing value={todayCount} goal={dailyGoal} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
@@ -359,12 +359,12 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
                 This Week
               </span>
               <span style={{ fontSize: '13px', color: '#111827', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                {thisWeekCount} <span style={{ color: '#6b7280', fontWeight: 500 }}>/ {WEEKLY_GOAL}</span>
+                {thisWeekCount} <span style={{ color: '#6b7280', fontWeight: 500 }}>/ {weeklyGoal}</span>
               </span>
             </div>
-            <WeeklyBar value={thisWeekCount} goal={WEEKLY_GOAL} />
+            <WeeklyBar value={thisWeekCount} goal={weeklyGoal} />
           </div>
-          <Nudge todayCount={todayCount} streak={streak} thisWeekCount={thisWeekCount} bestDay={bestDay} />
+          <Nudge todayCount={todayCount} streak={streak} thisWeekCount={thisWeekCount} bestDay={bestDay} dailyGoal={dailyGoal} />
         </div>
       </div>
 
@@ -446,7 +446,7 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
             </button>
           </div>
         </div>
-        <DailyChart rows={chartRows} days={chartRange} showDetails={showChartDetails} />
+        <DailyChart rows={chartRows} days={chartRange} goal={dailyGoal} showDetails={showChartDetails} />
       </div>
     </div>
   )
@@ -697,14 +697,14 @@ function LeadEditCard({ entry, currentPersonId, onSaved }) {
     try {
       let updated
       if (linkedLeadId) {
-        updated = await updateLead(linkedLeadId, edits)
+        updated = await updateLead(linkedLeadId, edits, currentPersonId)
       } else {
         // Promote first, then apply the edits to the freshly-created lead.
         // promoteOutreachToLead also backfills outreach.lead_id so future
         // expands hit the linked-lead path.
         const promoted = await promoteOutreachToLead(entry, currentPersonId)
         updated = Object.keys(edits).length > 0
-          ? await updateLead(promoted.id, edits)
+          ? await updateLead(promoted.id, edits, currentPersonId)
           : promoted
       }
       setLead(updated)
@@ -918,10 +918,27 @@ function OutreachAdmin() {
     return m
   }, [statsRows])
 
+  // Targets follow the viewing scope: a person's own admin-set targets, or
+  // the sum of everyone's when viewing the whole team.
+  const viewingTargets = useMemo(() => {
+    const daily = (p) => p?.daily_outreach_target || DAILY_GOAL
+    const weekly = (p) => p?.weekly_outreach_target || WEEKLY_GOAL
+    if (!isAdmin || viewing === 'me') return { daily: daily(currentPerson), weekly: weekly(currentPerson) }
+    if (viewing === 'all') {
+      const list = people || []
+      return {
+        daily: list.reduce((s, p) => s + daily(p), 0) || DAILY_GOAL,
+        weekly: list.reduce((s, p) => s + weekly(p), 0) || WEEKLY_GOAL
+      }
+    }
+    const p = people?.find(x => String(x.id) === String(viewing))
+    return { daily: daily(p), weekly: weekly(p) }
+  }, [isAdmin, viewing, currentPerson, people])
+
   const focusedMetrics = useMemo(() => {
     if (!currentPerson?.id) return null
-    return computeMetrics(dailyBuckets)
-  }, [currentPerson?.id, dailyBuckets])
+    return computeMetrics(dailyBuckets, viewingTargets.daily)
+  }, [currentPerson?.id, dailyBuckets, viewingTargets.daily])
 
   // Header label that matches whose data is on screen.
   const viewingLabel = !isAdmin || viewing === 'me'
@@ -965,9 +982,9 @@ function OutreachAdmin() {
     const next = entry.status === 'replied' ? 'sent' : 'replied'
     setTogglingId(entry.id)
     try {
-      await updateOutreach(entry.id, { status: next })
+      await updateOutreach(entry.id, { status: next }, currentPerson?.id)
       setEntries(prev => prev.map(x => x.id === entry.id ? { ...x, status: next } : x))
-      toast.success(next === 'replied' ? 'Marked as responded' : 'Marked as no response')
+      toast.success(next === 'replied' ? 'Marked as responded — lead moved to pipeline' : 'Marked as no response')
     } catch (err) {
       console.error('Failed to toggle status:', err)
       toast.error('Failed to update status')
@@ -1048,6 +1065,8 @@ function OutreachAdmin() {
         <AnalystDashboard
           personName={viewingLabel}
           metrics={focusedMetrics}
+          dailyGoal={viewingTargets.daily}
+          weeklyGoal={viewingTargets.weekly}
           chartRows={statsRows}
           chartRange={chartRange}
           onChartRangeChange={setChartRange}

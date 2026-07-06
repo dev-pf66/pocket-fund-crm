@@ -103,7 +103,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
       }
       let saved
       if (lead?.id) {
-        saved = await updateLead(lead.id, payload)
+        saved = await updateLead(lead.id, payload, currentPerson.id)
       } else {
         saved = await createLead(payload, currentPerson.id)
       }
@@ -242,6 +242,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
                 <option value="responded">Responded</option>
                 <option value="warm_lead">Warm Lead</option>
                 <option value="active_conversation">Active Conversation</option>
+                <option value="meeting_booked">Meeting</option>
                 <option value="client">Client</option>
               </select>
             </div>

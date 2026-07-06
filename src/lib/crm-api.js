@@ -65,6 +65,96 @@ export function cachePeek(key, ttlMs = 5 * 60 * 1000) {
 // LEADS API
 // ============================================================================
 
+// Pipeline stage progression. Forward-only automation: replies and stage
+// syncs may move a lead RIGHT along this list, never left. 'passed' is
+// terminal and outside the order — automation never touches passed leads.
+const STAGE_ORDER = ['new_lead', 'cold_outreach', 'responded', 'warm_lead', 'active_conversation', 'meeting_booked', 'client']
+const stageRank = (stage) => STAGE_ORDER.indexOf(stage)
+
+/**
+ * Move a lead forward to targetStage only if it currently sits at an earlier
+ * stage. Used by the reply→pipeline sync so an analyst marking "replied" on
+ * an old entry can never drag a warm/meeting/client lead backwards.
+ * Low-level on purpose: does NOT run the stage side effects (the caller is
+ * the automation, so re-marking outreach as replied would double-count).
+ */
+export async function advanceLeadStage(leadId, targetStage, currentPersonId = null) {
+  const { data: lead, error } = await supabase
+    .from('crm_leads')
+    .select('*')
+    .eq('id', leadId)
+    .single()
+  if (error) throw error
+  if (!lead) return null
+  if (lead.stage === 'passed' || lead.stage === 'client') return lead
+  if (stageRank(lead.stage) >= stageRank(targetStage)) return lead
+
+  const oldStage = lead.stage
+  const { data, error: updError } = await supabase
+    .from('crm_leads')
+    .update({ stage: targetStage })
+    .eq('id', leadId)
+    .select()
+    .single()
+  if (updError) throw updError
+
+  await logActivity(leadId, {
+    activity_type: 'note',
+    notes: `Moved to ${targetStage.replace(/_/g, ' ')} (auto — outreach reply)`
+  }, currentPersonId)
+
+  cacheClear('leads')
+  cacheClear('dashboard')
+  fireTTEvent('lead_stage_changed', { lead: data, oldStage })
+  return data
+}
+
+/**
+ * Side effects of a user-initiated stage change, so the funnel numbers stay
+ * honest whichever surface the analyst updates first:
+ * - Lead reaches 'responded' (or beyond): its latest un-replied outreach
+ *   entry flips to 'replied', keeping reply rate in sync with the pipeline.
+ * - Lead enters 'meeting_booked': auto-log a 'meeting' activity — exactly
+ *   what the Dashboard funnel counts — so meetings no longer depend on
+ *   someone remembering the quick-log button.
+ * Never throws: metrics side effects must not break the stage change itself.
+ */
+async function runStageSideEffects(lead, oldStage, newStage, currentPersonId = null) {
+  try {
+    const personId = currentPersonId ?? lead.assigned_to ?? lead.created_by ?? null
+
+    // Reply sync: crossed into responded-or-later from an earlier stage.
+    if (
+      stageRank(newStage) >= stageRank('responded') &&
+      (oldStage == null || (stageRank(oldStage) < stageRank('responded') && oldStage !== 'passed'))
+    ) {
+      const { data: rows } = await supabase
+        .from('crm_outreach_log')
+        .select('id, status')
+        .eq('lead_id', lead.id)
+        .in('status', ['sent', 'no_response'])
+        .order('outreach_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (rows?.length) {
+        // Direct update (not updateOutreach) — the reply→stage hook would
+        // otherwise re-enter here for no reason.
+        await supabase.from('crm_outreach_log').update({ status: 'replied' }).eq('id', rows[0].id)
+      }
+    }
+
+    // Meeting sync: entering the Meeting stage logs the meeting itself.
+    if (newStage === 'meeting_booked' && oldStage !== 'meeting_booked') {
+      await logActivity(lead.id, {
+        activity_type: 'meeting',
+        notes: 'Meeting — auto-logged from pipeline stage change'
+      }, personId)
+    }
+  } catch (e) {
+    console.error('Stage side effects failed (stage change itself succeeded):', e)
+  }
+}
+
 /**
  * Get leads with optional filters. When personId is provided, restricts
  * results to leads the person created OR is assigned to, so each user
@@ -182,7 +272,7 @@ export async function createLead(leadData, currentPersonId) {
 /**
  * Update lead
  */
-export async function updateLead(id, updates) {
+export async function updateLead(id, updates, currentPersonId = null) {
   // Clean up updates object - remove undefined/null values and internal fields
   const cleanUpdates = {}
   Object.keys(updates).forEach(key => {
@@ -235,6 +325,7 @@ export async function updateLead(id, updates) {
   // (moveLead) or an inline edit / form save (updateLead).
   if (cleanUpdates.stage !== undefined && priorStage !== data.stage) {
     fireTTEvent('lead_stage_changed', { lead: data, oldStage: priorStage })
+    await runStageSideEffects(data, priorStage, data.stage, currentPersonId)
   }
 
   return data
@@ -271,6 +362,8 @@ export async function moveLead(id, newStage, currentPersonId) {
   cacheClear('dashboard')
 
   fireTTEvent('lead_stage_changed', { lead: data, oldStage })
+
+  await runStageSideEffects(data, oldStage, newStage, currentPersonId)
 
   return data
 }
@@ -470,6 +563,7 @@ export async function getStaleLeads(personId = null) {
       responded: settings.warm_lead_threshold, // Responded is in the warming phase — reuse warm threshold
       warm_lead: settings.warm_lead_threshold,
       active_conversation: settings.active_conversation_threshold,
+      meeting_booked: settings.active_conversation_threshold, // Booked meetings go stale as fast as active talks
       reach_out_later: 999 // Use exact date instead
     }
 
@@ -563,6 +657,7 @@ export async function getPipelineStats(personId = null) {
     responded: 0,
     warm_lead: 0,
     active_conversation: 0,
+    meeting_booked: 0,
     client: 0,
     reach_out_later: 0,
     passed: 0,
@@ -698,6 +793,7 @@ export function calculateStaleness(lead, settings) {
     responded: settings.warm_lead_threshold,
     warm_lead: settings.warm_lead_threshold,
     active_conversation: settings.active_conversation_threshold,
+    meeting_booked: settings.active_conversation_threshold,
     client: 999,
     reach_out_later: 999,
     passed: 999
@@ -1233,6 +1329,11 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
   // would silently bail out with missing_fields.
   fireTTEvent('outreach_logged', data)
 
+  // An entry logged as already-replied belongs in the pipeline too.
+  if (data.status === 'replied') {
+    await syncReplyToPipeline(data, currentPersonId)
+  }
+
   return data
 }
 
@@ -1249,18 +1350,64 @@ export async function logOutreachBatch(rows, currentPersonId) {
     logged_by: currentPersonId,
     outreach_date: r.outreach_date || today,
   }))
+
+  // Attribution: link rows to existing leads before insert (one candidate
+  // fetch + client-side match, instead of N lookups). Unmatched rows stay
+  // orphans — we don't mass-create leads from a CSV of sent outreach.
+  try {
+    const { data: candidates } = await supabase
+      .from('crm_leads')
+      .select('id, name, firm_name, email, linkedin_url')
+    if (candidates?.length) {
+      const byLinkedIn = new Map()
+      const byEmail = new Map()
+      const byNameFirm = new Map()
+      for (const l of candidates) {
+        if (l.linkedin_url) byLinkedIn.set(normalizeLinkedInUrl(l.linkedin_url), l.id)
+        if (l.email) byEmail.set(l.email.toLowerCase(), l.id)
+        if (l.name) byNameFirm.set(`${l.name.toLowerCase()}|${(l.firm_name || '').toLowerCase()}`, l.id)
+      }
+      for (const r of records) {
+        if (r.lead_id) continue
+        if (r.linkedin_url && byLinkedIn.has(normalizeLinkedInUrl(r.linkedin_url))) {
+          r.lead_id = byLinkedIn.get(normalizeLinkedInUrl(r.linkedin_url))
+        } else if (r.lead_name && /@/.test(r.lead_name) && byEmail.has(r.lead_name.toLowerCase())) {
+          r.lead_id = byEmail.get(r.lead_name.toLowerCase())
+        } else if (r.lead_name && byNameFirm.has(`${r.lead_name.toLowerCase()}|${(r.firm_name || '').toLowerCase()}`)) {
+          r.lead_id = byNameFirm.get(`${r.lead_name.toLowerCase()}|${(r.firm_name || '').toLowerCase()}`)
+        }
+      }
+    }
+  } catch (e) {
+    console.error('logOutreachBatch: lead auto-link failed, importing unlinked', e)
+  }
+
   const { data, error } = await supabase
     .from('crm_outreach_log')
     .insert(records)
-    .select('id')
+    .select('*')
   if (error) throw error
+
+  // Rows imported as already-replied flow into the pipeline like any other
+  // reply. Sequential on purpose — each may create a lead and dedup checks
+  // must see the previous row's creation.
+  for (const row of data || []) {
+    if (row.status === 'replied') {
+      await syncReplyToPipeline(row, currentPersonId)
+    }
+  }
+
   return (data || []).length
 }
 
 /**
- * Update outreach entry
+ * Update outreach entry. Marking an entry 'replied' pushes its person into
+ * the pipeline: the linked lead advances to 'responded' (forward-only), or
+ * an unlinked entry gets promoted into a lead at 'responded'. This is the
+ * Tracker→Pipeline bridge — a reply anywhere shows up in the pipeline
+ * without anyone re-entering the contact.
  */
-export async function updateOutreach(id, updates) {
+export async function updateOutreach(id, updates, currentPersonId = null) {
   const { data, error } = await supabase
     .from('crm_outreach_log')
     .update(updates)
@@ -1269,7 +1416,30 @@ export async function updateOutreach(id, updates) {
     .single()
 
   if (error) throw error
+
+  if (updates.status === 'replied') {
+    await syncReplyToPipeline(data, currentPersonId)
+  }
   return data
+}
+
+/**
+ * Reply→pipeline sync. Never throws — the reply status itself is already
+ * saved; a sync failure shouldn't surface as "failed to update status".
+ */
+async function syncReplyToPipeline(outreachRow, currentPersonId = null) {
+  try {
+    const personId = currentPersonId ?? outreachRow.logged_by ?? null
+    if (outreachRow.lead_id) {
+      await advanceLeadStage(outreachRow.lead_id, 'responded', personId)
+    } else if (outreachRow.lead_name) {
+      await promoteOutreachToLead(outreachRow, personId, { stage: 'responded' })
+    }
+    cacheClear('leads')
+    cacheClear('dashboard')
+  } catch (e) {
+    console.error('Reply→pipeline sync failed (status update itself succeeded):', e)
+  }
 }
 
 /**
@@ -1277,7 +1447,7 @@ export async function updateOutreach(id, updates) {
  * real CRM lead so it can be viewed and edited in LeadDetail. Backfills the
  * outreach row's lead_id so future renders link straight through.
  */
-export async function promoteOutreachToLead(outreach, currentPersonId) {
+export async function promoteOutreachToLead(outreach, currentPersonId, { stage = 'new_lead' } = {}) {
   if (!outreach?.lead_name) throw new Error('Outreach entry has no lead_name to promote')
 
   const name = String(outreach.lead_name).trim()
@@ -1285,8 +1455,9 @@ export async function promoteOutreachToLead(outreach, currentPersonId) {
     name,
     firm_name: outreach.firm_name || null,
     lead_source: outreach.lead_source || null,
-    stage: 'new_lead'
+    stage
   }
+  if (outreach.linkedin_url) leadData.linkedin_url = outreach.linkedin_url
 
   // If the name field actually holds an email (common for CSV-imported rows),
   // capture the email and fall back to the local-part as a readable name.
@@ -1313,7 +1484,17 @@ export async function promoteOutreachToLead(outreach, currentPersonId) {
   } catch (e) {
     console.error('promoteOutreachToLead: dedup lookup failed, falling through to create', e)
   }
-  if (!lead) lead = await createLead(leadData, currentPersonId)
+  if (!lead) {
+    lead = await createLead(leadData, currentPersonId)
+  } else if (stage !== 'new_lead') {
+    // Reply-driven promotion that matched an existing lead: pull that lead
+    // forward to the requested stage (forward-only; never regresses).
+    try {
+      lead = await advanceLeadStage(lead.id, stage, currentPersonId) || lead
+    } catch (e) {
+      console.error('promoteOutreachToLead: failed to advance existing lead', e)
+    }
+  }
 
   try {
     await updateOutreach(outreach.id, { lead_id: lead.id })
@@ -1654,126 +1835,32 @@ export async function analyzeOutreach(entries) {
 // "Latest" is by outreach_date descending — replies override an earlier
 // 'sent' on the same lead, which is the behavior we want.
 // ============================================================================
-// GOALS SYSTEM
+// LEAD HISTORY (person-hub cards on LeadDetail)
 // ============================================================================
-// Restored after the cleanup commit. The Goals page + the dashboard's
-// per-period progress counters depend on these.
+// The Goals page (crm_goals / crm_goal_progress) was removed July 2026 —
+// outreach targets are now per-user columns on people, set from Admin.
 
-function getWeekStartDate(date = new Date()) {
-  return istWeekStart(istDateStr(date.getTime()))
+/** All outreach entries linked to a lead, newest first. */
+export async function getOutreachForLead(leadId) {
+  const { data, error } = await supabase
+    .from('crm_outreach_log')
+    .select('*, logged_by_person:logged_by(id, name)')
+    .eq('lead_id', leadId)
+    .order('outreach_date', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
 }
 
-/**
- * Period-start (YYYY-MM-DD) for a given frequency.
- * - daily:   today in IST
- * - weekly:  Monday of this IST week
- * - monthly: first day of this IST month
- */
-export function getPeriodStart(frequency, date = new Date()) {
-  const d = new Date(date)
-  const istDate = istDateStr(d.getTime())
-  if (frequency === 'daily') return istDate
-  if (frequency === 'weekly') return istWeekStart(istDate)
-  if (frequency === 'monthly') return istDate.slice(0, 7) + '-01'
-  throw new Error(`Unknown frequency: ${frequency}`)
-}
-
-export async function getGoals(personId) {
-  const { data: goals, error } = await supabase
-    .from('crm_goals')
+/** All PE OS demos linked to a lead, newest first. */
+export async function getDemosForLead(leadId) {
+  const { data, error } = await supabase
+    .from('crm_demos')
     .select('*')
-    .eq('person_id', personId)
-    .eq('is_active', true)
-    .order('goal_order', { ascending: true })
-    .order('created_at', { ascending: true })
+    .eq('lead_id', leadId)
+    .order('demo_date', { ascending: false, nullsFirst: false })
   if (error) throw error
-  if (!goals || goals.length === 0) return []
-
-  const goalIds = goals.map(g => g.id)
-  const { data: progressRows, error: progError } = await supabase
-    .from('crm_goal_progress')
-    .select('*')
-    .in('goal_id', goalIds)
-  if (progError) throw progError
-
-  return goals.map(goal => {
-    const periodStart = getPeriodStart(goal.frequency)
-    const row = progressRows?.find(p => p.goal_id === goal.id && p.period_start === periodStart)
-    return { ...goal, current_count: row?.count || 0, period_start: periodStart }
-  })
-}
-
-export async function createGoal(goalData) {
-  const { data, error } = await supabase
-    .from('crm_goals')
-    .insert([goalData])
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function updateGoal(id, updates) {
-  const { data, error } = await supabase
-    .from('crm_goals')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function deleteGoal(id) {
-  const { error } = await supabase
-    .from('crm_goals')
-    .delete()
-    .eq('id', id)
-  if (error) throw error
-}
-
-/**
- * Add `delta` (default +1) to the current period's progress row for a goal.
- * Creates the row if missing. Floors the count at 0. Returns the new count.
- */
-export async function incrementGoalProgress(goalId, delta = 1) {
-  const { data: goal, error: goalError } = await supabase
-    .from('crm_goals')
-    .select('frequency')
-    .eq('id', goalId)
-    .single()
-  if (goalError) throw goalError
-
-  const periodStart = getPeriodStart(goal.frequency)
-
-  const { data: existing, error: selError } = await supabase
-    .from('crm_goal_progress')
-    .select('id, count')
-    .eq('goal_id', goalId)
-    .eq('period_start', periodStart)
-    .maybeSingle()
-  if (selError) throw selError
-
-  if (existing) {
-    const newCount = Math.max(0, existing.count + delta)
-    const { data, error } = await supabase
-      .from('crm_goal_progress')
-      .update({ count: newCount })
-      .eq('id', existing.id)
-      .select()
-      .single()
-    if (error) throw error
-    return data.count
-  }
-
-  const initialCount = Math.max(0, delta)
-  const { data, error } = await supabase
-    .from('crm_goal_progress')
-    .insert([{ goal_id: goalId, period_start: periodStart, count: initialCount }])
-    .select()
-    .single()
-  if (error) throw error
-  return data.count
+  return data || []
 }
 
 // ============================================================================

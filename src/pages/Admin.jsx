@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
-import { getPeople, setUserAdmin, deleteUser, sendPasswordResetEmail, adminSetUserPassword, generateTempPassword, setUserArchived } from '../lib/supabase'
+import { getPeople, setUserAdmin, deleteUser, sendPasswordResetEmail, adminSetUserPassword, generateTempPassword, setUserArchived, setUserTargets } from '../lib/supabase'
 import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
-import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound, Archive, ArchiveRestore } from 'lucide-react'
+import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound, Archive, ArchiveRestore, Target } from 'lucide-react'
 import { isAdminUser } from '../lib/admin'
 
 function FieldOptionsSection({ title, fieldName, hint }) {
@@ -109,6 +109,11 @@ function Admin() {
   const [resetPasswordValue, setResetPasswordValue] = useState('')
   const [resetting, setResetting] = useState(false)
   const [resetApplied, setResetApplied] = useState(false)
+  // Outreach-targets modal: which user, plus draft daily/weekly values
+  const [targetsUser, setTargetsUser] = useState(null)
+  const [targetsDaily, setTargetsDaily] = useState('')
+  const [targetsWeekly, setTargetsWeekly] = useState('')
+  const [savingTargets, setSavingTargets] = useState(false)
 
   // Lead type state
   const [leadTypes, setLeadTypes] = useState([])
@@ -238,9 +243,38 @@ function Admin() {
     )
   }
 
+  function openTargetsModal(user) {
+    setTargetsUser(user)
+    setTargetsDaily(user.daily_outreach_target || 10)
+    setTargetsWeekly(user.weekly_outreach_target || 50)
+  }
+
+  async function handleSaveTargets() {
+    if (!targetsUser) return
+    const daily = parseInt(targetsDaily, 10)
+    const weekly = parseInt(targetsWeekly, 10)
+    if (!Number.isFinite(daily) || daily < 1 || !Number.isFinite(weekly) || weekly < 1) {
+      toast.warn('Targets must be positive numbers.')
+      return
+    }
+    setSavingTargets(true)
+    try {
+      const updated = await setUserTargets(targetsUser.id, daily, weekly)
+      setUsers(prev => prev.map(u => u.id === targetsUser.id ? { ...u, ...updated } : u))
+      toast.success(`Targets set for ${targetsUser.name || targetsUser.email}: ${daily}/day · ${weekly}/week`)
+      refreshPeople?.()
+      setTargetsUser(null)
+    } catch (err) {
+      console.error('Failed to save targets:', err)
+      toast.error(`Failed to save targets: ${err.message}`)
+    } finally {
+      setSavingTargets(false)
+    }
+  }
+
   async function handleRemove(user) {
     const label = user.name || user.email
-    const confirmMsg = `Remove ${label}? This permanently deletes their user record and all linked data (goals, progress). They can sign in again to create a new record.`
+    const confirmMsg = `Remove ${label}? This permanently deletes their user record — their logged outreach and lead activity are kept but no longer attributed to them. They can sign in again to create a new record.`
     if (!confirm(confirmMsg)) return
 
     setActingId(user.id)
@@ -413,6 +447,7 @@ function Admin() {
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Name</th>
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Email</th>
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Role</th>
+                  <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Targets</th>
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Joined</th>
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151', textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -445,6 +480,17 @@ function Admin() {
                         ) : (
                           <span style={{ fontSize: '12px', color: '#6b7280' }}>User</span>
                         )}
+                      </td>
+                      <td style={{ padding: '10px 8px' }}>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => openTargetsModal(u)}
+                          disabled={busy}
+                          title="Set daily/weekly outreach targets — drives their Dashboard rings and streaks"
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          <Target size={13} /> {u.daily_outreach_target || 10}/day · {u.weekly_outreach_target || 50}/wk
+                        </button>
                       </td>
                       <td style={{ padding: '10px 8px', color: '#6b7280' }}>
                         {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
@@ -505,6 +551,71 @@ function Admin() {
           </div>
         )}
       </div>
+
+      {targetsUser && (
+        <div
+          onClick={() => !savingTargets && setTargetsUser(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '10px', padding: '24px',
+              width: '90%', maxWidth: '400px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+            }}
+          >
+            <h2 style={{ margin: '0 0 6px', fontSize: '18px' }}>Outreach targets</h2>
+            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+              {targetsUser.name || targetsUser.email}
+              {targetsUser.email && <span style={{ color: '#9ca3af' }}> · {targetsUser.email}</span>}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                  Daily target
+                </label>
+                <input
+                  type="number" min="1" max="500"
+                  value={targetsDaily}
+                  onChange={(e) => setTargetsDaily(e.target.value)}
+                  disabled={savingTargets}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                  Weekly target
+                </label>
+                <input
+                  type="number" min="1" max="5000"
+                  value={targetsWeekly}
+                  onChange={(e) => setTargetsWeekly(e.target.value)}
+                  disabled={savingTargets}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                />
+              </div>
+            </div>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '20px' }}>
+              Drives their Dashboard daily ring, streak, and weekly bar. Takes effect immediately.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="btn btn-secondary" onClick={() => setTargetsUser(null)} disabled={savingTargets}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSaveTargets} disabled={savingTargets}>
+                {savingTargets ? 'Saving…' : 'Save targets'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {resetTarget && (
         <div

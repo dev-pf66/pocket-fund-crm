@@ -97,7 +97,7 @@ function OutreachTracker() {
     setLoading(true)
     try {
       const [dashStats, leadsData, templateData] = await Promise.all([
-        getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30 }),
+        getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30, dailyGoal: currentPerson.daily_outreach_target || 10 }),
         getLeads({ stage: 'cold_outreach' }, currentPerson.id),
         getEmailTemplates().catch(() => [])
       ])
@@ -296,7 +296,8 @@ function OutreachTracker() {
 
   async function handleUpdateStatus(id, newStatus) {
     try {
-      await updateOutreach(id, { status: newStatus })
+      await updateOutreach(id, { status: newStatus }, currentPerson?.id)
+      if (newStatus === 'replied') toast.success('Reply logged — lead moved to Responded in the pipeline')
       await loadData()
     } catch (error) {
       console.error('Failed to update status:', error)
@@ -323,7 +324,7 @@ function OutreachTracker() {
         if (k === 'outreach_date' && !v) v = null
         updates[k] = v
       }
-      await updateOutreach(selectedOutreach.id, updates)
+      await updateOutreach(selectedOutreach.id, updates, currentPerson?.id)
       setOutreaches(prev => prev.map(o => o.id === selectedOutreach.id ? { ...o, ...updates } : o))
       toast.success('Outreach updated')
       setShowDetailsModal(false)
@@ -380,8 +381,9 @@ function OutreachTracker() {
     bounced: <XCircle size={14} />
   }
 
-  const goalPercentage = Math.min((todayCount / 10) * 100, 100)
-  const goalMet = todayCount >= 10
+  const dailyTarget = currentPerson?.daily_outreach_target || 10
+  const goalPercentage = Math.min((todayCount / dailyTarget) * 100, 100)
+  const goalMet = todayCount >= dailyTarget
 
   if (loading && outreaches.length === 0) {
     return <div className="loading">Loading outreach tracker...</div>
@@ -453,7 +455,7 @@ function OutreachTracker() {
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: goalMet ? 'var(--success)' : 'var(--primary)' }}>
             {todayCount}
-            <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/10</span>
+            <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/{dailyTarget}</span>
           </div>
           <div style={{
             width: '100%',
@@ -488,7 +490,7 @@ function OutreachTracker() {
             <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}> days</span>
           </div>
           <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--gray-600)' }}>
-            {streak > 0 ? `${streak} consecutive days with 10+ outreaches` : 'Hit 10 today to start a streak!'}
+            {streak > 0 ? `${streak} consecutive days with ${dailyTarget}+ outreaches` : `Hit ${dailyTarget} today to start a streak!`}
           </div>
         </div>
 

@@ -7,9 +7,14 @@ import { TrendingUp, AlertCircle, Calendar, Activity, Clock, FlaskConical, Flame
 import { isAdminUser } from '../lib/admin'
 import { buildDailyCounts, computeMetrics, milestoneFor } from '../lib/outreachMetrics'
 
-const DAILY_GOAL = 10
-const WEEKLY_GOAL = 50
 const FUNNEL_WEEKS = 8
+
+// Per-user outreach targets are set by the admin (Admin → All Users).
+// These are only the fallbacks for users who haven't had one set yet.
+export const DEFAULT_DAILY_TARGET = 10
+export const DEFAULT_WEEKLY_TARGET = 50
+export const dailyTargetOf = (person) => person?.daily_outreach_target || DEFAULT_DAILY_TARGET
+export const weeklyTargetOf = (person) => person?.weekly_outreach_target || DEFAULT_WEEKLY_TARGET
 
 const PIPELINE_SEGMENTS = [
   { key: 'new_lead',             label: 'New',       color: '#a78bfa' },
@@ -17,6 +22,7 @@ const PIPELINE_SEGMENTS = [
   { key: 'responded',            label: 'Responded', color: '#06b6d4' },
   { key: 'warm_lead',            label: 'Warm',      color: '#fbbf24' },
   { key: 'active_conversation',  label: 'Active',    color: '#f97316' },
+  { key: 'meeting_booked',       label: 'Meeting',   color: '#ec4899' },
   { key: 'client',               label: 'Clients',   color: '#22c55e' },
 ]
 
@@ -75,9 +81,11 @@ function Dashboard() {
     }
   }
 
+  const myDailyTarget = dailyTargetOf(currentPerson)
+  const myWeeklyTarget = weeklyTargetOf(currentPerson)
   const myMetrics = useMemo(
-    () => computeMetrics(buildDailyCounts(personalRows), DAILY_GOAL),
-    [personalRows]
+    () => computeMetrics(buildDailyCounts(personalRows), myDailyTarget),
+    [personalRows, myDailyTarget]
   )
   const milestone = useMemo(() => milestoneFor(careerTotal), [careerTotal])
 
@@ -131,7 +139,7 @@ function Dashboard() {
       </div>
 
       {/* My Week — personal gamification, self-only data */}
-      <MyWeekCard metrics={myMetrics} careerTotal={careerTotal} milestone={milestone} />
+      <MyWeekCard metrics={myMetrics} careerTotal={careerTotal} milestone={milestone} dailyGoal={myDailyTarget} weeklyGoal={myWeeklyTarget} />
 
       {/* Today's Outreach */}
       <div className="card dashboard-card">
@@ -142,8 +150,9 @@ function Dashboard() {
         <div className="today-outreach-grid">
           {visiblePeople.map(person => {
             const stats = personStats.get(person.id) || { todayCount: 0, weekCount: 0, weekReplies: 0 }
-            const pct = Math.min(100, (stats.todayCount / DAILY_GOAL) * 100)
-            const hit = stats.todayCount >= DAILY_GOAL
+            const personTarget = dailyTargetOf(person)
+            const pct = Math.min(100, (stats.todayCount / personTarget) * 100)
+            const hit = stats.todayCount >= personTarget
             const isMe = person.id === currentPerson?.id
             return (
               <div key={person.id} className={`person-outreach-card${isMe ? ' person-outreach-card-me' : ''}`}>
@@ -155,7 +164,7 @@ function Dashboard() {
                   <span className={`person-outreach-count${hit ? ' person-outreach-count-hit' : ''}`}>
                     {stats.todayCount}
                   </span>
-                  <span className="person-outreach-goal">/ {DAILY_GOAL}</span>
+                  <span className="person-outreach-goal">/ {personTarget}</span>
                 </div>
                 <div className="person-outreach-bar-track">
                   <div
@@ -298,11 +307,11 @@ function Dashboard() {
 
 // Personal gamification block. Everything here is the signed-in user's own
 // numbers — no teammate data, consistent with the isolation rules.
-function MyWeekCard({ metrics, careerTotal, milestone }) {
+function MyWeekCard({ metrics, careerTotal, milestone, dailyGoal, weeklyGoal }) {
   const { todayCount, streak, thisWeekCount, bestDay, bestWeek } = metrics
-  const ringPct = Math.min(1, todayCount / DAILY_GOAL)
-  const weekPct = Math.min(100, (thisWeekCount / WEEKLY_GOAL) * 100)
-  const ringHit = todayCount >= DAILY_GOAL
+  const ringPct = Math.min(1, todayCount / dailyGoal)
+  const weekPct = Math.min(100, (thisWeekCount / weeklyGoal) * 100)
+  const ringHit = todayCount >= dailyGoal
   const size = 76, stroke = 8
   const r = (size - stroke) / 2
   const circ = 2 * Math.PI * r
@@ -338,7 +347,7 @@ function MyWeekCard({ metrics, careerTotal, milestone }) {
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: '17px', fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{todayCount}</span>
-            <span style={{ fontSize: '10px', color: '#6b7280' }}>/ {DAILY_GOAL} today</span>
+            <span style={{ fontSize: '10px', color: '#6b7280' }}>/ {dailyGoal} today</span>
           </div>
         </div>
 
@@ -349,13 +358,13 @@ function MyWeekCard({ metrics, careerTotal, milestone }) {
               This Week
             </span>
             <span style={{ fontSize: '13px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-              {thisWeekCount} <span style={{ color: '#6b7280', fontWeight: 500 }}>/ {WEEKLY_GOAL}</span>
+              {thisWeekCount} <span style={{ color: '#6b7280', fontWeight: 500 }}>/ {weeklyGoal}</span>
             </span>
           </div>
           <div style={{ height: '10px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden' }}>
             <div style={{
               width: `${weekPct}%`, height: '100%',
-              background: thisWeekCount >= WEEKLY_GOAL ? '#16a34a' : 'linear-gradient(90deg, #3b82f6, #2563eb)',
+              background: thisWeekCount >= weeklyGoal ? '#16a34a' : 'linear-gradient(90deg, #3b82f6, #2563eb)',
               transition: 'width 0.4s ease'
             }} />
           </div>

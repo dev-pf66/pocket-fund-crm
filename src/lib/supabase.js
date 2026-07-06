@@ -91,6 +91,25 @@ export async function setUserArchived(id, archived) {
   return data[0]
 }
 
+// Admin-set outreach targets. Drive the Dashboard rings/bars and the
+// Tracker/Log progress displays for that user. Null/0 falls back to the
+// app-wide defaults (10/day, 50/week).
+export async function setUserTargets(id, dailyTarget, weeklyTarget) {
+  const { data, error } = await supabase
+    .from('people')
+    .update({
+      daily_outreach_target: dailyTarget || null,
+      weekly_outreach_target: weeklyTarget || null
+    })
+    .eq('id', id)
+    .select()
+  if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error('No rows updated — RLS may be blocking this action.')
+  }
+  return data[0]
+}
+
 // Generate a share-friendly temporary password. Avoids look-alike
 // characters (0/O, 1/l/I) so admins can read it over chat without typos.
 export function generateTempPassword(len = 16) {

@@ -16,6 +16,7 @@ const STAGES = [
   { key: 'responded', label: 'Responded', color: '#06b6d4' },
   { key: 'warm_lead', label: 'Warm Leads', color: '#fbbf24' },
   { key: 'active_conversation', label: 'Active', color: '#f97316' },
+  { key: 'meeting_booked', label: 'Meeting', color: '#ec4899' },
   { key: 'client', label: 'Clients', color: '#22c55e' }
 ]
 

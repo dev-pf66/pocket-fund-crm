@@ -3,7 +3,7 @@ import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp, PARTNERS_OWNER_EMAIL } from '../App'
 import { isAdminUser } from '../lib/admin'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, CheckSquare, Briefcase, Shield, Inbox, Handshake, Presentation } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
@@ -33,11 +33,10 @@ function Layout() {
           <NavLink to="/outreach-queue" onClick={() => setMobileMenuOpen(false)}><Inbox size={18} />Queue</NavLink>
           <NavLink to="/outreach-admin" onClick={() => setMobileMenuOpen(false)}><ClipboardList size={18} />Log</NavLink>
           <NavLink to="/pe-os" onClick={() => setMobileMenuOpen(false)}><Presentation size={18} />PE OS</NavLink>
-          <NavLink to="/my-goals" onClick={() => setMobileMenuOpen(false)}><CheckSquare size={18} />Goals</NavLink>
+          <NavLink to="/investors" onClick={() => setMobileMenuOpen(false)}><Briefcase size={18} />Investors</NavLink>
           <NavLink to="/analytics" onClick={() => setMobileMenuOpen(false)}><BarChart3 size={18} />Analytics</NavLink>
           <NavLink to="/help" onClick={() => setMobileMenuOpen(false)}><HelpCircle size={18} />Help</NavLink>
           {isAdminUser(currentPerson) && (<>
-            <NavLink to="/investors" onClick={() => setMobileMenuOpen(false)}><Briefcase size={18} />Investors</NavLink>
             <NavLink to="/templates" onClick={() => setMobileMenuOpen(false)}><Mail size={18} />Templates</NavLink>
             <NavLink to="/samples" onClick={() => setMobileMenuOpen(false)}><FileText size={18} />Sample Deals</NavLink>
           </>)}

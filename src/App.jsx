@@ -48,7 +48,6 @@ const Analytics = lazyWithRetry(() => import('./pages/Analytics'))
 const OutreachTracker = lazyWithRetry(() => import('./pages/OutreachTracker'))
 const OutreachAdmin = lazyWithRetry(() => import('./pages/OutreachAdmin'))
 const OutreachQueue = lazyWithRetry(() => import('./pages/OutreachQueue'))
-const MyGoals = lazyWithRetry(() => import('./pages/MyGoals'))
 const Admin = lazyWithRetry(() => import('./pages/Admin'))
 const Help = lazyWithRetry(() => import('./pages/Help'))
 const HelpAdmin = lazyWithRetry(() => import('./pages/HelpAdmin'))
@@ -178,16 +177,16 @@ function AppContent() {
               <Route path="outreach-queue" element={<OutreachQueue />} />
               <Route path="outreach-admin" element={<OutreachAdmin />} />
               <Route path="pe-os" element={<PEOSBoard />} />
-              <Route path="my-goals" element={<MyGoals />} />
               <Route path="admin" element={<Admin />} />
               <Route path="import" element={<ImportLeads />} />
               {/* Analytics is open to everyone — non-admins see only
                   their own numbers (auto-scoped by RLS + the page's
                   built-in admin check). The other admin pages stay gated. */}
               <Route path="analytics" element={<Analytics />} />
+              {/* Investors is the shared contact book — whole team can see it. */}
+              <Route path="investors" element={<Investors />} />
+              <Route path="investors/:id" element={<InvestorDetail />} />
               {isAdmin && <>
-                <Route path="investors" element={<Investors />} />
-                <Route path="investors/:id" element={<InvestorDetail />} />
                 <Route path="templates" element={<EmailTemplates />} />
                 <Route path="samples" element={<SampleDeals />} />
               </>}

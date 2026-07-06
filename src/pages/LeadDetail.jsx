@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript } from '../lib/crm-api'
+import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript, getOutreachForLead, getDemosForLead } from '../lib/crm-api'
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -125,6 +125,7 @@ const STAGE_OPTIONS = [
   { value: 'responded', label: 'Responded' },
   { value: 'warm_lead', label: 'Warm Lead' },
   { value: 'active_conversation', label: 'Active Conversation' },
+  { value: 'meeting_booked', label: 'Meeting' },
   { value: 'client', label: 'Client' },
   { value: 'passed', label: 'Passed' }
 ]
@@ -146,6 +147,8 @@ function LeadDetail() {
   const [newTranscript, setNewTranscript, clearNewTranscript] = useSessionState(`ld:${id}:newTranscript`, emptyTranscript())
   const [allTags, setAllTags] = useState([])
   const [leadTags, setLeadTags] = useState([])
+  const [outreachHistory, setOutreachHistory] = useState([])
+  const [demos, setDemos] = useState([])
   const [enriching, setEnriching] = useState(false)
   const [calculating, setCalculating] = useState(false)
   const [analysingTranscriptId, setAnalysingTranscriptId] = useState(null)
@@ -163,12 +166,14 @@ function LeadDetail() {
   async function loadData() {
     setLoading(true)
     try {
-      const [leadData, activitiesData, transcriptsData, tagsData, leadTagsData] = await Promise.all([
+      const [leadData, activitiesData, transcriptsData, tagsData, leadTagsData, outreachData, demosData] = await Promise.all([
         getLeadById(id),
         getLeadActivities(id),
         getLeadTranscripts(id),
         getTags(),
-        getLeadTags(id)
+        getLeadTags(id),
+        getOutreachForLead(id).catch(() => []),
+        getDemosForLead(id).catch(() => [])
       ])
       setLead(leadData)
       setEditedLead(leadData)
@@ -176,6 +181,8 @@ function LeadDetail() {
       setTranscripts(transcriptsData)
       setAllTags(tagsData)
       setLeadTags(leadTagsData)
+      setOutreachHistory(outreachData)
+      setDemos(demosData)
     } catch (error) {
       console.error('Failed to load lead:', error)
     } finally {
@@ -211,7 +218,7 @@ function LeadDetail() {
 
   async function handleSave() {
     try {
-      const updatedLead = await updateLead(id, editedLead)
+      const updatedLead = await updateLead(id, editedLead, currentPerson?.id)
       setLead(updatedLead)
       setIsEditing(false)
     } catch (error) {
@@ -228,7 +235,7 @@ function LeadDetail() {
     setLead(l => ({ ...l, [field]: normalized }))
     setEditedLead(l => ({ ...l, [field]: normalized }))
     try {
-      await updateLead(id, { [field]: normalized })
+      await updateLead(id, { [field]: normalized }, currentPerson?.id)
     } catch (error) {
       console.error(`Failed to update ${field}:`, error)
       toast.error(`Failed to save: ${error.message}`)
@@ -534,6 +541,7 @@ function LeadDetail() {
                   <option value="responded">Responded</option>
                   <option value="warm_lead">Warm Lead</option>
                   <option value="active_conversation">Active Conversation</option>
+                  <option value="meeting_booked">Meeting</option>
                   <option value="client">Client</option>
                   <option value="passed">Passed</option>
                 </select>
@@ -1220,6 +1228,60 @@ function LeadDetail() {
             </div>
           </div>
         </div>
+
+        {/* Outreach History — every logged touch on this person, so the
+            person-hub actually shows the outreach → reply journey. */}
+        {outreachHistory.length > 0 && (
+          <div className="card">
+            <h2 style={{ marginBottom: '12px' }}>Outreach History <span style={{ fontSize: '13px', fontWeight: 500, color: '#6b7280' }}>({outreachHistory.length})</span></h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {outreachHistory.map(o => (
+                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', color: '#6b7280', fontVariantNumeric: 'tabular-nums', minWidth: '84px' }}>{o.outreach_date}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>{(o.outreach_type || '').replace(/_/g, ' ')}</span>
+                  <span style={{
+                    fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '999px',
+                    background: o.status === 'replied' ? '#f0fdf4' : o.status === 'bounced' ? '#fef2f2' : '#f3f4f6',
+                    color: o.status === 'replied' ? '#166534' : o.status === 'bounced' ? '#991b1b' : '#6b7280'
+                  }}>
+                    {(o.status || 'sent').replace(/_/g, ' ')}
+                  </span>
+                  {o.logged_by_person?.name && (
+                    <span style={{ fontSize: '12px', color: '#9ca3af' }}>by {o.logged_by_person.name}</span>
+                  )}
+                  {o.message_content && (
+                    <span style={{ fontSize: '12px', color: '#6b7280', flex: '1 1 100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {o.message_content}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PE OS Demos with this person */}
+        {demos.length > 0 && (
+          <div className="card">
+            <h2 style={{ marginBottom: '12px' }}>PE OS Demos <span style={{ fontSize: '13px', fontWeight: 500, color: '#6b7280' }}>({demos.length})</span></h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {demos.map(d => (
+                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', color: '#6b7280', fontVariantNumeric: 'tabular-nums', minWidth: '84px' }}>{d.demo_date || 'unscheduled'}</span>
+                  <span style={{
+                    fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '999px',
+                    background: d.stage === 'signed_up' ? '#f0fdf4' : d.stage === 'passed' ? '#fef2f2' : '#eff6ff',
+                    color: d.stage === 'signed_up' ? '#166534' : d.stage === 'passed' ? '#991b1b' : '#1e40af'
+                  }}>
+                    {(d.stage || '').replace(/_/g, ' ')}
+                  </span>
+                  {d.use_case && <span style={{ fontSize: '12px', color: '#6b7280' }}>{d.use_case}</span>}
+                  {d.next_steps && <span style={{ fontSize: '12px', color: '#6b7280' }}>→ {d.next_steps}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Activity Timeline */}
         <div className="card">
