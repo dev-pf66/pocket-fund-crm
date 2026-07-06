@@ -1,0 +1,21 @@
+name: CI
+
+# Catches broken builds before they reach production. Exists because a
+# "dead code cleanup" once deleted functions still imported by live pages
+# and nothing flagged it until users hit blank screens.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
