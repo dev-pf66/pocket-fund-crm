@@ -1,12 +1,15 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { getCRMDashboardData, getOutreachStatsByPerson, cachePeek } from '../lib/crm-api'
+import { getCRMDashboardData, getOutreachStatsByPerson, getWeeklyFunnel, getCareerOutreachCount, cachePeek } from '../lib/crm-api'
 import { useApp } from '../App'
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
-import { TrendingUp, AlertCircle, Calendar, Activity, Clock, FlaskConical } from 'lucide-react'
+import { TrendingUp, AlertCircle, Calendar, Activity, Clock, FlaskConical, Flame, Trophy, Award, Target } from 'lucide-react'
 import { isAdminUser } from '../lib/admin'
+import { buildDailyCounts, computeMetrics, milestoneFor } from '../lib/outreachMetrics'
 
 const DAILY_GOAL = 10
+const WEEKLY_GOAL = 50
+const FUNNEL_WEEKS = 8
 
 const PIPELINE_SEGMENTS = [
   { key: 'new_lead',             label: 'New',       color: '#a78bfa' },
@@ -37,6 +40,12 @@ function Dashboard() {
   const cacheKey = 'dashboard:' + (currentPerson?.id ?? 'all')
   const [data, setData] = useState(() => cachePeek(cacheKey) || null)
   const [outreachRows, setOutreachRows] = useState([])
+  // Gamification (self-only): 90 days of own rows for streak/bests, plus
+  // all-time count for the milestone badge.
+  const [personalRows, setPersonalRows] = useState([])
+  const [careerTotal, setCareerTotal] = useState(0)
+  // Admin-only weekly funnel (outreach → replies → meetings → demos).
+  const [funnel, setFunnel] = useState([])
   const [loading, setLoading] = useState(() => !cachePeek(cacheKey))
 
   useEffect(() => {
@@ -46,19 +55,31 @@ function Dashboard() {
   async function loadData() {
     if (!currentPerson?.id) return
     try {
-      const [dashboardData, rows] = await Promise.all([
+      const [dashboardData, rows, myRows, career, funnelRows] = await Promise.all([
         getCRMDashboardData(currentPerson.id),
         // Admins get all-team rows; non-admins only their own.
-        getOutreachStatsByPerson(7, isAdmin ? null : currentPerson.id).catch(() => [])
+        getOutreachStatsByPerson(7, isAdmin ? null : currentPerson.id).catch(() => []),
+        getOutreachStatsByPerson(90, currentPerson.id).catch(() => []),
+        getCareerOutreachCount(currentPerson.id).catch(() => 0),
+        isAdmin ? getWeeklyFunnel(FUNNEL_WEEKS, null).catch(() => []) : Promise.resolve([])
       ])
       setData(dashboardData)
       setOutreachRows(rows)
+      setPersonalRows(myRows)
+      setCareerTotal(career)
+      setFunnel(funnelRows)
     } catch (error) {
       console.error('Failed to load dashboard:', error)
     } finally {
       setLoading(false)
     }
   }
+
+  const myMetrics = useMemo(
+    () => computeMetrics(buildDailyCounts(personalRows), DAILY_GOAL),
+    [personalRows]
+  )
+  const milestone = useMemo(() => milestoneFor(careerTotal), [careerTotal])
 
   const today = istToday()
   const weekStart = istAddDays(today, -6)
@@ -108,6 +129,9 @@ function Dashboard() {
         <h1>Dashboard</h1>
         <Link to="/outreach" className="btn btn-primary">Log Outreach</Link>
       </div>
+
+      {/* My Week — personal gamification, self-only data */}
+      <MyWeekCard metrics={myMetrics} careerTotal={careerTotal} milestone={milestone} />
 
       {/* Today's Outreach */}
       <div className="card dashboard-card">
@@ -207,6 +231,9 @@ function Dashboard() {
         )}
       </div>
 
+      {/* Weekly funnel — admin only: outreach → replies → meetings → demos */}
+      {isAdmin && funnel.length > 0 && <FunnelCard funnel={funnel} />}
+
       {/* Pipeline Overview */}
       <div className="card dashboard-card">
         <div className="dashboard-card-header">
@@ -265,6 +292,181 @@ function Dashboard() {
           <p>No action required. All leads are up to date.</p>
         </div>
       )}
+    </div>
+  )
+}
+
+// Personal gamification block. Everything here is the signed-in user's own
+// numbers — no teammate data, consistent with the isolation rules.
+function MyWeekCard({ metrics, careerTotal, milestone }) {
+  const { todayCount, streak, thisWeekCount, bestDay, bestWeek } = metrics
+  const ringPct = Math.min(1, todayCount / DAILY_GOAL)
+  const weekPct = Math.min(100, (thisWeekCount / WEEKLY_GOAL) * 100)
+  const ringHit = todayCount >= DAILY_GOAL
+  const size = 76, stroke = 8
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+
+  return (
+    <div className="card dashboard-card">
+      <div className="dashboard-card-header">
+        <h2><Target size={20} /> My Week</h2>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: '6px',
+          padding: '4px 12px', borderRadius: '999px',
+          background: streak > 0 ? '#fff7ed' : '#f3f4f6',
+          border: `1px solid ${streak > 0 ? '#fed7aa' : '#e5e7eb'}`,
+          fontSize: '13px', fontWeight: 600,
+          color: streak > 0 ? '#9a3412' : '#6b7280'
+        }}>
+          <Flame size={14} style={{ color: streak > 0 ? '#ea580c' : '#9ca3af' }} />
+          {streak} day{streak === 1 ? '' : 's'} streak
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Today ring */}
+        <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+          <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
+            <circle
+              cx={size / 2} cy={size / 2} r={r} fill="none"
+              stroke={ringHit ? '#16a34a' : '#2563eb'} strokeWidth={stroke} strokeLinecap="round"
+              strokeDasharray={`${circ * ringPct} ${circ * (1 - ringPct)}`}
+              style={{ transition: 'stroke-dasharray 0.4s ease' }}
+            />
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '17px', fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{todayCount}</span>
+            <span style={{ fontSize: '10px', color: '#6b7280' }}>/ {DAILY_GOAL} today</span>
+          </div>
+        </div>
+
+        {/* Weekly progress */}
+        <div style={{ flex: '1 1 220px', minWidth: '200px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              This Week
+            </span>
+            <span style={{ fontSize: '13px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+              {thisWeekCount} <span style={{ color: '#6b7280', fontWeight: 500 }}>/ {WEEKLY_GOAL}</span>
+            </span>
+          </div>
+          <div style={{ height: '10px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden' }}>
+            <div style={{
+              width: `${weekPct}%`, height: '100%',
+              background: thisWeekCount >= WEEKLY_GOAL ? '#16a34a' : 'linear-gradient(90deg, #3b82f6, #2563eb)',
+              transition: 'width 0.4s ease'
+            }} />
+          </div>
+          <div style={{ display: 'flex', gap: '14px', marginTop: '8px', fontSize: '12px', color: '#6b7280', flexWrap: 'wrap' }}>
+            <span><Trophy size={12} style={{ verticalAlign: '-2px' }} /> Best day: <strong style={{ color: '#111827' }}>{bestDay.count || 0}</strong>{bestDay.date ? ` (${fmtDate(bestDay.date)})` : ''}</span>
+            <span>Best week: <strong style={{ color: '#111827' }}>{bestWeek.count || 0}</strong></span>
+          </div>
+        </div>
+
+        {/* Career milestone */}
+        <div style={{ flexShrink: 0, textAlign: 'center', padding: '10px 16px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: milestone.reached?.color || '#6b7280' }}>
+            <Award size={15} />
+            {milestone.reached ? milestone.reached.label : 'Rookie'}
+          </div>
+          <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
+            {careerTotal.toLocaleString()} all-time
+            {milestone.next && <> · {milestone.toNext} to {milestone.next.label}</>}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Week-over-week delta chip. Positive = green for counts/rates where up is
+// good (everything in this funnel).
+function Delta({ curr, prev, suffix = '' }) {
+  if (prev == null) return null
+  const diff = curr - prev
+  if (diff === 0) return <span style={{ fontSize: '11px', color: '#9ca3af' }}>—</span>
+  const up = diff > 0
+  return (
+    <span style={{ fontSize: '11px', fontWeight: 600, color: up ? '#16a34a' : '#dc2626' }}>
+      {up ? '▲' : '▼'} {Math.abs(diff)}{suffix}
+    </span>
+  )
+}
+
+const pct = (num, den) => den > 0 ? Math.round((num / den) * 100) : 0
+
+// Admin-only: weekly outreach → reply → meeting funnel with WoW deltas.
+// "Mtg conv" = (meetings + demos) / outreach for the week.
+function FunnelCard({ funnel }) {
+  const curr = funnel[funnel.length - 1]
+  const prev = funnel.length > 1 ? funnel[funnel.length - 2] : null
+  const newestFirst = [...funnel].reverse()
+  const maxOutreach = Math.max(1, ...funnel.map(w => w.outreach))
+
+  const tiles = [
+    { label: 'Outreach', value: curr.outreach, delta: <Delta curr={curr.outreach} prev={prev?.outreach} /> },
+    { label: 'Reply Rate', value: `${pct(curr.replies, curr.outreach)}%`, delta: <Delta curr={pct(curr.replies, curr.outreach)} prev={prev ? pct(prev.replies, prev.outreach) : null} suffix="pp" /> },
+    { label: 'Meetings', value: curr.meetings, delta: <Delta curr={curr.meetings} prev={prev?.meetings} /> },
+    { label: 'PE OS Demos', value: curr.demos, delta: <Delta curr={curr.demos} prev={prev?.demos} /> },
+    { label: 'Mtg Conv', value: `${pct(curr.meetings + curr.demos, curr.outreach)}%`, delta: <Delta curr={pct(curr.meetings + curr.demos, curr.outreach)} prev={prev ? pct(prev.meetings + prev.demos, prev.outreach) : null} suffix="pp" /> }
+  ]
+
+  return (
+    <div className="card dashboard-card">
+      <div className="dashboard-card-header">
+        <h2><TrendingUp size={20} /> Funnel</h2>
+        <span className="dashboard-date-label">last {funnel.length} weeks · this week vs last</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+        {tiles.map(t => (
+          <div key={t.label} style={{ padding: '12px 14px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.label}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+              <span style={{ fontSize: '20px', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{t.value}</span>
+              {t.delta}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid #e5e7eb', textAlign: 'left', color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <th style={{ padding: '6px 8px' }}>Week</th>
+            <th style={{ padding: '6px 8px', width: '30%' }}>Outreach</th>
+            <th style={{ padding: '6px 8px' }}>Replies</th>
+            <th style={{ padding: '6px 8px' }}>Meetings</th>
+            <th style={{ padding: '6px 8px' }}>Demos</th>
+            <th style={{ padding: '6px 8px' }}>Signups</th>
+            <th style={{ padding: '6px 8px' }}>Mtg Conv</th>
+          </tr>
+        </thead>
+        <tbody>
+          {newestFirst.map((w, i) => (
+            <tr key={w.weekStart} style={{ borderBottom: '1px solid #f3f4f6', fontWeight: i === 0 ? 600 : 400 }}>
+              <td style={{ padding: '8px', whiteSpace: 'nowrap' }}>
+                {fmtDate(w.weekStart)}{i === 0 && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#1d4ed8', fontWeight: 600 }}>now</span>}
+              </td>
+              <td style={{ padding: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ flex: 1, height: '8px', background: '#f3f4f6', borderRadius: '999px', overflow: 'hidden' }}>
+                    <div style={{ width: `${(w.outreach / maxOutreach) * 100}%`, height: '100%', background: '#60a5fa' }} />
+                  </div>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: '32px', textAlign: 'right' }}>{w.outreach}</span>
+                </div>
+              </td>
+              <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums' }}>{w.replies} <span style={{ color: '#6b7280' }}>({pct(w.replies, w.outreach)}%)</span></td>
+              <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums' }}>{w.meetings}</td>
+              <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums' }}>{w.demos}</td>
+              <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums', color: w.signups > 0 ? '#16a34a' : undefined, fontWeight: w.signups > 0 ? 600 : undefined }}>{w.signups}</td>
+              <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums' }}>{pct(w.meetings + w.demos, w.outreach)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

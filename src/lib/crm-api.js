@@ -1535,6 +1535,83 @@ export async function getAllOutreachLogs(filters = {}) {
  * Used to compute today/streak/weekly/best-day dashboards without
  * loading the full outreach rows. Returns: [{logged_by, outreach_date, status}]
  */
+// All-time outreach count for a person — drives the career milestone badge
+// on the Dashboard. head:true so no rows cross the wire.
+export async function getCareerOutreachCount(personId) {
+  if (!personId) return 0
+  const { count, error } = await supabase
+    .from('crm_outreach_log')
+    .select('id', { count: 'exact', head: true })
+    .eq('logged_by', personId)
+  if (error) throw error
+  return count || 0
+}
+
+/**
+ * Weekly funnel for the admin Dashboard: per IST week (Mon-Sun), how much
+ * outreach went out, how many replies came back, how many meetings were
+ * logged (crm_lead_activities call/meeting), and how many PE OS demos
+ * happened (crm_demos by demo_date; signups = demos at stage signed_up).
+ * personId null = team-wide (RLS lets admins through).
+ * Returns weeks oldest → newest: [{ weekStart, outreach, replies, meetings, demos, signups }]
+ */
+export async function getWeeklyFunnel(weeksBack = 8, personId = null) {
+  const thisWeekStart = istWeekStart(istDateStr())
+  const rangeStart = istAddDays(thisWeekStart, -7 * (weeksBack - 1))
+
+  let outreachQ = supabase
+    .from('crm_outreach_log')
+    .select('outreach_date, status')
+    .gte('outreach_date', rangeStart)
+  if (personId) outreachQ = outreachQ.eq('logged_by', personId)
+
+  let meetingsQ = supabase
+    .from('crm_lead_activities')
+    .select('activity_date, activity_type')
+    .in('activity_type', ['call', 'meeting'])
+    .gte('activity_date', rangeStart)
+  if (personId) meetingsQ = meetingsQ.eq('logged_by', personId)
+
+  let demosQ = supabase
+    .from('crm_demos')
+    .select('demo_date, stage')
+    .not('demo_date', 'is', null)
+    .gte('demo_date', rangeStart)
+  if (personId) demosQ = demosQ.eq('created_by', personId)
+
+  const [outreach, meetings, demos] = await Promise.all([outreachQ, meetingsQ, demosQ])
+  for (const res of [outreach, meetings, demos]) {
+    if (res.error) throw res.error
+  }
+
+  // Seed every week in range so quiet weeks still render as zeros.
+  const weeks = new Map()
+  for (let i = 0; i < weeksBack; i += 1) {
+    const ws = istAddDays(thisWeekStart, -7 * (weeksBack - 1 - i))
+    weeks.set(ws, { weekStart: ws, outreach: 0, replies: 0, meetings: 0, demos: 0, signups: 0 })
+  }
+  const bucket = (dateStr) => weeks.get(istWeekStart(String(dateStr).slice(0, 10)))
+
+  for (const r of outreach.data || []) {
+    const w = bucket(r.outreach_date)
+    if (!w) continue
+    w.outreach += 1
+    if (r.status === 'replied') w.replies += 1
+  }
+  for (const r of meetings.data || []) {
+    const w = bucket(r.activity_date)
+    if (w) w.meetings += 1
+  }
+  for (const r of demos.data || []) {
+    const w = bucket(r.demo_date)
+    if (!w) continue
+    w.demos += 1
+    if (r.stage === 'signed_up') w.signups += 1
+  }
+
+  return [...weeks.values()]
+}
+
 export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
   let q = supabase
     .from('crm_outreach_log')

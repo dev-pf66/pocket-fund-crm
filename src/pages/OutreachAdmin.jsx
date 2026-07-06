@@ -11,6 +11,7 @@ import { useLeadTypes } from '../hooks/useLeadTypes'
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import LeadForm from './LeadForm'
 import { isAdminUser } from '../lib/admin'
+import { computeMetrics } from '../lib/outreachMetrics'
 
 const DAILY_GOAL = 10
 const WEEKLY_GOAL = 50
@@ -40,45 +41,6 @@ function FitStars({ score }) {
       ))}
     </span>
   )
-}
-
-// Compute dashboard metrics from a person's daily count buckets.
-// dailyCounts: Map<dateStr, number>
-function computeMetrics(dailyCounts) {
-  const today = todayStr()
-  const todayCount = dailyCounts.get(today) || 0
-
-  // Streak: consecutive days meeting the daily goal. Include today if hit;
-  // otherwise count backward from yesterday so a mid-day lull doesn't erase
-  // the streak.
-  let streak = 0
-  let cursor = todayCount >= DAILY_GOAL ? today : addDays(today, -1)
-  while ((dailyCounts.get(cursor) || 0) >= DAILY_GOAL) {
-    streak += 1
-    cursor = addDays(cursor, -1)
-  }
-
-  // Weekly: Mon-Sun ending this week.
-  const thisWeekStart = weekStart(today)
-  let thisWeekCount = 0
-  for (let i = 0; i < 7; i += 1) {
-    thisWeekCount += dailyCounts.get(addDays(thisWeekStart, i)) || 0
-  }
-
-  // Personal bests across the loaded window.
-  let bestDay = { date: null, count: 0 }
-  const weekBuckets = new Map()
-  for (const [date, count] of dailyCounts) {
-    if (count > bestDay.count) bestDay = { date, count }
-    const ws = weekStart(date)
-    weekBuckets.set(ws, (weekBuckets.get(ws) || 0) + count)
-  }
-  let bestWeek = { start: null, count: 0 }
-  for (const [start, count] of weekBuckets) {
-    if (count > bestWeek.count) bestWeek = { start, count }
-  }
-
-  return { todayCount, streak, thisWeekCount, bestDay, bestWeek, thisWeekStart }
 }
 
 function ProgressRing({ value, goal, size = 96, stroke = 8, color = '#2563eb' }) {
