@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { Send, MessageSquare, Calendar, TrendingUp, Sparkles } from 'lucide-react'
 import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 import { isAdminUser } from '../lib/admin'
+import { replyRateColor } from '../lib/outreachMetrics'
 
 // fromOffset = days back for range start, toOffset = days back for range end.
 // e.g. Yesterday: from=1,to=1 — Today: from=0,to=0 — 7d: from=6,to=0
@@ -234,7 +235,7 @@ function Analytics() {
           const replyRate = st.total > 0 ? Math.round((st.replies / st.total) * 100) : 0
           const dailyAvg = (st.total / days).toFixed(1)
           const weeklyAvg = (st.total / Math.max(1, Math.ceil(days / 7))).toFixed(1)
-          const rateColor = replyRate >= 10 ? 'var(--success)' : replyRate >= 5 ? '#f59e0b' : 'inherit'
+          const rateColor = replyRateColor(replyRate, st.total)
           return (
             <div key={person.id} className="card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>

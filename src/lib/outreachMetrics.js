@@ -4,6 +4,16 @@
 
 import { istToday, istAddDays, istWeekStart } from './dateUtils'
 
+// Consistent reply-rate coloring across the app: green >10%, amber 5–10%,
+// red <5%. Returns 'inherit' when there's no outreach yet (rate is a
+// meaningless 0), so empty rows don't falsely read as a red alert.
+export function replyRateColor(rate, total = 1) {
+  if (rate == null || total === 0) return 'inherit'
+  if (rate > 10) return '#16a34a'
+  if (rate >= 5) return '#f59e0b'
+  return '#dc2626'
+}
+
 // rows: [{ outreach_date, ... }] → Map<dateStr, count>
 export function buildDailyCounts(rows) {
   const m = new Map()

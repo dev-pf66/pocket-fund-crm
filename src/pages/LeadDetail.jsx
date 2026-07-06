@@ -4,6 +4,7 @@ import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, ge
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import StageChip from '../components/StageChip'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
 import { istToday } from '../lib/dateUtils'
@@ -882,7 +883,7 @@ function LeadDetail() {
                   onSave={(v) => saveField('stage', v)}
                   type="select"
                   options={STAGE_OPTIONS}
-                  renderValue={(v) => v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  renderValue={(v) => <StageChip stage={v} />}
                 />
               </div>
 

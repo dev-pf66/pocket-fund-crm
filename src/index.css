@@ -7964,3 +7964,80 @@ input, select, textarea {
   font-size: 0.875rem;
 }
 .empty-state svg { margin: 0 auto 12px; opacity: 0.35; color: var(--gray-400); }
+
+/* ── Sidebar nav groups ─────────────────────────────────────────────── */
+.nav-group + .nav-group { margin-top: 0.875rem; }
+.nav-group-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--gray-400);
+  padding: 0 0.625rem;
+  margin-bottom: 0.25rem;
+}
+
+/* ── Compact "Today's Outreach" list (one row per person) ───────────── */
+.today-outreach-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.today-outreach-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.4fr) 3fr auto;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.5rem 0.875rem;
+  border-top: 1px solid var(--border);
+}
+.today-outreach-row:first-child { border-top: none; }
+.today-outreach-row-me { background: #eff6ff; }
+.today-outreach-row .person-outreach-name {
+  margin-bottom: 0;
+  font-size: 0.75rem;
+}
+.today-outreach-row-bar {
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.today-outreach-row-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.today-outreach-row-fill.hit { background: #16a34a; }
+.today-outreach-row-count {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: right;
+}
+.today-outreach-row-count.hit { color: #16a34a; }
+.today-outreach-row-count .goal { color: var(--gray-400); font-weight: 500; font-size: 0.8125rem; }
+
+/* ── Stage chip — shared pipeline-stage pill ────────────────────────── */
+.stage-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-transform: capitalize;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--chip, #9ca3af) 14%, white);
+  color: color-mix(in srgb, var(--chip, #9ca3af) 78%, #1f2937);
+  border: 1px solid color-mix(in srgb, var(--chip, #9ca3af) 32%, white);
+}

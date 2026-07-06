@@ -5,7 +5,8 @@ import { useApp } from '../App'
 import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 import { TrendingUp, AlertCircle, Calendar, Activity, Clock, FlaskConical, Flame, Trophy, Award, Target } from 'lucide-react'
 import { isAdminUser } from '../lib/admin'
-import { buildDailyCounts, computeMetrics, milestoneFor } from '../lib/outreachMetrics'
+import { buildDailyCounts, computeMetrics, milestoneFor, replyRateColor } from '../lib/outreachMetrics'
+import StageChip from '../components/StageChip'
 
 const FUNNEL_WEEK_OPTIONS = [4, 8, 12]
 
@@ -157,6 +158,18 @@ function Dashboard() {
     return map
   }, [outreachRows, today])
 
+  // Today's list order: me pinned top, then by count desc, then name — so the
+  // leader is obvious at a glance in the compact row layout.
+  const todayPeople = useMemo(() => {
+    return [...visiblePeople].sort((a, b) => {
+      const aMe = a.id === currentPerson?.id, bMe = b.id === currentPerson?.id
+      if (aMe !== bMe) return aMe ? -1 : 1
+      const ca = todayCounts.get(a.id) || 0, cb = todayCounts.get(b.id) || 0
+      if (cb !== ca) return cb - ca
+      return (a.name || '').localeCompare(b.name || '')
+    })
+  }, [visiblePeople, todayCounts, currentPerson?.id])
+
   // Per-person stats within the selected summary range.
   const personStats = useMemo(() => {
     const map = new Map()
@@ -212,31 +225,25 @@ function Dashboard() {
           <h2><Activity size={20} /> Today's Outreach</h2>
           <span className="dashboard-date-label">{fmtDate(today)}</span>
         </div>
-        <div className="today-outreach-grid">
-          {visiblePeople.map(person => {
+        <div className="today-outreach-list">
+          {todayPeople.map(person => {
             const todayCount = todayCounts.get(person.id) || 0
             const personTarget = dailyTargetOf(person)
             const pct = Math.min(100, (todayCount / personTarget) * 100)
             const hit = todayCount >= personTarget
             const isMe = person.id === currentPerson?.id
             return (
-              <div key={person.id} className={`person-outreach-card${isMe ? ' person-outreach-card-me' : ''}`}>
-                <div className="person-outreach-name">
+              <div key={person.id} className={`today-outreach-row${isMe ? ' today-outreach-row-me' : ''}`}>
+                <span className="person-outreach-name">
                   {person.name}
                   {isMe && <span className="person-outreach-you">you</span>}
+                </span>
+                <div className="today-outreach-row-bar">
+                  <div className={`today-outreach-row-fill${hit ? ' hit' : ''}`} style={{ width: `${pct}%` }} />
                 </div>
-                <div className="person-outreach-count-row">
-                  <span className={`person-outreach-count${hit ? ' person-outreach-count-hit' : ''}`}>
-                    {todayCount}
-                  </span>
-                  <span className="person-outreach-goal">/ {personTarget}</span>
-                </div>
-                <div className="person-outreach-bar-track">
-                  <div
-                    className={`person-outreach-bar-fill${hit ? ' person-outreach-bar-hit' : ''}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
+                <span className={`today-outreach-row-count${hit ? ' hit' : ''}`}>
+                  {todayCount}<span className="goal"> / {personTarget}</span>
+                </span>
               </div>
             )
           })}
@@ -262,7 +269,7 @@ function Dashboard() {
             <div className="week-stat-label">Replies</div>
           </div>
           <div className="week-stat-block">
-            <div className={`week-stat-value${teamWeek.replyRate >= 10 ? ' week-stat-good' : ''}`}>
+            <div className="week-stat-value" style={{ color: replyRateColor(teamWeek.replyRate, teamWeek.total) }}>
               {teamWeek.replyRate}%
             </div>
             <div className="week-stat-label">Reply Rate</div>
@@ -300,7 +307,7 @@ function Dashboard() {
                   </span>
                   <span>{s.count}</span>
                   <span>{s.replies}</span>
-                  <span className={rate >= 10 ? 'week-stat-good' : ''}>{rate}%</span>
+                  <span style={{ color: replyRateColor(rate, s.count) }}>{rate}%</span>
                 </div>
               )
             })}
@@ -532,7 +539,7 @@ function FunnelCard({ funnel, weeks, onWeeksChange }) {
         </thead>
         <tbody>
           {newestFirst.map((w, i) => (
-            <tr key={w.weekStart} style={{ borderBottom: '1px solid #f3f4f6', fontWeight: i === 0 ? 600 : 400 }}>
+            <tr key={w.weekStart} style={{ borderBottom: '1px solid #f3f4f6', fontWeight: i === 0 ? 600 : 400, background: i === 0 ? '#eff6ff' : undefined }}>
               <td style={{ padding: '8px', whiteSpace: 'nowrap' }}>
                 {fmtDate(w.weekStart)}{i === 0 && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#1d4ed8', fontWeight: 600 }}>now</span>}
               </td>
@@ -612,9 +619,7 @@ function AlertSection({ tone, title, icon, leads, limit, showDays, showStage }) 
           <li key={lead.id} className="alert-lead-row">
             <Link to={`/leads/${lead.id}`} className="alert-lead-name">{lead.name}</Link>
             {lead.firm_name && <span className="alert-lead-firm">{lead.firm_name}</span>}
-            {showStage && lead.stage && (
-              <span className="alert-lead-stage">{lead.stage.replace(/_/g, ' ')}</span>
-            )}
+            {showStage && lead.stage && <StageChip stage={lead.stage} />}
             {showDays && lead.last_activity_date && (
               <span className="alert-lead-days">
                 <Clock size={12} />
