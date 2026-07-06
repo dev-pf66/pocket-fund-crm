@@ -58,7 +58,7 @@ Measure relationship quality:
 **IMPORTANT:** Run this SQL in your Supabase SQL Editor:
 
 ```
-File: supabase-migration-lead-improvements.sql
+File: migrations/003_lead-improvements.sql
 Location: Already open on your laptop + saved to Downloads
 ```
 

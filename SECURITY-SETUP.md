@@ -16,7 +16,7 @@
 - `package.json` - Added security dependencies
 
 ### 2. Row Level Security (RLS) Policies ✓
-**Created:** `supabase-security-rls-policies.sql`
+**Created:** `migrations/010_security-rls-policies.sql`
 
 **Coverage:** RLS policies for all tables:
 - ✅ people
@@ -48,7 +48,7 @@ You **MUST** run the RLS policies SQL file to enable security:
 
 ### Step 2: Run RLS Policy File
 1. Click **+ New query**
-2. Open the file: `supabase-security-rls-policies.sql`
+2. Open the file: `migrations/010_security-rls-policies.sql`
 3. Copy all contents
 4. Paste into SQL Editor
 5. Click **Run** (or press Cmd/Ctrl + Enter)
@@ -177,4 +177,4 @@ Your CRM now has **enterprise-grade security**:
 - Ready for production deployment
 - No known vulnerabilities
 
-**Next Step:** Run `supabase-security-rls-policies.sql` in Supabase SQL Editor (5 minutes)
+**Next Step:** Run `migrations/010_security-rls-policies.sql` in Supabase SQL Editor (5 minutes)

@@ -14,7 +14,7 @@ Sales lead management tool for PF.
 ## Setup
 
 1. Create new Supabase project
-2. Run `supabase-crm-schema.sql`
+2. Run `migrations/001_crm-schema.sql`
 3. Copy `.env.example` to `.env`
 4. Add your Supabase credentials
 5. `npm install`

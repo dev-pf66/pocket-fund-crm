@@ -74,7 +74,7 @@ New menu item: **🎯 Outreach Tracker** (between Sales Pipeline and Analytics)
 **⚠️ CRITICAL:** Run this SQL in your Supabase SQL Editor:
 
 ```
-File: supabase-migration-outreach-tracker.sql
+File: migrations/004_outreach-tracker.sql
 Location: Already open on your laptop + saved to Downloads
 ```
 
