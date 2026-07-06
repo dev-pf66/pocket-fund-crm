@@ -9,6 +9,14 @@ import { Plus, Search, Filter, Upload, Save, ChevronDown, X, Bookmark } from 'lu
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
 
+// Mirrors the helper in Layout.jsx — admins see the whole team's leads on
+// the pipeline; everyone else is scoped to their own book.
+const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
+function isAdminUser(person) {
+  if (!person) return false
+  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
+}
+
 const STAGES = [
   { key: 'new_lead', label: 'New Leads', color: '#a78bfa' },
   { key: 'cold_outreach', label: 'Cold Outreach', color: '#60a5fa' },
@@ -106,9 +114,14 @@ function LeadsBoard() {
   const { currentPerson, people } = useApp()
   const navigate = useNavigate()
   const leadTypes = useLeadTypes()
+  const isAdmin = isAdminUser(currentPerson)
+  // Admins load the whole team's leads (getLeads with null personId, which
+  // RLS lets admins through); non-admins are scoped to their own.
+  const leadScopeId = isAdmin ? null : (currentPerson?.id ?? null)
+  const seedKey = 'leads:' + (leadScopeId ?? 'all') + ':{}'
   // Seed from cache so sidebar nav back to Pipeline renders instantly.
-  const [leads, setLeads] = useState(() => cachePeek('leads:{}') || [])
-  const [loading, setLoading] = useState(() => !cachePeek('leads:{}'))
+  const [leads, setLeads] = useState(() => cachePeek(seedKey) || [])
+  const [loading, setLoading] = useState(() => !cachePeek(seedKey))
   // Lead IDs that show up in any PE OS demo. Drives the "PE OS" filter pill.
   const [demoLeadIds, setDemoLeadIds] = useState(() => new Set())
   // Map<lead_id, latest_outreach_status>. Drives the response-status filter.
@@ -146,15 +159,16 @@ function LeadsBoard() {
   useEffect(() => {
     loadLeads()
     getCRMSettings().then(setSettings).catch(console.error)
-  }, [currentPerson?.id])
+  }, [currentPerson?.id, isAdmin])
 
   const loadLeads = useCallback(async function loadLeads() {
     if (!currentPerson?.id) return
     try {
+      // Admins pull everything (leadScopeId null); non-admins pull their own.
       const [data, demoIds, statusMap] = await Promise.all([
-        getLeads({}, currentPerson.id),
-        getDemoLeadIds(currentPerson.id).catch(() => new Set()),
-        getLeadLatestOutreachStatus(currentPerson.id).catch(() => new Map())
+        getLeads({}, leadScopeId),
+        getDemoLeadIds(leadScopeId).catch(() => new Set()),
+        getLeadLatestOutreachStatus(leadScopeId).catch(() => new Map())
       ])
       setLeads(data)
       setDemoLeadIds(demoIds)
@@ -164,7 +178,7 @@ function LeadsBoard() {
     } finally {
       setLoading(false)
     }
-  }, [currentPerson?.id])
+  }, [currentPerson?.id, leadScopeId])
 
   const handleDragStart = useCallback(function handleDragStart(e, lead) {
     setDraggedLead(lead)
