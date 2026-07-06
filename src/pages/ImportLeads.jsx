@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createLead } from '../lib/crm-api'
+import { createLead, getLeads } from '../lib/crm-api'
+import { normalizeLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Upload, X, Check, AlertCircle } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -26,7 +27,7 @@ function ImportLeads() {
   const [mapping, setMapping] = useState({})
   const [step, setStep] = useState(1) // 1=upload, 2=map, 3=preview, 4=importing, 5=complete
   const [importing, setImporting] = useState(false)
-  const [results, setResults] = useState({ success: 0, failed: 0, errors: [] })
+  const [results, setResults] = useState({ success: 0, duplicates: 0, failed: 0, errors: [] })
 
   const fieldOptions = [
     { value: '', label: '-- Skip --' },
@@ -136,12 +137,55 @@ function ImportLeads() {
     setStep(4)
     setImporting(true)
 
-    const results = { success: 0, failed: 0, errors: [] }
+    const results = { success: 0, duplicates: 0, failed: 0, errors: [] }
+
+    // Build duplicate lookups once from existing leads (email, LinkedIn URL,
+    // name+firm pair) so re-uploading a list doesn't create duplicates.
+    const existingEmails = new Set()
+    const existingLinkedIns = new Set()
+    const existingNameFirms = new Set()
+    try {
+      const existingLeads = await getLeads({}, null)
+      for (const existing of existingLeads || []) {
+        if (existing.email) existingEmails.add(existing.email.toLowerCase())
+        if (existing.linkedin_url) {
+          const normalized = normalizeLinkedInUrl(existing.linkedin_url)
+          if (normalized) existingLinkedIns.add(normalized)
+        }
+        if (existing.name) {
+          existingNameFirms.add(`${existing.name.toLowerCase()}|${(existing.firm_name || '').toLowerCase()}`)
+        }
+      }
+    } catch (error) {
+      // If the lookup fails, proceed without duplicate detection rather than
+      // blocking the import entirely.
+      console.error('Failed to load existing leads for duplicate check:', error)
+    }
 
     for (const lead of leads) {
+      const emailKey = lead.email ? lead.email.toLowerCase() : null
+      const linkedinKey = lead.linkedin_url ? normalizeLinkedInUrl(lead.linkedin_url) : null
+      const nameFirmKey = lead.name
+        ? `${lead.name.toLowerCase()}|${(lead.firm_name || '').toLowerCase()}`
+        : null
+
+      const isDuplicate =
+        (emailKey && existingEmails.has(emailKey)) ||
+        (linkedinKey && existingLinkedIns.has(linkedinKey)) ||
+        (nameFirmKey && existingNameFirms.has(nameFirmKey))
+
+      if (isDuplicate) {
+        results.duplicates++
+        continue
+      }
+
       try {
         await createLead(lead, currentPerson?.id)
         results.success++
+        // Register keys so duplicates within the same CSV are caught too.
+        if (emailKey) existingEmails.add(emailKey)
+        if (linkedinKey) existingLinkedIns.add(linkedinKey)
+        if (nameFirmKey) existingNameFirms.add(nameFirmKey)
       } catch (error) {
         results.failed++
         results.errors.push(`${lead.name}: ${error.message}`)
@@ -301,7 +345,10 @@ function ImportLeads() {
               <>
                 <Check size={64} color="#22c55e" />
                 <h2>Import Complete! ✓</h2>
-                <p>Successfully imported {results.success} leads</p>
+                <p>
+                  Successfully imported {results.success} leads
+                  {results.duplicates > 0 && <> · {results.duplicates} duplicates skipped</>}
+                </p>
               </>
             ) : (
               <>
@@ -309,6 +356,7 @@ function ImportLeads() {
                 <h2>Import Finished</h2>
                 <p>
                   ✓ {results.success} succeeded<br />
+                  {results.duplicates > 0 && <>⊘ {results.duplicates} duplicates skipped<br /></>}
                   ✗ {results.failed} failed
                 </p>
                 {results.errors.length > 0 && (
