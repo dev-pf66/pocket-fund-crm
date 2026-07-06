@@ -2,12 +2,60 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { getCRMDashboardData, getOutreachStatsByPerson, getWeeklyFunnel, getCareerOutreachCount, cachePeek } from '../lib/crm-api'
 import { useApp } from '../App'
-import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
+import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 import { TrendingUp, AlertCircle, Calendar, Activity, Clock, FlaskConical, Flame, Trophy, Award, Target } from 'lucide-react'
 import { isAdminUser } from '../lib/admin'
 import { buildDailyCounts, computeMetrics, milestoneFor } from '../lib/outreachMetrics'
 
-const FUNNEL_WEEKS = 8
+const FUNNEL_WEEK_OPTIONS = [4, 8, 12]
+
+// Selectable window for the team summary card. IST calendar weeks are
+// Mon–Sun, matching the funnel and streak math everywhere else.
+const SUMMARY_RANGES = [
+  { key: 'this_week', label: 'This Week' },
+  { key: 'last_week', label: 'Last Week' },
+  { key: '7d', label: '7 Days' },
+  { key: '14d', label: '14 Days' },
+  { key: '30d', label: '30 Days' }
+]
+// Longest window any preset needs — one fetch covers every selection.
+const SUMMARY_FETCH_DAYS = 35
+
+function summaryRangeBounds(key, today) {
+  if (key === 'this_week') return { start: istWeekStart(today), end: today }
+  if (key === 'last_week') {
+    const ws = istWeekStart(today)
+    return { start: istAddDays(ws, -7), end: istAddDays(ws, -1) }
+  }
+  const days = parseInt(key, 10) || 7
+  return { start: istAddDays(today, -(days - 1)), end: today }
+}
+
+// Shared pill-row selector used by the summary and funnel cards.
+function RangePills({ options, value, onChange }) {
+  return (
+    <div style={{ display: 'inline-flex', border: '1px solid #e5e7eb', borderRadius: '999px', overflow: 'hidden', background: 'white' }}>
+      {options.map(opt => {
+        const active = value === opt.key
+        return (
+          <button
+            key={opt.key}
+            onClick={() => onChange(opt.key)}
+            style={{
+              padding: '4px 10px', fontSize: '12px', border: 'none', cursor: 'pointer',
+              fontWeight: active ? 600 : 500,
+              color: active ? '#1d4ed8' : '#6b7280',
+              background: active ? '#eff6ff' : 'transparent',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 // Per-user outreach targets are set by the admin (Admin → All Users).
 // These are only the fallbacks for users who haven't had one set yet.
@@ -52,28 +100,35 @@ function Dashboard() {
   const [careerTotal, setCareerTotal] = useState(0)
   // Admin-only weekly funnel (outreach → replies → meetings → demos).
   const [funnel, setFunnel] = useState([])
+  const [funnelWeeks, setFunnelWeeks] = useState(8)
+  const [summaryRange, setSummaryRange] = useState('this_week')
   const [loading, setLoading] = useState(() => !cachePeek(cacheKey))
 
   useEffect(() => {
     loadData()
   }, [currentPerson?.id, isAdmin])
 
+  // Funnel refetches on its own when the weeks window changes.
+  useEffect(() => {
+    if (!currentPerson?.id || !isAdmin) return
+    getWeeklyFunnel(funnelWeeks, null).then(setFunnel).catch(() => {})
+  }, [currentPerson?.id, isAdmin, funnelWeeks])
+
   async function loadData() {
     if (!currentPerson?.id) return
     try {
-      const [dashboardData, rows, myRows, career, funnelRows] = await Promise.all([
+      const [dashboardData, rows, myRows, career] = await Promise.all([
         getCRMDashboardData(currentPerson.id),
-        // Admins get all-team rows; non-admins only their own.
-        getOutreachStatsByPerson(7, isAdmin ? null : currentPerson.id).catch(() => []),
+        // Admins get all-team rows; non-admins only their own. Fetched wide
+        // enough for every summary-range preset, filtered client-side.
+        getOutreachStatsByPerson(SUMMARY_FETCH_DAYS, isAdmin ? null : currentPerson.id).catch(() => []),
         getOutreachStatsByPerson(90, currentPerson.id).catch(() => []),
-        getCareerOutreachCount(currentPerson.id).catch(() => 0),
-        isAdmin ? getWeeklyFunnel(FUNNEL_WEEKS, null).catch(() => []) : Promise.resolve([])
+        getCareerOutreachCount(currentPerson.id).catch(() => 0)
       ])
       setData(dashboardData)
       setOutreachRows(rows)
       setPersonalRows(myRows)
       setCareerTotal(career)
-      setFunnel(funnelRows)
     } catch (error) {
       console.error('Failed to load dashboard:', error)
     } finally {
@@ -90,29 +145,39 @@ function Dashboard() {
   const milestone = useMemo(() => milestoneFor(careerTotal), [careerTotal])
 
   const today = istToday()
-  const weekStart = istAddDays(today, -6)
+  const { start: rangeStart, end: rangeEnd } = summaryRangeBounds(summaryRange, today)
+  const rangeLabel = SUMMARY_RANGES.find(r => r.key === summaryRange)?.label || 'This Week'
 
-  // Compute per-person stats from raw outreach rows
-  const personStats = useMemo(() => {
+  // Today's counts, independent of the selected summary range.
+  const todayCounts = useMemo(() => {
     const map = new Map()
     for (const r of outreachRows) {
-      if (!map.has(r.logged_by)) {
-        map.set(r.logged_by, { todayCount: 0, weekCount: 0, weekReplies: 0 })
-      }
-      const s = map.get(r.logged_by)
-      s.weekCount += 1
-      if (r.status === 'replied') s.weekReplies += 1
-      if (r.outreach_date === today) s.todayCount += 1
+      if (r.outreach_date === today) map.set(r.logged_by, (map.get(r.logged_by) || 0) + 1)
     }
     return map
   }, [outreachRows, today])
 
-  // Team totals for this week
+  // Per-person stats within the selected summary range.
+  const personStats = useMemo(() => {
+    const map = new Map()
+    for (const r of outreachRows) {
+      if (r.outreach_date < rangeStart || r.outreach_date > rangeEnd) continue
+      if (!map.has(r.logged_by)) {
+        map.set(r.logged_by, { count: 0, replies: 0 })
+      }
+      const s = map.get(r.logged_by)
+      s.count += 1
+      if (r.status === 'replied') s.replies += 1
+    }
+    return map
+  }, [outreachRows, rangeStart, rangeEnd])
+
+  // Team totals for the selected range
   const teamWeek = useMemo(() => {
     let total = 0, replies = 0
     for (const s of personStats.values()) {
-      total += s.weekCount
-      replies += s.weekReplies
+      total += s.count
+      replies += s.replies
     }
     return { total, replies, replyRate: total > 0 ? Math.round((replies / total) * 100) : 0 }
   }, [personStats])
@@ -149,10 +214,10 @@ function Dashboard() {
         </div>
         <div className="today-outreach-grid">
           {visiblePeople.map(person => {
-            const stats = personStats.get(person.id) || { todayCount: 0, weekCount: 0, weekReplies: 0 }
+            const todayCount = todayCounts.get(person.id) || 0
             const personTarget = dailyTargetOf(person)
-            const pct = Math.min(100, (stats.todayCount / personTarget) * 100)
-            const hit = stats.todayCount >= personTarget
+            const pct = Math.min(100, (todayCount / personTarget) * 100)
+            const hit = todayCount >= personTarget
             const isMe = person.id === currentPerson?.id
             return (
               <div key={person.id} className={`person-outreach-card${isMe ? ' person-outreach-card-me' : ''}`}>
@@ -162,7 +227,7 @@ function Dashboard() {
                 </div>
                 <div className="person-outreach-count-row">
                   <span className={`person-outreach-count${hit ? ' person-outreach-count-hit' : ''}`}>
-                    {stats.todayCount}
+                    {todayCount}
                   </span>
                   <span className="person-outreach-goal">/ {personTarget}</span>
                 </div>
@@ -178,11 +243,14 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* This Week Summary */}
+      {/* Team summary — selectable window */}
       <div className="card dashboard-card">
-        <div className="dashboard-card-header">
-          <h2><Calendar size={20} /> {isAdmin ? 'This Week' : 'My Week'}</h2>
-          <span className="dashboard-date-label">{fmtDate(weekStart)} – {fmtDate(today)}</span>
+        <div className="dashboard-card-header" style={{ flexWrap: 'wrap', gap: '10px' }}>
+          <h2><Calendar size={20} /> {isAdmin ? rangeLabel : `My ${rangeLabel}`}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <RangePills options={SUMMARY_RANGES} value={summaryRange} onChange={setSummaryRange} />
+            <span className="dashboard-date-label">{fmtDate(rangeStart)} – {fmtDate(rangeEnd)}</span>
+          </div>
         </div>
         <div className="week-summary-grid">
           <div className="week-stat-block">
@@ -222,16 +290,16 @@ function Dashboard() {
               <span>Rate</span>
             </div>
             {visiblePeople.map(person => {
-              const s = personStats.get(person.id) || { weekCount: 0, weekReplies: 0 }
-              const rate = s.weekCount > 0 ? Math.round((s.weekReplies / s.weekCount) * 100) : 0
+              const s = personStats.get(person.id) || { count: 0, replies: 0 }
+              const rate = s.count > 0 ? Math.round((s.replies / s.count) * 100) : 0
               return (
                 <div key={person.id} className="week-person-row">
                   <span className="week-person-name">
                     {person.name}
                     {person.id === currentPerson?.id && <span className="person-outreach-you">you</span>}
                   </span>
-                  <span>{s.weekCount}</span>
-                  <span>{s.weekReplies}</span>
+                  <span>{s.count}</span>
+                  <span>{s.replies}</span>
                   <span className={rate >= 10 ? 'week-stat-good' : ''}>{rate}%</span>
                 </div>
               )
@@ -241,7 +309,9 @@ function Dashboard() {
       </div>
 
       {/* Weekly funnel — admin only: outreach → replies → meetings → demos */}
-      {isAdmin && funnel.length > 0 && <FunnelCard funnel={funnel} />}
+      {isAdmin && funnel.length > 0 && (
+        <FunnelCard funnel={funnel} weeks={funnelWeeks} onWeeksChange={setFunnelWeeks} />
+      )}
 
       {/* Pipeline Overview */}
       <div className="card dashboard-card">
@@ -408,7 +478,7 @@ const pct = (num, den) => den > 0 ? Math.round((num / den) * 100) : 0
 
 // Admin-only: weekly outreach → reply → meeting funnel with WoW deltas.
 // "Mtg conv" = (meetings + demos) / outreach for the week.
-function FunnelCard({ funnel }) {
+function FunnelCard({ funnel, weeks, onWeeksChange }) {
   const curr = funnel[funnel.length - 1]
   const prev = funnel.length > 1 ? funnel[funnel.length - 2] : null
   const newestFirst = [...funnel].reverse()
@@ -426,7 +496,14 @@ function FunnelCard({ funnel }) {
     <div className="card dashboard-card">
       <div className="dashboard-card-header">
         <h2><TrendingUp size={20} /> Funnel</h2>
-        <span className="dashboard-date-label">last {funnel.length} weeks · this week vs last</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <RangePills
+            options={FUNNEL_WEEK_OPTIONS.map(n => ({ key: n, label: `${n}w` }))}
+            value={weeks}
+            onChange={onWeeksChange}
+          />
+          <span className="dashboard-date-label">last {funnel.length} weeks · this week vs last</span>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', marginBottom: '16px' }}>
