@@ -10,6 +10,7 @@ import {
 import { isLinkedInUrl } from '../lib/linkedin'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
+import { isAdminUser } from '../lib/admin'
 import {
   Inbox,
   Plus,
@@ -23,14 +24,6 @@ import {
 } from 'lucide-react'
 
 const UNBATCHED_KEY = '__unbatched__'
-
-// Mirrors the helper in Layout.jsx — admins can split queue assignments
-// across the team; non-admins only see / add to their own queue.
-const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
-function isAdminUser(person) {
-  if (!person) return false
-  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
-}
 
 function OutreachQueue() {
   const { currentPerson, people } = useApp()

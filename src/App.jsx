@@ -15,6 +15,7 @@ import LeadsBoard from './pages/LeadsBoard'
 import LeadDetail from './pages/LeadDetail'
 import Investors from './pages/Investors'
 import InvestorDetail from './pages/InvestorDetail'
+import { isAdminUser } from './lib/admin'
 
 // After a deploy, users with a cached index.html reference chunk filenames
 // that no longer exist on the CDN. Detect that failure mode and reload once
@@ -64,12 +65,6 @@ export const AppContext = createContext()
 
 export function useApp() {
   return useContext(AppContext)
-}
-
-const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
-function isAdminUser(person) {
-  if (!person) return false
-  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
 }
 
 function AppContent() {

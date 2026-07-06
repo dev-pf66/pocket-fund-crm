@@ -11,6 +11,7 @@ import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, X } from 'lucide-react'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { istToday, istAddDays } from '../lib/dateUtils'
+import { isAdminUser } from '../lib/admin'
 
 // Effective YYYY-MM-DD (IST) for a demo. Prefers the timed datetime,
 // falls back to the date-only field. en-CA locale yields YYYY-MM-DD.
@@ -182,13 +183,6 @@ function fromLocalIstInput(local) {
   // Date.UTC gives the UTC ms for that wall-clock time; subtract the IST
   // offset so the resulting timestamp represents that IST instant.
   return new Date(Date.UTC(y, m - 1, d, hh, mm) - 5.5 * 60 * 60 * 1000).toISOString()
-}
-
-// Mirrors the helper in Layout.jsx.
-const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
-function isAdminUser(person) {
-  if (!person) return false
-  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
 }
 
 function PEOSBoard() {

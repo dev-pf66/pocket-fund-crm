@@ -8,14 +8,7 @@ import QuickAddCard from '../components/QuickAddCard'
 import { Plus, Search, Filter, Upload, Save, ChevronDown, X, Bookmark } from 'lucide-react'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
-
-// Mirrors the helper in Layout.jsx — admins see the whole team's leads on
-// the pipeline; everyone else is scoped to their own book.
-const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
-function isAdminUser(person) {
-  if (!person) return false
-  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
-}
+import { isAdminUser } from '../lib/admin'
 
 const STAGES = [
   { key: 'new_lead', label: 'New Leads', color: '#a78bfa' },

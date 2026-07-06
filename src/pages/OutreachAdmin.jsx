@@ -10,6 +10,7 @@ import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { useLeadTypes } from '../hooks/useLeadTypes'
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import LeadForm from './LeadForm'
+import { isAdminUser } from '../lib/admin'
 
 const DAILY_GOAL = 10
 const WEEKLY_GOAL = 50
@@ -677,14 +678,6 @@ function StatTile({ icon, label, value, sub }) {
       </div>
     </div>
   )
-}
-
-// Admins can view team-wide outreach + drill into any teammate. Non-admins
-// stay scoped to themselves. Mirrors the isAdminUser helper in Layout.jsx.
-const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
-function isAdminUser(person) {
-  if (!person) return false
-  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
 }
 
 // Inline editor for the lead behind an outreach entry. Handles both cases:

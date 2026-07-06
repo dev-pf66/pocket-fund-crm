@@ -4,6 +4,7 @@ import { getCRMDashboardData, getOutreachStatsByPerson, cachePeek } from '../lib
 import { useApp } from '../App'
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
 import { TrendingUp, AlertCircle, Calendar, Activity, Clock, FlaskConical } from 'lucide-react'
+import { isAdminUser } from '../lib/admin'
 
 const DAILY_GOAL = 10
 
@@ -19,13 +20,6 @@ const PIPELINE_SEGMENTS = [
 function daysSince(dateStr) {
   if (!dateStr) return null
   return Math.ceil((Date.now() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
-}
-
-// Mirrors the helper in Layout.jsx.
-const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
-function isAdminUser(person) {
-  if (!person) return false
-  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
 }
 
 function Dashboard() {

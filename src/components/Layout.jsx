@@ -2,14 +2,8 @@ import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp, PARTNERS_OWNER_EMAIL } from '../App'
+import { isAdminUser } from '../lib/admin'
 import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, CheckSquare, Briefcase, Shield, Inbox, Handshake, Presentation } from 'lucide-react'
-
-// Fallback until is_admin column is populated on every person record.
-const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
-function isAdminUser(person) {
-  if (!person) return false
-  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
-}
 
 function Layout() {
   const { signOut } = useAuth()

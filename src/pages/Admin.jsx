@@ -5,15 +5,7 @@ import { getPeople, setUserAdmin, deleteUser, sendPasswordResetEmail, adminSetUs
 import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
 import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound, Archive, ArchiveRestore } from 'lucide-react'
-
-// Fallback bootstrap admin — used until the is_admin column is populated.
-// Once the migration seeds is_admin=true for this email, this is moot.
-const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
-
-function isAdminUser(person) {
-  if (!person) return false
-  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
-}
+import { isAdminUser } from '../lib/admin'
 
 function FieldOptionsSection({ title, fieldName, hint }) {
   const { toast } = useToast()

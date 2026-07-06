@@ -4,6 +4,7 @@ import { getOutreachStatsByPerson, getAllOutreachLogs, analyzeOutreach } from '.
 import { supabase } from '../lib/supabase'
 import { Send, MessageSquare, Calendar, TrendingUp, Sparkles } from 'lucide-react'
 import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
+import { isAdminUser } from '../lib/admin'
 
 // fromOffset = days back for range start, toOffset = days back for range end.
 // e.g. Yesterday: from=1,to=1 — Today: from=0,to=0 — 7d: from=6,to=0
@@ -23,13 +24,6 @@ function StatBox({ label, value, color }) {
       <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>{label}</div>
     </div>
   )
-}
-
-// Mirrors the helper in Layout.jsx.
-const BOOTSTRAP_ADMIN_EMAIL = 'dev@pocket-fund.com'
-function isAdminUser(person) {
-  if (!person) return false
-  return Boolean(person.is_admin) || person.email === BOOTSTRAP_ADMIN_EMAIL
 }
 
 function Analytics() {
