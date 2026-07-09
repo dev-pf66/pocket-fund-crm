@@ -3,7 +3,7 @@ import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp, PARTNERS_OWNER_EMAIL } from '../App'
 import { isAdminUser } from '../lib/admin'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
@@ -31,6 +31,7 @@ function Layout() {
       items: [
         { to: '/pipeline', label: 'Pipeline', icon: <Users size={18} /> },
         { to: '/pe-os', label: 'PE OS', icon: <Presentation size={18} /> },
+        { to: '/sellers', label: 'Indian Sellers', icon: <Store size={18} /> },
         { to: '/investors', label: 'Investors', icon: <Briefcase size={18} /> },
         { to: '/partners', label: 'Partners', icon: <Handshake size={18} />, show: isPartnersOwner },
       ],

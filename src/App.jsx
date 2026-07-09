@@ -54,6 +54,7 @@ const HelpAdmin = lazyWithRetry(() => import('./pages/HelpAdmin'))
 const ChatTerminal = lazyWithRetry(() => import('./components/ChatTerminal'))
 const PartnersBoard = lazyWithRetry(() => import('./pages/PartnersBoard'))
 const PEOSBoard = lazyWithRetry(() => import('./pages/PEOSBoard'))
+const SellersBoard = lazyWithRetry(() => import('./pages/SellersBoard'))
 
 // Email of the only person who can see the Potential Partners tab.
 // Personal pipeline — RLS already isolates the data, but the route + nav
@@ -177,6 +178,7 @@ function AppContent() {
               <Route path="outreach-queue" element={<OutreachQueue />} />
               <Route path="outreach-admin" element={<OutreachAdmin />} />
               <Route path="pe-os" element={<PEOSBoard />} />
+              <Route path="sellers" element={<SellersBoard />} />
               <Route path="admin" element={<Admin />} />
               <Route path="import" element={<ImportLeads />} />
               {/* Analytics is open to everyone — non-admins see only
