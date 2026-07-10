@@ -1857,7 +1857,7 @@ export async function getWeeklyFunnel(weeksBack = 8, personId = null) {
 export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
   let q = supabase
     .from('crm_outreach_log')
-    .select('logged_by, outreach_date, status, outreach_type')
+    .select('logged_by, outreach_date, status, outreach_type, lead_source')
     .gte('outreach_date', istAddDays(istDateStr(), -daysBack))
   if (personId) q = q.eq('logged_by', personId)
 
@@ -1865,6 +1865,28 @@ export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
 
   if (error) throw error
   return data || []
+}
+
+/**
+ * Raw material for Analytics' speed/follow-through metrics: leads created in
+ * the window plus every lead-linked outreach touch. Aggregation happens
+ * client-side so the page can re-slice by person/window without refetching.
+ */
+export async function getLeadTouchData(daysBack = 90) {
+  const since = istAddDays(istDateStr(), -daysBack)
+  const [leadsRes, touchesRes] = await Promise.all([
+    supabase
+      .from('crm_leads')
+      .select('id, created_at, created_by, assigned_to')
+      .gte('created_at', since),
+    supabase
+      .from('crm_outreach_log')
+      .select('lead_id, outreach_date')
+      .not('lead_id', 'is', null)
+  ])
+  if (leadsRes.error) throw leadsRes.error
+  if (touchesRes.error) throw touchesRes.error
+  return { leads: leadsRes.data || [], touches: touchesRes.data || [] }
 }
 
 // ============================================================================

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../App'
-import { getOutreachStatsByPerson, getAllOutreachLogs, analyzeOutreach } from '../lib/crm-api'
+import { getOutreachStatsByPerson, getAllOutreachLogs, analyzeOutreach, getLeadTouchData } from '../lib/crm-api'
 import { supabase } from '../lib/supabase'
-import { Send, MessageSquare, Calendar, TrendingUp, Sparkles } from 'lucide-react'
+import { Send, MessageSquare, Calendar, TrendingUp, Sparkles, Tag, Zap } from 'lucide-react'
 import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 import { isAdminUser } from '../lib/admin'
 import { replyRateColor } from '../lib/outreachMetrics'
@@ -33,6 +33,7 @@ function Analytics() {
   const [timeWin, setTimeWin] = useState(TIME_WINDOWS[3]) // default: 7 days
   const [outreachRows, setOutreachRows] = useState([])
   const [meetingRows, setMeetingRows] = useState([])
+  const [touchData, setTouchData] = useState({ leads: [], touches: [] })
   const [loading, setLoading] = useState(true)
   // personFilter is always a string ('all' or stringified id) so it round-trips
   // cleanly through <select> e.target.value (which is always a string). For
@@ -62,17 +63,19 @@ function Analytics() {
     try {
       const sinceDate = istAddDays(istToday(), -90)
 
-      const [outreach, meetings] = await Promise.all([
+      const [outreach, meetings, touch] = await Promise.all([
         getOutreachStatsByPerson(90),
         supabase
           .from('crm_lead_activities')
           .select('logged_by, activity_date, activity_type')
           .in('activity_type', ['call', 'meeting'])
           .gte('activity_date', sinceDate)
-          .then(({ data, error }) => { if (error) throw error; return data || [] })
+          .then(({ data, error }) => { if (error) throw error; return data || [] }),
+        getLeadTouchData(90).catch(() => ({ leads: [], touches: [] }))
       ])
       setOutreachRows(outreach)
       setMeetingRows(meetings)
+      setTouchData(touch)
     } catch (e) {
       console.error('Analytics load failed', e)
     } finally {
@@ -159,6 +162,65 @@ function Analytics() {
     const wks = new Set([...weekKeys, ...Object.keys(meetingsByWeek)])
     return [...wks].sort().reverse().slice(0, 8)
   }, [weekKeys, meetingsByWeek])
+
+  // Reply rate sliced by lead source — answers "which lists are worth buying".
+  // Uses the same window + person filter as everything else on the page.
+  const sourceStats = useMemo(() => {
+    const map = new Map()
+    for (const r of filteredRows) {
+      const src = (r.lead_source || '').trim() || 'Unknown'
+      if (!map.has(src)) map.set(src, { source: src, total: 0, replies: 0 })
+      const s = map.get(src)
+      s.total += 1
+      if (r.status === 'replied') s.replies += 1
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total)
+  }, [filteredRows])
+
+  // Speed & follow-through for leads *created* in the window:
+  // time-to-first-touch, untouched count, and % of touched leads with a
+  // second touch. Backfill-created leads can carry outreach dated before
+  // their created_at — clamp to 0 rather than report negative days.
+  const touchMetrics = useMemo(() => {
+    const touchesByLead = new Map()
+    for (const t of touchData.touches) {
+      const arr = touchesByLead.get(t.lead_id) || []
+      arr.push(t.outreach_date)
+      touchesByLead.set(t.lead_id, arr)
+    }
+    const inWindow = touchData.leads.filter(l => {
+      const created = (l.created_at || '').slice(0, 10)
+      if (created < sinceDate || created > toDate) return false
+      if (personFilter !== 'all') {
+        const owner = l.assigned_to ?? l.created_by
+        if (String(owner) !== personFilter) return false
+      }
+      return true
+    })
+    const firstTouchDays = []
+    let touched = 0, followedUp = 0
+    for (const l of inWindow) {
+      const dates = touchesByLead.get(l.id)
+      if (!dates?.length) continue
+      touched += 1
+      if (dates.length >= 2) followedUp += 1
+      const created = (l.created_at || '').slice(0, 10)
+      const first = [...dates].sort()[0]
+      const diff = Math.max(0, Math.round((new Date(first) - new Date(created)) / 86400000))
+      firstTouchDays.push(diff)
+    }
+    firstTouchDays.sort((a, b) => a - b)
+    const median = firstTouchDays.length
+      ? firstTouchDays[Math.floor(firstTouchDays.length / 2)]
+      : null
+    return {
+      created: inWindow.length,
+      touched,
+      untouched: inWindow.length - touched,
+      medianFirstTouch: median,
+      followUpRate: touched > 0 ? Math.round((followedUp / touched) * 100) : null
+    }
+  }, [touchData, sinceDate, toDate, personFilter])
 
   const totalMeetings = Object.values(meetingsByWeek).reduce((s, v) => s + v, 0)
   const weeksInWindow = Math.max(1, Math.ceil(days / 7))
@@ -409,6 +471,89 @@ function Analytics() {
           {meetingWeekKeys.length === 0 && (
             <div style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-500)' }}>No meeting data</div>
           )}
+        </div>
+      </div>
+
+      {/* Source Quality + Speed & Follow-Through */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        {/* Reply rate by lead source */}
+        <div className="card">
+          <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Tag size={18} /> Source Quality
+          </h2>
+          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+            Reply rate by lead source — which lists are worth it
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {sourceStats.slice(0, 8).map(s => {
+              const rate = s.total > 0 ? Math.round((s.replies / s.total) * 100) : 0
+              return (
+                <div key={s.source}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '14px' }}>
+                    <span style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{s.source}</span>
+                    <span style={{ fontWeight: '700', color: replyRateColor(rate, s.total) }}>
+                      {rate}%{' '}
+                      <span style={{ fontWeight: '400', color: 'var(--gray-500)', fontSize: '12px' }}>
+                        ({s.replies}/{s.total})
+                      </span>
+                    </span>
+                  </div>
+                  <div style={{ height: '8px', background: 'var(--gray-200)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${Math.min(100, rate * 4)}%`, height: '100%', borderRadius: '4px',
+                      background: replyRateColor(rate, s.total) === 'inherit' ? 'var(--gray-300)' : replyRateColor(rate, s.total),
+                      transition: 'width 0.4s ease'
+                    }} />
+                  </div>
+                </div>
+              )
+            })}
+            {sourceStats.length > 8 && (
+              <div style={{ fontSize: '12px', color: 'var(--gray-400)' }}>
+                + {sourceStats.length - 8} smaller sources hidden
+              </div>
+            )}
+            {sourceStats.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-500)' }}>No data in this window</div>
+            )}
+          </div>
+        </div>
+
+        {/* Speed & follow-through */}
+        <div className="card">
+          <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Zap size={18} /> Speed &amp; Follow-Through
+          </h2>
+          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+            Leads created in this window: how fast the first touch lands, and who gets a second one
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--primary)' }}>
+                {touchMetrics.medianFirstTouch != null ? `${touchMetrics.medianFirstTouch}d` : '—'}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Median time to first touch</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: touchMetrics.followUpRate == null ? 'var(--gray-400)' : touchMetrics.followUpRate >= 50 ? 'var(--success)' : '#f59e0b' }}>
+                {touchMetrics.followUpRate != null ? `${touchMetrics.followUpRate}%` : '—'}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Touched leads with a 2nd touch</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700' }}>{touchMetrics.created}</div>
+              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Leads created</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '16px', background: touchMetrics.untouched > 0 ? '#fef3c7' : 'var(--gray-50)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: touchMetrics.untouched > 0 ? '#b45309' : 'var(--success)' }}>
+                {touchMetrics.untouched}
+              </div>
+              <div style={{ fontSize: '13px', color: touchMetrics.untouched > 0 ? '#b45309' : 'var(--gray-500)', marginTop: '4px' }}>Never touched</div>
+            </div>
+          </div>
+          <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--gray-400)' }}>
+            Touches = outreach entries linked to the lead. Untouched leads sit in someone's queue.
+          </div>
         </div>
       </div>
 
