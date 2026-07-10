@@ -23,6 +23,10 @@
     {
       "path": "/api/daily-leads-v2",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/weekly-digest",
+      "schedule": "30 3 * * 1"
     }
   ]
 }
