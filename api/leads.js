@@ -5,7 +5,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Valid enum values
-const VALID_STAGES = ['new_lead', 'cold_outreach', 'responded', 'warm_lead', 'active_conversation', 'client', 'passed']
+const VALID_STAGES = ['new_lead', 'cold_outreach', 'responded', 'warm_lead', 'active_conversation', 'meeting_booked', 'client', 'reach_out_later', 'passed']
 const VALID_LEAD_TYPES = ['Independent Sponsor', 'PE Firm', 'Family Office', 'Other']
 const VALID_LEAD_SOURCES = ['LinkedIn', 'Referral', 'Cold Email', 'Event', 'Website']
 
@@ -24,9 +24,12 @@ function authenticate(req) {
   return apiKey === validKey
 }
 
+// Fields allowed when updating a lead via PATCH
+const PATCH_FIELDS = ['assigned_to', 'stage', 'next_follow_up_date', 'notes']
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key')
 
   if (req.method === 'OPTIONS') {
@@ -41,8 +44,10 @@ export default async function handler(req, res) {
     return handleGet(req, res)
   } else if (req.method === 'POST') {
     return handlePost(req, res)
+  } else if (req.method === 'PATCH') {
+    return handlePatch(req, res)
   } else {
-    return res.status(405).json({ error: 'Method not allowed. Use GET or POST.' })
+    return res.status(405).json({ error: 'Method not allowed. Use GET, POST, or PATCH.' })
   }
 }
 
@@ -145,6 +150,57 @@ async function handlePost(req, res) {
     if (error) throw error
 
     return res.status(201).json({ success: true, data })
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message })
+  }
+}
+
+async function handlePatch(req, res) {
+  try {
+    const body = req.body || {}
+    const id = req.query.id || body.id
+
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'id is required (query param or body field)' })
+    }
+
+    if (body.stage && !VALID_STAGES.includes(body.stage)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid stage. Must be one of: ${VALID_STAGES.join(', ')}`
+      })
+    }
+
+    // Whitelist updatable fields
+    const updates = {}
+    for (const field of PATCH_FIELDS) {
+      if (body[field] !== undefined) {
+        updates[field] = body[field]
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: `No updatable fields provided. Allowed: ${PATCH_FIELDS.join(', ')}`
+      })
+    }
+
+    const { data, error } = await supabase
+      .from('crm_leads')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ success: false, error: 'Lead not found' })
+      }
+      throw error
+    }
+
+    return res.status(200).json({ success: true, data })
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message })
   }

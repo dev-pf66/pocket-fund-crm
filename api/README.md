@@ -33,7 +33,9 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `GET` | [`/api/leads`](#get-apileads) | API key | List leads (filterable) |
 | `GET` | [`/api/leads?id=`](#get-apileadsid123) | API key | Get single lead by ID |
 | `POST` | [`/api/leads`](#post-apileads) | API key | Create a new lead |
+| `PATCH` | [`/api/leads?id=`](#patch-apileadsid123) | API key | Update a lead (assignment, stage, follow-up, notes) |
 | `GET` | [`/api/activities`](#get-apiactivities) | API key | List lead activities |
+| `POST` | [`/api/activities`](#post-apiactivities) | API key | Log an activity on a lead |
 | `GET` | [`/api/analytics`](#get-apianalytics) | API key | Pipeline analytics & conversion rates |
 | `POST` | [`/api/analyze-transcript`](#post-apianalyze-transcript) | API key | AI analysis of a sales call transcript |
 | `POST` | [`/api/enrich-linkedin`](#post-apienrich-linkedin) | API key | AI-powered LinkedIn profile enrichment |
@@ -244,6 +246,39 @@ curl -X POST \
 
 ---
 
+### PATCH /api/leads?id=123
+
+Update an existing lead by ID. `id` can be a query param or a body field. Only the whitelisted fields below are applied; anything else is ignored. Returns the full updated lead object.
+
+**Request Body:**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `assigned_to` | integer | Person ID to assign the lead to (`null` to unassign) |
+| `stage` | string | See [Stage enum](#stage) |
+| `next_follow_up_date` | string | ISO date (`YYYY-MM-DD`) |
+| `notes` | string | |
+
+**Example:**
+```bash
+curl -X PATCH \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "assigned_to": 5, "next_follow_up_date": "2026-07-14" }' \
+  "https://pocket-fund-crm.vercel.app/api/leads?id=123"
+```
+
+**200 Response:**
+```json
+{ "success": true, "data": { "id": 123, "assigned_to": 5, "next_follow_up_date": "2026-07-14", ... } }
+```
+
+**400 Response** (no valid fields): `{ "success": false, "error": "No updatable fields provided. Allowed: assigned_to, stage, next_follow_up_date, notes" }`
+
+**404 Response**: `{ "success": false, "error": "Lead not found" }`
+
+---
+
 ## Activities
 
 ### GET /api/activities
@@ -287,6 +322,36 @@ curl -H "x-api-key: YOUR_KEY" \
     }
   ]
 }
+```
+
+---
+
+### POST /api/activities
+
+Log an activity on a lead. Also stamps the lead's `last_activity_date` / `last_activity_type`, so staleness badges and the Today queue reflect the touch immediately.
+
+**Request Body:**
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `lead_id` | integer | **Yes** | |
+| `activity_type` | string | **Yes** | See [Activity Type enum](#activity-type) |
+| `notes` | string | No | |
+| `activity_date` | string | No | ISO timestamp; defaults to now |
+| `logged_by` | integer | No | Person ID; omit for agent-logged activities |
+
+**Example:**
+```bash
+curl -X POST \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "lead_id": 32, "activity_type": "note", "notes": "Followed up via LinkedIn" }' \
+  "https://pocket-fund-crm.vercel.app/api/activities"
+```
+
+**201 Response:**
+```json
+{ "success": true, "data": { "id": 46, "lead_id": 32, "activity_type": "note", ... } }
 ```
 
 ---
@@ -703,9 +768,12 @@ Pipeline stages a lead progresses through:
 |-------|-------------|
 | `new_lead` | Freshly added, not yet contacted |
 | `cold_outreach` | Initial contact, no response yet |
+| `responded` | Replied to outreach |
 | `warm_lead` | Responded or showed interest |
 | `active_conversation` | Ongoing discussions |
+| `meeting_booked` | Meeting scheduled |
 | `client` | Converted to paying client |
+| `reach_out_later` | Parked until a set date |
 | `passed` | Lead declined or disqualified |
 
 ### Lead Type

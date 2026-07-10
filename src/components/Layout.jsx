@@ -3,7 +3,7 @@ import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp, PARTNERS_OWNER_EMAIL } from '../App'
 import { isAdminUser } from '../lib/admin'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
@@ -20,6 +20,7 @@ function Layout() {
     {
       label: 'Daily Work',
       items: [
+        { to: '/today', label: 'Today', icon: <Sun size={18} /> },
         { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
         { to: '/outreach', label: 'Tracker', icon: <Target size={18} /> },
         { to: '/outreach-queue', label: 'Queue', icon: <Inbox size={18} /> },

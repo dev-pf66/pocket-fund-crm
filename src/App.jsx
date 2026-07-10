@@ -10,6 +10,7 @@ import Signup from './pages/Signup'
 import ResetPassword from './pages/ResetPassword'
 
 // Eagerly loaded — these are the main pages users navigate between
+import Today from './pages/Today'
 import Dashboard from './pages/Dashboard'
 import LeadsBoard from './pages/LeadsBoard'
 import LeadDetail from './pages/LeadDetail'
@@ -171,6 +172,7 @@ function AppContent() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="today" element={<Today />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="pipeline" element={<LeadsBoard />} />
               <Route path="leads/:id" element={<LeadDetail />} />
