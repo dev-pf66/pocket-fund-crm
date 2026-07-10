@@ -3,7 +3,8 @@ import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp, PARTNERS_OWNER_EMAIL } from '../App'
 import { isAdminUser } from '../lib/admin'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun } from 'lucide-react'
+import CommandPalette from './CommandPalette'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun, Search } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
@@ -72,6 +73,22 @@ function Layout() {
 
       <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <h1>PF Sales CRM</h1>
+        <button
+          onClick={() => {
+            setMobileMenuOpen(false)
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+            margin: '0 0 12px', padding: '7px 10px',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '8px', color: 'inherit', opacity: 0.75, cursor: 'pointer',
+            fontSize: '13px', textAlign: 'left'
+          }}
+        >
+          <Search size={14} /> Search
+          <span style={{ marginLeft: 'auto', fontSize: '11px', opacity: 0.7 }}>⌘K</span>
+        </button>
         <nav>{navGroups.map(group => (
           <div key={group.label} className="nav-group">
             <div className="nav-group-label">{group.label}</div>
@@ -105,6 +122,8 @@ function Layout() {
       <main className="main-content">
         <Outlet />
       </main>
+
+      <CommandPalette includePartners={isPartnersOwner} />
     </div>
   )
 }
