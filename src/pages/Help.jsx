@@ -11,7 +11,8 @@ const CATEGORIES = {
   leads: { label: 'Lead Management', icon: '👤', color: '#8b5cf6' },
   outreach: { label: 'Outreach Tracking', icon: '📧', color: '#10b981' },
   team: { label: 'Team Features', icon: '👥', color: '#f59e0b' },
-  analytics: { label: 'Analytics', icon: '📊', color: '#06b6d4' }
+  analytics: { label: 'Analytics', icon: '📊', color: '#06b6d4' },
+  sellers: { label: 'Indian Sellers', icon: '🏪', color: '#f97316' }
 }
 
 function Help() {
