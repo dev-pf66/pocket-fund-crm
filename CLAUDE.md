@@ -1,6 +1,6 @@
 # Pocket Fund Sales CRM (boston workspace)
 
-Pocket Fund's sales CRM — the source of truth for buyers, sellers, investors, and partners (deliberately NOT in the wiki). Users: Dev, Aum, and the outreach team. React SPA + Vercel serverless functions + Supabase.
+Pocket Fund's sales CRM — the source of truth for buyers, sellers, investors, and partners (deliberately NOT in the wiki). Users: Dev, Aum, Gaurav, Pushkar, and the other analysts on the outreach team. React SPA + Vercel serverless functions + Supabase.
 
 ## Repo topology
 
@@ -12,7 +12,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 - Vercel deploys from origin/main; live at https://pocket-fund-crm.vercel.app.
 - Never claim a fix is live without verifying the deployed site (global `/ship-verify` skill). A push is not a deploy; a deploy is not a verified fix.
-- Vercel crons (`vercel.json`): `daily-leads-v2` (09:00 UTC daily), `weekly-digest` (Mon 03:30 UTC = 9:00 IST → posts per-analyst rollup as a due-dated Sage task, idempotent via `crm_tt_mappings`).
+- Vercel crons (`vercel.json`): `daily-leads-v2` (09:00 UTC daily; v2 is the only version — the old `api/daily-leads.js` was deleted July 2026), `weekly-digest` (Mon 03:30 UTC = 9:00 IST → posts per-analyst rollup as a due-dated Sage task, idempotent via `crm_tt_mappings`).
 - `TASK_TRACKER_API_URL`/`TASK_TRACKER_API_KEY` + `CRON_SECRET` live in Vercel prod env — they were missing until July 2026, which silently disabled ALL task-tracker automation and the daily-leads cron. If TT automation looks dead, check these first.
 
 ## Supabase
@@ -20,7 +20,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Project ref: `lzydgdzjrgvqglxmyfjk` (https://lzydgdzjrgvqglxmyfjk.supabase.co).
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 034). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 035). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
 - `crm_investors` RLS is deliberately "Allow all access" (open to the team as the shared contact book) — do not "fix" it.
 
 ## CRM API (preferred access path for CRM data)
@@ -36,7 +36,8 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - All stage automation is **forward-only** (`advanceLeadStage`) — never regresses a lead, never touches client/passed. It deliberately skips `runStageSideEffects` to avoid double-counting.
 - Reply↔pipeline sync is bidirectional: outreach marked 'replied' advances the lead to `responded`; lead dragged to responded+ flips its latest un-replied outreach entry to 'replied'.
 - Entering `meeting_booked` auto-logs a 'meeting' activity — that's what the Dashboard Funnel counts as meetings.
-- Per-user outreach targets: `people.daily_outreach_target` / `weekly_outreach_target` (migration 032), set in Admin → All Users → Targets; NULL falls back to 10/50. The old Goals page is removed (`crm_goals` tables still exist, unused).
+- Per-user outreach targets: `people.daily_outreach_target` / `weekly_outreach_target` (migration 032), set in Admin → All Users → Targets; NULL falls back to 10/50. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
+- Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view.
 - Dev's standing product decisions (July 2026): Tracker/Queue/Log stay three separate pages; all five contact tables stay (leads, sellers, investors, partners, demos).
 
 ## Dev environment
@@ -45,6 +46,8 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Run: `npm install && npm run dev`. Build: `npm run build`. Lint: `npm run lint`.
 - `.env` is gitignored — fresh worktrees need the two `VITE_` values (unquoted). `.env.local` comes from `vercel env pull`.
 - Local `npm run dev` runs the SPA only; `api/*` functions do not run locally without `vercel dev`.
+- `@sentry/react` is installed but there is **no Sentry project yet** — don't look for one when debugging production, and don't claim errors are tracked.
+- The Apify lead finder (`scripts/apify-lead-finder.js`, `APIFY-SETUP.md`) is **abandoned** (Dev: good idea, not pursued). Don't revive or maintain it; note `daily-leads-v2` still uses apify-client independently.
 - `bot/` is a separate Telegram bot (grammY + Claude + Supabase service key) with its own package.json — **not currently running anywhere** and not part of the Vercel deploy. Don't assume it's live.
 
 ## Related docs

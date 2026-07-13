@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 
 // The pipeline owner sees the unassigned banner alongside admins. Matched by
-// name, mirroring how api/daily-leads.js resolves the same person.
+// name, mirroring how api/daily-leads-v2.js resolves the same person.
 function isPipelineOwner(person) {
   return /\baum\b/i.test(person?.name || '')
 }
