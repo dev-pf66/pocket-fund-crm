@@ -181,3 +181,45 @@ export async function onLeadStageChanged({ lead, oldStage, actorPersonId }) {
 
   return { skipped: 'stage_not_mapped', stage: newStage }
 }
+
+// Manual task creation from the CRM (an "Add Task" button on a pipeline card).
+// Unlike the automatic rules above there's no dedup — each click is a
+// deliberate, distinct task — so the mapping is keyed by the returned TT
+// task id purely for traceability.
+export async function onManualTaskCreate({ payload, actorPersonId }) {
+  const { entityType, leadId, taskType, title, description, dueDate, priority, assigneePersonId } = payload || {}
+  if (!title || !title.trim()) return { error: 'title_required' }
+  if (!dueDate) return { error: 'due_date_required' } // every task gets a due date
+
+  // Resolve the TT assignee: the chosen owner if given, else the acting user.
+  const resolveTt = async (personId) => {
+    if (!personId) return null
+    const p = await getCrmPerson(personId)
+    return p?.email ? await resolveTtPersonByEmail(p.email) : null
+  }
+  const ttAssignee = (await resolveTt(assigneePersonId)) ?? (await resolveTt(actorPersonId))
+  const ttCreator = (await resolveTt(actorPersonId)) ?? ttAssignee
+
+  const task = await tt.createTask({
+    title: title.trim(),
+    description: description?.trim() || null,
+    priority: priority || 'medium',
+    status: 'not_started',
+    due_date: dueDate,
+    assigned_to: ttAssignee,
+    created_by: ttCreator
+  })
+
+  try {
+    await upsertMapping({
+      entity_type: 'manual_task', entity_key: String(task.id),
+      tt_task_id: task.id,
+      crm_lead_id: entityType === 'lead' ? (leadId || null) : null,
+      crm_person_id: actorPersonId || null,
+      metadata: { taskType: taskType || 'custom', title: title.trim(), entityType: entityType || 'lead', crm_entity_id: leadId || null }
+    })
+  } catch (e) { console.error('manual_task mapping failed', e.message) }
+
+  await log({ event_type: 'manual_task', status: 'ok', crm_lead_id: entityType === 'lead' ? (leadId || null) : null, crm_person_id: actorPersonId || null, tt_task_id: task.id, payload, response: task })
+  return { fired: true, task }
+}

@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript, getOutreachForLead, getDemosForLead } from '../lib/crm-api'
+import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript, getOutreachForLead, getDemosForLead, createTrackerTask } from '../lib/crm-api'
 import { useApp } from '../App'
-import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck, CheckSquare } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import StageChip from '../components/StageChip'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
-import { istToday } from '../lib/dateUtils'
+import { istToday, istAddDays } from '../lib/dateUtils'
 
 const today = istToday
 const emptyActivity = () => ({ activity_type: 'call', notes: '', transcript: '', activity_date: today() })
@@ -153,6 +153,7 @@ function LeadDetail() {
   const [enriching, setEnriching] = useState(false)
   const [calculating, setCalculating] = useState(false)
   const [analysingTranscriptId, setAnalysingTranscriptId] = useState(null)
+  const [showTaskModal, setShowTaskModal] = useState(false)
 
   const rawLeadTypes = useLeadTypes()
   const leadTypeOptions = [
@@ -422,6 +423,10 @@ function LeadDetail() {
         <div style={{ display: 'flex', gap: '8px' }}>
           {!isEditing ? (
             <>
+              <button className="btn btn-secondary" onClick={() => setShowTaskModal(true)} title="Create a task in the Sage task tracker for this lead">
+                <CheckSquare size={16} />
+                Add Task
+              </button>
               <button className="btn btn-secondary" onClick={() => setIsEditing(true)} title="Edit firmographics, decision timeline, and relationship fields">
                 <Edit2 size={16} />
                 More Fields
@@ -1546,6 +1551,138 @@ function LeadDetail() {
             ))}
           </div>
         </div>
+      </div>
+
+      {showTaskModal && (
+        <TaskModal
+          leadId={lead.id}
+          firm={lead.firm_name || lead.name}
+          people={people}
+          defaultAssigneeId={lead.assigned_to || currentPerson?.id || ''}
+          onClose={() => setShowTaskModal(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// The five task types Dev signed off on. Each seeds the title/description/
+// priority/due-date; the user can tweak any field before creating.
+const TASK_PRESETS = [
+  { key: 'follow_up',    label: 'Follow up',         priority: 'high',   dueDays: 2, title: f => `Follow up with ${f}`,        desc: (f, id) => `Follow up with ${f}. CRM lead #${id}.` },
+  { key: 'reply',        label: 'Reply',             priority: 'high',   dueDays: 1, title: f => `Reply to ${f}`,              desc: (f, id) => `Reply to ${f}. CRM lead #${id}.` },
+  { key: 'meeting_prep', label: 'Prep for meeting',  priority: 'medium', dueDays: 1, title: f => `Prep for meeting with ${f}`, desc: (f, id) => `Prepare for the meeting / intro call with ${f}. CRM lead #${id}.` },
+  { key: 'send_samples', label: 'Send sample deals', priority: 'medium', dueDays: 1, title: f => `Send sample deals to ${f}`,  desc: (f, id) => `Send sample deals to ${f}. CRM lead #${id}.` },
+  { key: 'custom',       label: 'Custom',            priority: 'medium', dueDays: 2, title: () => '',                          desc: () => '' },
+]
+
+function TaskModal({ leadId, firm, people, defaultAssigneeId, onClose }) {
+  const { toast } = useToast()
+  const [taskType, setTaskType] = useState('follow_up')
+  const [saving, setSaving] = useState(false)
+
+  const presetFor = (key) => {
+    const p = TASK_PRESETS.find(x => x.key === key) || TASK_PRESETS[0]
+    return { title: p.title(firm), description: p.desc(firm, leadId), priority: p.priority, dueDate: istAddDays(istToday(), p.dueDays) }
+  }
+  const [form, setForm] = useState(() => ({ ...presetFor('follow_up'), assigneePersonId: defaultAssigneeId ? String(defaultAssigneeId) : '' }))
+
+  function selectType(key) {
+    setTaskType(key)
+    setForm(f => ({ ...f, ...presetFor(key) }))
+  }
+  const update = (field, value) => setForm(f => ({ ...f, [field]: value }))
+
+  async function submit(e) {
+    e.preventDefault()
+    if (!form.title.trim() || !form.dueDate || saving) return
+    setSaving(true)
+    try {
+      await createTrackerTask({
+        entityType: 'lead', leadId, taskType,
+        title: form.title, description: form.description,
+        dueDate: form.dueDate, priority: form.priority,
+        assigneePersonId: form.assigneePersonId ? parseInt(form.assigneePersonId, 10) : null,
+      })
+      toast.success('Task added to tracker')
+      onClose()
+    } catch (err) {
+      console.error('Failed to create task:', err)
+      toast.error('Failed to create task: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Add Task</h2>
+        <form onSubmit={submit}>
+          <div className="form-group">
+            <label>Task Type</label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {TASK_PRESETS.map(p => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => selectType(p.key)}
+                  style={{
+                    padding: '5px 12px', borderRadius: '999px', fontSize: '12px', cursor: 'pointer',
+                    border: taskType === p.key ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
+                    background: taskType === p.key ? '#eff6ff' : 'white',
+                    color: taskType === p.key ? '#1d4ed8' : '#6b7280',
+                    fontWeight: taskType === p.key ? 600 : 500,
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Title *</label>
+            <input type="text" value={form.title} onChange={e => update('title', e.target.value)} placeholder="Task title" required autoFocus />
+          </div>
+
+          <div className="form-group">
+            <label>Description</label>
+            <textarea value={form.description} onChange={e => update('description', e.target.value)} rows={3} placeholder="Details (optional)" />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Due Date *</label>
+              <input type="date" value={form.dueDate} onChange={e => update('dueDate', e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label>Priority</label>
+              <select value={form.priority} onChange={e => update('priority', e.target.value)}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Assign To</label>
+            <select value={form.assigneePersonId} onChange={e => update('assigneePersonId', e.target.value)}>
+              <option value="">Me / unassigned</option>
+              {people.map(p => (
+                <option key={p.id} value={String(p.id)}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving || !form.title.trim() || !form.dueDate}>
+              {saving ? 'Adding…' : 'Add Task'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )

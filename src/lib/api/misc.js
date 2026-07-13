@@ -475,3 +475,25 @@ export async function deleteLeadTypeOption(id) {
   if (error) throw error
   cacheClear('lead_type_options')
 }
+
+// ============================================================================
+// TASK TRACKER — manual task creation
+// ============================================================================
+
+// Create a task in the Sage task tracker from the CRM (the "Add Task" button
+// on a pipeline card). Unlike fireTTEvent this awaits and returns the result
+// so the UI can confirm success or surface the error. The tracker API key is
+// server-side only, so this goes through the /api/events/fire dispatcher.
+export async function createTrackerTask(payload) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not signed in')
+  const res = await fetch('/api/events/fire', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ event_type: 'create_manual_task', payload })
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body?.error || `Failed to create task (${res.status})`)
+  if (body?.result?.error) throw new Error(body.result.error)
+  return body.result
+}

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { onOutreachLogged, onLeadStageChanged } from '../../src/lib/integrations/task-tracker.js'
+import { onOutreachLogged, onLeadStageChanged, onManualTaskCreate } from '../../src/lib/integrations/task-tracker.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY
@@ -40,6 +40,9 @@ export default async function handler(req, res) {
         result = await onLeadStageChanged({
           lead: payload.lead, oldStage: payload.oldStage, actorPersonId: actor.id
         })
+        break
+      case 'create_manual_task':
+        result = await onManualTaskCreate({ payload, actorPersonId: actor.id })
         break
       default:
         return res.status(400).json({ error: `Unknown event_type: ${event_type}` })
