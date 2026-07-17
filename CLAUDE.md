@@ -12,7 +12,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 - Vercel deploys from origin/main; live at https://pocket-fund-crm.vercel.app.
 - Never claim a fix is live without verifying the deployed site (global `/ship-verify` skill). A push is not a deploy; a deploy is not a verified fix.
-- Vercel crons (`vercel.json`): `daily-leads-v2` (09:00 UTC daily; v2 is the only version — the old `api/daily-leads.js` was deleted July 2026), `weekly-digest` (Mon 03:30 UTC = 9:00 IST → posts per-analyst rollup as a due-dated Sage task, idempotent via `crm_tt_mappings`).
+- Vercel crons (`vercel.json`): `daily-leads-v2` (09:00 UTC daily; v2 is the only version — the old `api/daily-leads.js` was deleted July 2026), `weekly-digest` (Mon 03:30 UTC = 9:00 IST → posts per-analyst rollup as a due-dated Sage task, idempotent via `crm_tt_mappings`). The digest covers **every non-archived person, zeros included** (Dev's call, July 2026) — don't filter it back down to active-only.
 - `TASK_TRACKER_API_URL`/`TASK_TRACKER_API_KEY` + `CRON_SECRET` live in Vercel prod env — they were missing until July 2026, which silently disabled ALL task-tracker automation and the daily-leads cron. If TT automation looks dead, check these first.
 
 ## Supabase
@@ -37,7 +37,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Reply↔pipeline sync is bidirectional: outreach marked 'replied' advances the lead to `responded`; lead dragged to responded+ flips its latest un-replied outreach entry to 'replied'.
 - Entering `meeting_booked` auto-logs a 'meeting' activity — that's what the Dashboard Funnel counts as meetings.
 - Per-user outreach targets: `people.daily_outreach_target` / `weekly_outreach_target` (migration 032), set in Admin → All Users → Targets; NULL falls back to 10/50. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
-- Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view.
+- Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view. Shipped July 2026 (`feature/today-tab` PR merged).
 - Dev's standing product decisions (July 2026): Tracker/Queue/Log stay three separate pages; all five contact tables stay (leads, sellers, investors, partners, demos).
 
 ## Dev environment
@@ -48,7 +48,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Local `npm run dev` runs the SPA only; `api/*` functions do not run locally without `vercel dev`.
 - `@sentry/react` is installed but there is **no Sentry project yet** — don't look for one when debugging production, and don't claim errors are tracked.
 - The Apify lead finder (`scripts/apify-lead-finder.js`, `APIFY-SETUP.md`) is **abandoned** (Dev: good idea, not pursued). Don't revive or maintain it; note `daily-leads-v2` still uses apify-client independently.
-- `bot/` is a separate Telegram bot (grammY + Claude + Supabase service key) with its own package.json — **not currently running anywhere** and not part of the Vercel deploy. Don't assume it's live.
+- `bot/` is a separate Telegram bot (grammY + Claude + Supabase service key) with its own package.json — **not currently running anywhere** and not part of the Vercel deploy. Dev's call (July 2026): low priority — keep the code but don't maintain, fix, or extend it unless he asks.
 
 ## Related docs
 
@@ -60,13 +60,14 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
 
-**IMPORTANT: This project has a knowledge graph. ALWAYS use the
-code-review-graph MCP tools BEFORE using Grep/Glob/Read to explore
-the codebase.** The graph is faster, cheaper (fewer tokens), and gives
-you structural context (callers, dependents, test coverage) that file
-scanning cannot.
+This project has a knowledge graph. **Prefer the code-review-graph MCP
+tools over Grep/Glob/Read when the server is connected** — the graph is
+faster, cheaper (fewer tokens), and gives you structural context
+(callers, dependents, test coverage) that file scanning cannot. The
+server is sometimes flaky/disconnected; when it is, fall back to
+Grep/Glob/Read without ceremony instead of waiting on it.
 
-### When to use graph tools FIRST
+### When to prefer graph tools
 
 - **Exploring code**: `semantic_search_nodes` or `query_graph` instead of Grep
 - **Understanding impact**: `get_impact_radius` instead of manually tracing imports
@@ -74,7 +75,7 @@ scanning cannot.
 - **Finding relationships**: `query_graph` with callers_of/callees_of/imports_of/tests_for
 - **Architecture questions**: `get_architecture_overview` + `list_communities`
 
-Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
+Fall back to Grep/Glob/Read when the graph doesn't cover what you need or the server is down.
 
 ### Key Tools
 

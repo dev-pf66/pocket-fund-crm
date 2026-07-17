@@ -103,7 +103,6 @@ async function buildDigest() {
   }
 
   const people = (peopleRes.data || []).filter(p => !p.is_archived)
-  const nameOf = new Map(people.map(p => [p.id, p.name]))
 
   const team = blank()
   for (const s of perPerson.values()) {
@@ -121,17 +120,19 @@ async function buildDigest() {
   )
   lines.push('')
 
-  const rows = [...perPerson.entries()]
-    .filter(([pid, s]) => nameOf.has(pid) && (s.outreach || s.prevOutreach || s.meetings))
-    .sort((a, b) => b[1].outreach - a[1].outreach)
-  for (const [pid, s] of rows) {
+  // Every active person appears, zeros included — the digest is the
+  // accountability view, so a silent week must be visible (Dev, July 2026).
+  const rows = people
+    .map(p => [p.name, perPerson.get(p.id) || blank()])
+    .sort((a, b) => b[1].outreach - a[1].outreach || a[0].localeCompare(b[0]))
+  for (const [name, s] of rows) {
     lines.push(
-      `${nameOf.get(pid)}: ${s.outreach} outreach (${delta(s.outreach, s.prevOutreach)}) · ` +
+      `${name}: ${s.outreach} outreach (${delta(s.outreach, s.prevOutreach)}) · ` +
       `${s.replies} replies (${pct(s.replies, s.outreach)}%) · ` +
       `${s.meetings} meetings${s.demos ? ` · ${s.demos} demos` : ''}${s.signups ? ` · ${s.signups} signups` : ''}`
     )
   }
-  if (rows.length === 0) lines.push('No outreach logged by anyone last week.')
+  if (team.outreach === 0) lines.push('', 'No outreach logged by anyone last week.')
 
   return { weekKey: lastStart, title: `Weekly Outreach Digest — w/o ${lastStart}`, body: lines.join('\n') }
 }
