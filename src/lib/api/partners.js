@@ -8,13 +8,14 @@ import { supabase } from '../supabase'
 // POTENTIAL PARTNERS
 // ============================================================================
 
-export async function getPartners(personId = null) {
-  let q = supabase
+// Partners is a shared team pipeline (like crm_investors) — everyone sees the
+// whole book, so we don't scope by created_by. The `personId` arg is kept for
+// backwards-compatible call sites but is ignored.
+export async function getPartners() {
+  const { data, error } = await supabase
     .from('crm_partners')
     .select('*')
     .order('updated_at', { ascending: false })
-  if (personId) q = q.eq('created_by', personId)
-  const { data, error } = await q
   if (error) throw error
   return data || []
 }

@@ -57,11 +57,6 @@ const PartnersBoard = lazyWithRetry(() => import('./pages/PartnersBoard'))
 const PEOSBoard = lazyWithRetry(() => import('./pages/PEOSBoard'))
 const SellersBoard = lazyWithRetry(() => import('./pages/SellersBoard'))
 
-// Email of the only person who can see the Potential Partners tab.
-// Personal pipeline — RLS already isolates the data, but the route + nav
-// link are gated so it never appears for other users.
-export const PARTNERS_OWNER_EMAIL = 'dev@pocket-fund.com'
-
 export const AppContext = createContext()
 
 export function useApp() {
@@ -196,9 +191,9 @@ function AppContent() {
               </>}
               <Route path="help" element={<Help />} />
               <Route path="help/admin" element={<HelpAdmin />} />
-              {currentPerson?.email === PARTNERS_OWNER_EMAIL && (
-                <Route path="partners" element={<PartnersBoard />} />
-              )}
+              {/* Partners is a shared team pipeline (like Investors) — open to
+                  everyone, not just the original owner. */}
+              <Route path="partners" element={<PartnersBoard />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

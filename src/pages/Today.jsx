@@ -28,7 +28,8 @@ import {
   Megaphone,
   ChevronDown,
   Inbox,
-  RefreshCw
+  RefreshCw,
+  XCircle
 } from 'lucide-react'
 
 // The pipeline owner sees the unassigned banner alongside admins. Matched by
@@ -136,6 +137,24 @@ function Today() {
       toast.success(`Snoozed ${lead.name} until ${fmtDate(until)}`)
     } catch (err) {
       console.error('Failed to snooze:', err)
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  async function handleDismiss(lead) {
+    setPendingId(lead.id)
+    try {
+      await updateLead(lead.id, { stage: 'passed' }, currentPerson.id)
+      setQueue(prev => ({
+        leads: prev.leads.filter(l => l.id !== lead.id),
+        total: Math.max(0, prev.total - 1)
+      }))
+      setFollowUps(prev => prev.filter(l => l.id !== lead.id))
+      toast.success(`Marked ${lead.name} dead (Passed)`)
+    } catch (err) {
+      console.error('Failed to dismiss lead:', err)
       toast.error('Failed: ' + err.message)
     } finally {
       setPendingId(null)
@@ -301,6 +320,7 @@ function Today() {
               busy={pendingId === lead.id}
               onTouched={handleTouched}
               onSnooze={handleSnooze}
+              onDismiss={handleDismiss}
             />
           ))
         )}
@@ -323,6 +343,7 @@ function Today() {
               busy={pendingId === lead.id}
               onTouched={handleTouched}
               onSnooze={handleSnooze}
+              onDismiss={handleDismiss}
               contextOverride={followUpContext(lead)}
             />
           ))
@@ -402,7 +423,7 @@ function followUpContext(lead) {
   return `day ${daysStaleFor(lead)} since last touch — cadence mark`
 }
 
-function TodayRow({ lead, settings, busy, onTouched, onSnooze, contextOverride }) {
+function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contextOverride }) {
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
   const [showSnooze, setShowSnooze] = useState(false)
@@ -411,6 +432,12 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, contextOverride }
     onTouched(lead, note)
     setNote('')
     setShowNote(false)
+  }
+
+  function confirmDismiss() {
+    if (window.confirm(`Mark ${lead.name || 'this lead'} as a dead lead (stage → Passed)? It leaves your queue.`)) {
+      onDismiss(lead)
+    }
   }
 
   return (
@@ -494,6 +521,15 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, contextOverride }
               </div>
             )}
           </div>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={confirmDismiss}
+            disabled={busy}
+            title="Mark as a dead lead (stage → Passed) and remove from the queue"
+            style={{ color: '#b91c1c' }}
+          >
+            <XCircle size={14} /> Dead
+          </button>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { useApp, PARTNERS_OWNER_EMAIL } from '../App'
+import { useApp } from '../App'
 import { isAdminUser } from '../lib/admin'
 import CommandPalette from './CommandPalette'
 import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun, Search } from 'lucide-react'
@@ -12,7 +12,6 @@ function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const isAdmin = isAdminUser(currentPerson)
-  const isPartnersOwner = currentPerson?.email === PARTNERS_OWNER_EMAIL
 
   // Grouped nav — sections keep the eleven items from reading as one flat
   // "which page do I use?" list. Each item carries a `show` flag; groups with
@@ -35,7 +34,7 @@ function Layout() {
         { to: '/pe-os', label: 'PE OS', icon: <Presentation size={18} /> },
         { to: '/sellers', label: 'Indian Sellers', icon: <Store size={18} /> },
         { to: '/investors', label: 'Investors', icon: <Briefcase size={18} /> },
-        { to: '/partners', label: 'Partners', icon: <Handshake size={18} />, show: isPartnersOwner },
+        { to: '/partners', label: 'Partners', icon: <Handshake size={18} /> },
       ],
     },
     {
@@ -123,7 +122,7 @@ function Layout() {
         <Outlet />
       </main>
 
-      <CommandPalette includePartners={isPartnersOwner} />
+      <CommandPalette includePartners />
     </div>
   )
 }

@@ -46,7 +46,9 @@ const CATEGORIES = [
   { key: 'podcast', label: 'Podcast', color: '#f59e0b' },
   { key: 'media', label: 'Media', color: '#ef4444' },
   { key: 'competitor', label: 'Competitor', color: '#6b7280' },
-  { key: 'adjacent_industry', label: 'Adjacent Industry', color: '#14b8a6' }
+  { key: 'adjacent_industry', label: 'Adjacent Industry', color: '#14b8a6' },
+  { key: 'professor', label: 'Professor', color: '#7c3aed' },
+  { key: 'research_partner', label: 'Research Partner', color: '#0d9488' }
 ]
 
 const CATEGORY_BY_KEY = Object.fromEntries(CATEGORIES.map(c => [c.key, c]))
@@ -237,7 +239,7 @@ function PartnersBoard() {
     if (!currentPerson?.id) return
     setLoading(true)
     try {
-      const data = await getPartners(currentPerson.id)
+      const data = await getPartners()
       setPartners(data)
     } catch (err) {
       console.error('Failed to load partners:', err)
@@ -373,7 +375,7 @@ function PartnersBoard() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <h1 style={{ margin: 0 }}>Partners</h1>
-          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>Personal pipeline for partnership outreach</p>
+          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>Shared team pipeline for partnership outreach</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
           <Plus size={16} /> Add Partner
