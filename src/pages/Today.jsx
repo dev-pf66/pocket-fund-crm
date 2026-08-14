@@ -415,10 +415,17 @@ function touchContext(lead) {
 
 function followUpContext(lead) {
   const today = istToday()
+  // The note is the whole point of scheduling — surface it in the row so the
+  // rep doesn't have to open the lead to remember what they promised.
+  const note = lead.follow_up_note ? ` — “${lead.follow_up_note}”` : ''
+  const cadence = lead.follow_up_cadence?.offsets?.length
+    ? ` · ${lead.follow_up_cadence.name} ${Math.min(lead.follow_up_cadence.step, lead.follow_up_cadence.offsets.length)}/${lead.follow_up_cadence.offsets.length}`
+    : ''
   if (lead.next_follow_up_date && lead.next_follow_up_date <= today) {
-    return lead.next_follow_up_date === today
+    const when = lead.next_follow_up_date === today
       ? 'follow-up scheduled for today'
       : `follow-up was scheduled for ${fmtDate(lead.next_follow_up_date)}`
+    return when + cadence + note
   }
   return `day ${daysStaleFor(lead)} since last touch — cadence mark`
 }

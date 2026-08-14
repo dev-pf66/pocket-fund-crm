@@ -5,6 +5,7 @@ import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck, CheckSquare } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import StageChip from '../components/StageChip'
+import FollowUpCard from '../components/FollowUpCard'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
 import { istToday, istAddDays } from '../lib/dateUtils'
@@ -1147,6 +1148,22 @@ function LeadDetail() {
             </div>
           )}
         </div>
+
+        {/* Reach back out — scheduled follow-up + cadence for this lead */}
+        <FollowUpCard
+          lead={lead}
+          currentPerson={currentPerson}
+          onChange={updated => {
+            // A lead row comes back for plain schedule edits; null means the
+            // action also wrote an activity, so refetch both.
+            if (updated) {
+              setLead(updated)
+              setEditedLead(updated)
+            } else {
+              refreshActivities()
+            }
+          }}
+        />
 
         {/* Tags Card */}
         <div className="card">

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../App'
 import { isAdminUser } from '../lib/admin'
 import CommandPalette from './CommandPalette'
+import NotificationBell from './NotificationBell'
 import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun, Search } from 'lucide-react'
 
 function Layout() {
@@ -88,6 +89,7 @@ function Layout() {
           <Search size={14} /> Search
           <span style={{ marginLeft: 'auto', fontSize: '11px', opacity: 0.7 }}>⌘K</span>
         </button>
+        <NotificationBell personId={currentPerson?.id} />
         <nav>{navGroups.map(group => (
           <div key={group.label} className="nav-group">
             <div className="nav-group-label">{group.label}</div>

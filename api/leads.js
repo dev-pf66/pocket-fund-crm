@@ -13,7 +13,7 @@ const VALID_LEAD_SOURCES = ['LinkedIn', 'Referral', 'Cold Email', 'Event', 'Webs
 const ALLOWED_FIELDS = [
   'name', 'email', 'phone', 'firm_name', 'linkedin_url',
   'lead_type', 'deal_criteria', 'lead_source', 'stage', 'notes',
-  'initial_conversation', 'needs_sample_deals', 'next_follow_up_date',
+  'initial_conversation', 'needs_sample_deals', 'next_follow_up_date', 'follow_up_note',
   'reach_out_later_date', 'aum', 'investment_thesis', 'portfolio_size',
   'fund_vintage'
 ]
@@ -25,7 +25,7 @@ function authenticate(req) {
 }
 
 // Fields allowed when updating a lead via PATCH
-const PATCH_FIELDS = ['assigned_to', 'stage', 'next_follow_up_date', 'notes']
+const PATCH_FIELDS = ['assigned_to', 'stage', 'next_follow_up_date', 'follow_up_note', 'notes']
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')

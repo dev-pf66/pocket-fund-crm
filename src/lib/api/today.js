@@ -7,6 +7,7 @@ import { supabase } from '../supabase'
 import { istAddDays, istWeekStart } from '../dateUtils'
 import { cacheClear, istDateStr, getDaysBetween } from './core'
 import { logActivity, calculateStaleness } from './leads'
+import { advanceFollowUpCadence, clearFollowUp } from './followups'
 import { getCRMSettings } from './misc'
 
 // ============================================================================
@@ -110,19 +111,38 @@ export async function getTodayQueue(personId, { limit = 25 } = {}) {
  * One-tap "✓ Touched": logs a note activity (which also stamps
  * last_activity_date via logActivity) so the lead drops out of the queue
  * and the touch shows up in every activity-driven metric.
+ *
+ * If the lead is running a follow-up cadence, the touch also rolls it to its
+ * next step — that's what makes a cadence self-sustaining instead of
+ * something you re-arm by hand after every reach-out.
  */
 export async function markLeadTouched(lead, currentPersonId, note = '') {
   const trimmed = (note || '').trim()
-  return logActivity(lead.id, {
+  const activity = await logActivity(lead.id, {
     activity_type: 'note',
     notes: trimmed ? `Touched — ${trimmed}` : 'Touched (Today tab)'
   }, currentPersonId)
+
+  if (lead.follow_up_cadence?.offsets?.length) {
+    await advanceFollowUpCadence(lead, currentPersonId).catch(err =>
+      console.error('Cadence advance failed (touch was logged):', err)
+    )
+  } else if (lead.next_follow_up_date) {
+    // One-off reminder, now spent.
+    await clearFollowUp(lead.id, currentPersonId).catch(err =>
+      console.error('Follow-up clear failed (touch was logged):', err)
+    )
+  }
+  return activity
 }
 
 /**
  * Follow-ups due: assigned engaged leads (responded/warm/active/meeting)
- * hitting the day-3/7/14 cadence marks (thresholds from settings), or with
- * next_follow_up_date ≤ today. Sorted most-stale first.
+ * hitting the day-3/7/14 cadence marks (thresholds from settings), plus any
+ * non-terminal lead with next_follow_up_date ≤ today — an explicitly
+ * scheduled reach-out surfaces whatever stage the lead sits in, so a
+ * "circle back in a month" on a cold lead isn't silently dropped.
+ * Sorted most-stale first.
  */
 export async function getFollowUpsDue(personId) {
   if (!personId) return []
@@ -133,13 +153,14 @@ export async function getFollowUpsDue(personId) {
     .from('crm_leads')
     .select('*')
     .eq('assigned_to', personId)
-    .in('stage', TODAY_ENGAGED_STAGES)
+    .not('stage', 'in', '(passed,client)')
   if (error) throw error
 
   const marks = new Set([t.cold, t.warm, t.active])
   return (data || [])
     .filter(lead => {
       if (lead.next_follow_up_date && lead.next_follow_up_date <= today) return true
+      if (!TODAY_ENGAGED_STAGES.includes(lead.stage)) return false
       return marks.has(daysStaleFor(lead))
     })
     .sort((a, b) => daysStaleFor(b) - daysStaleFor(a))
