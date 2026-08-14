@@ -10,6 +10,9 @@ import {
   getUnassignedLeads,
   getTeamTouchesThisWeek,
   bulkClaimLeads,
+  bulkMarkTouched,
+  bulkSnoozeLeads,
+  bulkDismissLeads,
   markLeadTouched,
   pingDevOnLead,
   updateLead,
@@ -29,7 +32,9 @@ import {
   ChevronDown,
   Inbox,
   RefreshCw,
-  XCircle
+  XCircle,
+  Square,
+  CheckSquare
 } from 'lucide-react'
 
 // The pipeline owner sees the unassigned banner alongside admins. Matched by
@@ -56,6 +61,9 @@ function Today() {
   const [pingedIds, setPingedIds] = useState(() => new Set())
   const [claiming, setClaiming] = useState(false)
   const [pullingMore, setPullingMore] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [showBulkSnooze, setShowBulkSnooze] = useState(false)
 
   const personById = useMemo(() => {
     const map = new Map()
@@ -104,6 +112,111 @@ function Today() {
     () => queue.leads.filter(l => !followUpIds.has(l.id)),
     [queue.leads, followUpIds]
   )
+
+  // Bulk selection spans both Touches and Follow-ups — same row actions,
+  // one action bar. Escalations aren't selectable (Ping Dev is idempotent
+  // per-lead already and doesn't benefit from batching).
+  const selectableLeads = useMemo(() => [...touchLeads, ...followUps], [touchLeads, followUps])
+  const selectableById = useMemo(() => new Map(selectableLeads.map(l => [l.id, l])), [selectableLeads])
+  const selectedLeads = useMemo(
+    () => [...selectedIds].map(id => selectableById.get(id)).filter(Boolean),
+    [selectedIds, selectableById]
+  )
+
+  // Drop any selected id that's fallen out of the selectable pool (touched,
+  // snoozed, dismissed, or reloaded away) so the count never lies.
+  useEffect(() => {
+    setSelectedIds(prev => {
+      const next = new Set([...prev].filter(id => selectableById.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [selectableById])
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll(ids) {
+    setSelectedIds(prev => {
+      const allSelected = ids.length > 0 && ids.every(id => prev.has(id))
+      const next = new Set(prev)
+      if (allSelected) ids.forEach(id => next.delete(id))
+      else ids.forEach(id => next.add(id))
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
+  function removeFromQueues(ids) {
+    const idSet = new Set(ids)
+    setQueue(prev => ({
+      leads: prev.leads.filter(l => !idSet.has(l.id)),
+      total: Math.max(0, prev.total - ids.filter(id => !followUpIds.has(id)).length)
+    }))
+    setFollowUps(prev => prev.filter(l => !idSet.has(l.id)))
+  }
+
+  async function handleBulkTouch() {
+    if (!selectedLeads.length) return
+    setBulkBusy(true)
+    try {
+      const { succeeded, failed } = await bulkMarkTouched(selectedLeads, currentPerson.id)
+      removeFromQueues(succeeded)
+      setCounters(prev => ({ ...prev, touchesThisWeek: prev.touchesThisWeek + succeeded.length }))
+      clearSelection()
+      if (succeeded.length) toast.success(`Logged touch on ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to log`)
+    } catch (err) {
+      console.error('Bulk touch failed:', err)
+      toast.error('Bulk touch failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkSnooze(days) {
+    if (!selectedLeads.length) return
+    setShowBulkSnooze(false)
+    setBulkBusy(true)
+    try {
+      const { succeeded, failed } = await bulkSnoozeLeads(selectedLeads, days, currentPerson.id)
+      removeFromQueues(succeeded)
+      clearSelection()
+      if (succeeded.length) toast.success(`Snoozed ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to snooze`)
+    } catch (err) {
+      console.error('Bulk snooze failed:', err)
+      toast.error('Bulk snooze failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkDismiss() {
+    if (!selectedLeads.length) return
+    if (!window.confirm(`Mark ${selectedLeads.length} lead${selectedLeads.length === 1 ? '' : 's'} as dead (stage → Passed)? They leave your queue.`)) return
+    setBulkBusy(true)
+    try {
+      const { succeeded, failed } = await bulkDismissLeads(selectedLeads, currentPerson.id)
+      removeFromQueues(succeeded)
+      clearSelection()
+      if (succeeded.length) toast.success(`Marked ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'} dead`)
+      if (failed.length) toast.error(`${failed.length} failed to update`)
+    } catch (err) {
+      console.error('Bulk dismiss failed:', err)
+      toast.error('Bulk dismiss failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
 
   async function handleTouched(lead, note) {
     setPendingId(lead.id)
@@ -295,11 +408,83 @@ function Today() {
         </div>
       )}
 
+      {/* Bulk action bar — appears once anything's checked in Touches/Follow-ups */}
+      {selectedIds.size > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: '10px 16px', marginBottom: '16px', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            position: 'sticky', top: '8px', zIndex: 5
+          }}
+        >
+          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+            {selectedIds.size} lead{selectedIds.size === 1 ? '' : 's'} selected
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkTouch} disabled={bulkBusy}>
+              <Check size={14} /> {bulkBusy ? 'Working…' : 'Mark touched'}
+            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={() => setShowBulkSnooze(v => !v)}
+                disabled={bulkBusy}
+              >
+                Snooze <ChevronDown size={12} />
+              </button>
+              {showBulkSnooze && (
+                <div
+                  style={{
+                    position: 'absolute', right: 0, top: '100%', marginTop: '4px', zIndex: 10,
+                    background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: '120px', overflow: 'hidden'
+                  }}
+                >
+                  {[[1, 'Tomorrow'], [3, '3 days'], [7, 'Next week']].map(([days, label]) => (
+                    <button
+                      key={days}
+                      onClick={() => handleBulkSnooze(days)}
+                      style={{
+                        display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+                        background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px',
+                        color: '#374151'
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={handleBulkDismiss}
+              disabled={bulkBusy}
+              style={{ color: '#b91c1c' }}
+            >
+              <XCircle size={14} /> Mark dead
+            </button>
+            <button className="btn btn-sm btn-secondary" onClick={clearSelection} disabled={bulkBusy}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Section 1 — Today's touches */}
       <SectionCard
         icon={<Check size={16} />}
         title="Today's touches"
         subtitle={`Top ${touchLeads.length} of ${queue.total} — ranked by stage weight × days stale × lead score`}
+        headerExtra={touchLeads.length > 0 && (
+          <SelectAllCheckbox
+            ids={touchLeads.map(l => l.id)}
+            selectedIds={selectedIds}
+            onToggle={() => toggleSelectAll(touchLeads.map(l => l.id))}
+          />
+        )}
       >
         {touchLeads.length === 0 ? (
           queue.total === 0 ? (
@@ -321,6 +506,8 @@ function Today() {
               onTouched={handleTouched}
               onSnooze={handleSnooze}
               onDismiss={handleDismiss}
+              selected={selectedIds.has(lead.id)}
+              onToggleSelect={() => toggleSelect(lead.id)}
             />
           ))
         )}
@@ -331,6 +518,13 @@ function Today() {
         icon={<AlarmClock size={16} />}
         title="Follow-ups due"
         subtitle="Engaged leads hitting the day 3 / 7 / 14 marks, or scheduled for today"
+        headerExtra={followUps.length > 0 && (
+          <SelectAllCheckbox
+            ids={followUps.map(l => l.id)}
+            selectedIds={selectedIds}
+            onToggle={() => toggleSelectAll(followUps.map(l => l.id))}
+          />
+        )}
       >
         {followUps.length === 0 ? (
           <EmptyState title="No follow-ups due." />
@@ -345,6 +539,8 @@ function Today() {
               onSnooze={handleSnooze}
               onDismiss={handleDismiss}
               contextOverride={followUpContext(lead)}
+              selected={selectedIds.has(lead.id)}
+              onToggleSelect={() => toggleSelect(lead.id)}
             />
           ))
         )}
@@ -376,17 +572,36 @@ function Today() {
   )
 }
 
-function SectionCard({ icon, title, subtitle, children }) {
+function SectionCard({ icon, title, subtitle, headerExtra, children }) {
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '16px' }}>
-      <div style={{ padding: '14px 18px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: '#111827', fontSize: '15px' }}>
-          {icon} {title}
+      <div style={{ padding: '14px 18px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: '#111827', fontSize: '15px' }}>
+            {icon} {title}
+          </div>
+          {subtitle && <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{subtitle}</div>}
         </div>
-        {subtitle && <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{subtitle}</div>}
+        {headerExtra}
       </div>
       <div style={{ padding: '10px' }}>{children}</div>
     </div>
+  )
+}
+
+// Header checkbox for a section — selects/deselects every visible row.
+function SelectAllCheckbox({ ids, selectedIds, onToggle }) {
+  const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id))
+  return (
+    <button
+      className="btn btn-sm btn-secondary"
+      onClick={onToggle}
+      title={allSelected ? 'Deselect all' : 'Select all'}
+      style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+    >
+      {allSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+      Select all
+    </button>
   )
 }
 
@@ -430,7 +645,7 @@ function followUpContext(lead) {
   return `day ${daysStaleFor(lead)} since last touch — cadence mark`
 }
 
-function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contextOverride }) {
+function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contextOverride, selected, onToggleSelect }) {
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
   const [showSnooze, setShowSnooze] = useState(false)
@@ -450,6 +665,16 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
   return (
     <div style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 10px', opacity: busy ? 0.5 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={onToggleSelect}
+            disabled={busy}
+            aria-label={`Select ${lead.name || 'lead'}`}
+            style={{ width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer' }}
+          />
+        )}
         <div style={{ flex: 1, minWidth: '220px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 500, color: '#111827', fontSize: '14px' }}>
