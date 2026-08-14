@@ -11,6 +11,7 @@ import {
 } from '../lib/crm-api'
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
 import { useToast } from './Toast'
+import { notifyFollowUpsChanged } from '../hooks/useFollowUpCount'
 
 const QUICK = [
   [1, 'Tomorrow'],
@@ -24,8 +25,8 @@ const QUICK = [
  * Per-lead reach-out scheduler: one date, one reason, and one click to put the
  * lead on a reusable multi-touch cadence. Writes to
  * crm_leads.next_follow_up_date — the same field the Today tab, the lead
- * cards and the sidebar bell all read, so anything scheduled here shows up
- * everywhere without a second sync path.
+ * cards and the Notifications page all read, so anything scheduled here shows
+ * up everywhere without a second sync path.
  *
  * `onChange` receives the updated lead so the parent can refresh in place, or
  * null when the parent should refetch (the "Reached out" path writes an
@@ -63,6 +64,7 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
     try {
       const updated = await fn()
       if (onChange) onChange(updated ?? null)
+      notifyFollowUpsChanged()
       toast.success(label)
     } catch (err) {
       console.error(`${label} failed:`, err)

@@ -56,6 +56,7 @@ const ChatTerminal = lazyWithRetry(() => import('./components/ChatTerminal'))
 const PartnersBoard = lazyWithRetry(() => import('./pages/PartnersBoard'))
 const PEOSBoard = lazyWithRetry(() => import('./pages/PEOSBoard'))
 const SellersBoard = lazyWithRetry(() => import('./pages/SellersBoard'))
+const Notifications = lazyWithRetry(() => import('./pages/Notifications'))
 
 export const AppContext = createContext()
 
@@ -168,6 +169,7 @@ function AppContent() {
             <Route path="/" element={<Layout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="today" element={<Today />} />
+              <Route path="notifications" element={<Notifications />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="pipeline" element={<LeadsBoard />} />
               <Route path="leads/:id" element={<LeadDetail />} />

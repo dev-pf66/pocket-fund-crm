@@ -4,13 +4,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../App'
 import { isAdminUser } from '../lib/admin'
 import CommandPalette from './CommandPalette'
-import NotificationBell from './NotificationBell'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun, Search } from 'lucide-react'
+import { useFollowUpCount } from '../hooks/useFollowUpCount'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun, Search, Bell } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
   const { currentPerson } = useApp()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const followUps = useFollowUpCount(currentPerson?.id)
 
   const isAdmin = isAdminUser(currentPerson)
 
@@ -22,6 +23,7 @@ function Layout() {
       label: 'Daily Work',
       items: [
         { to: '/today', label: 'Today', icon: <Sun size={18} /> },
+        { to: '/notifications', label: 'Notifications', icon: <Bell size={18} />, badge: followUps.total, badgeUrgent: followUps.overdue > 0 },
         { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
         { to: '/outreach', label: 'Tracker', icon: <Target size={18} /> },
         { to: '/outreach-queue', label: 'Queue', icon: <Inbox size={18} /> },
@@ -89,13 +91,25 @@ function Layout() {
           <Search size={14} /> Search
           <span style={{ marginLeft: 'auto', fontSize: '11px', opacity: 0.7 }}>⌘K</span>
         </button>
-        <NotificationBell personId={currentPerson?.id} />
         <nav>{navGroups.map(group => (
           <div key={group.label} className="nav-group">
             <div className="nav-group-label">{group.label}</div>
             {group.items.map(item => (
               <NavLink key={item.to} to={item.to} onClick={() => setMobileMenuOpen(false)}>
                 {item.icon}{item.label}
+                {item.badge > 0 && (
+                  <span
+                    title={item.badgeUrgent ? 'Overdue follow-ups' : 'Follow-ups due today'}
+                    style={{
+                      marginLeft: 'auto', minWidth: '20px', padding: '1px 6px',
+                      borderRadius: '999px', fontSize: '11px', fontWeight: 700,
+                      textAlign: 'center', color: 'white',
+                      background: item.badgeUrgent ? '#dc2626' : '#2563eb'
+                    }}
+                  >
+                    {item.badge}
+                  </span>
+                )}
               </NavLink>
             ))}
           </div>

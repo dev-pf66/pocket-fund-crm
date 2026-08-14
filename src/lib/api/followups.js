@@ -210,3 +210,37 @@ export async function getFollowUpNotifications(personId = null, { limit = 8 } = 
     leads: leads.slice(0, limit)
   }
 }
+
+/**
+ * Everything scheduled, bucketed — what the Notifications page renders.
+ * Unlike getFollowUpNotifications (counts + a preview, for the bell), this
+ * returns full lead rows and looks forward as well as back, so the page can
+ * answer "what's coming" and not just "what have I missed".
+ *
+ * personId null aggregates across every owner (admin view).
+ */
+export async function getFollowUpBoard(personId = null, { upcomingDays = 14 } = {}) {
+  const today = istToday()
+  const horizon = istAddDays(today, upcomingDays)
+
+  let q = supabase
+    .from('crm_leads')
+    .select('*')
+    .not('next_follow_up_date', 'is', null)
+    .lte('next_follow_up_date', horizon)
+    .not('stage', 'in', `(${TERMINAL_STAGES.join(',')})`)
+    .order('next_follow_up_date')
+  if (personId) q = q.eq('assigned_to', personId)
+
+  const { data, error } = await q
+  if (error) throw error
+
+  const leads = data || []
+  return {
+    overdue: leads.filter(l => l.next_follow_up_date < today),
+    dueToday: leads.filter(l => l.next_follow_up_date === today),
+    upcoming: leads.filter(l => l.next_follow_up_date > today),
+    horizon,
+    upcomingDays
+  }
+}
