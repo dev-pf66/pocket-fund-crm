@@ -104,6 +104,33 @@ export async function deleteInvestor(id) {
   cacheClear('investors')
 }
 
+/** Bulk status change — used by the Investors table's multi-select bar. */
+export async function bulkUpdateInvestorStatus(ids, status) {
+  if (!ids?.length) return 0
+  const { data, error } = await supabase
+    .from('crm_investors')
+    .update({ status })
+    .in('id', ids)
+    .select('id')
+
+  if (error) throw error
+  cacheClear('investors')
+  return (data || []).length
+}
+
+/** Bulk delete — used by the Investors table's multi-select bar. */
+export async function bulkDeleteInvestors(ids) {
+  if (!ids?.length) return 0
+  const { error } = await supabase
+    .from('crm_investors')
+    .delete()
+    .in('id', ids)
+
+  if (error) throw error
+  cacheClear('investors')
+  return ids.length
+}
+
 /**
  * Get interactions for an investor
  */

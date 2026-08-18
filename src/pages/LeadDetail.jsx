@@ -934,6 +934,24 @@ function LeadDetail() {
                 )}
               </div>
 
+              <div className="info-item">
+                <label>Added By</label>
+                <div style={{ padding: '8px 0', color: 'var(--gray-700)' }}>
+                  {people.find(p => p.id === lead.created_by)?.name || 'Unknown'}
+                </div>
+              </div>
+
+              <div className="info-item full-width">
+                <label>Next Steps</label>
+                <InlineField
+                  value={lead.next_steps}
+                  onSave={(v) => saveField('next_steps', v)}
+                  multiline
+                  placeholder="Click to note what happens next on this lead (Cmd+Enter to save)"
+                  renderValue={(v) => <span style={{ whiteSpace: 'pre-wrap' }}>{v}</span>}
+                />
+              </div>
+
               <div className="info-item full-width">
                 <label>Deal Criteria</label>
                 <InlineField

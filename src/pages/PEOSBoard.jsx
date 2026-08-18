@@ -12,6 +12,7 @@ import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, X } from 'lucid
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { istToday, istAddDays } from '../lib/dateUtils'
 import { isAdminUser } from '../lib/admin'
+import { runBulk } from '../lib/bulkActions'
 
 // Effective YYYY-MM-DD (IST) for a demo. Prefers the timed datetime,
 // falls back to the date-only field. en-CA locale yields YYYY-MM-DD.
@@ -213,6 +214,9 @@ function PEOSBoard() {
   const [dateFilter, setDateFilter] = useSessionState('peos:dateFilter', 'all')
   const [customFrom, setCustomFrom] = useSessionState('peos:customFrom', '')
   const [customTo, setCustomTo] = useSessionState('peos:customTo', '')
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkStage, setBulkStage] = useState('')
 
   useEffect(() => {
     loadDemos()
@@ -324,6 +328,70 @@ function PEOSBoard() {
     }
   }
 
+  // Drop any selected id that's scrolled out of the filtered set.
+  useEffect(() => {
+    const visible = new Set(filteredDemos.map(d => d.id))
+    setSelectedIds(prev => {
+      const next = new Set([...prev].filter(id => visible.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [filteredDemos])
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    const ids = filteredDemos.map(d => d.id)
+    setSelectedIds(prev => {
+      const allSelected = ids.length > 0 && ids.every(id => prev.has(id))
+      return allSelected ? new Set() : new Set(ids)
+    })
+  }
+
+  async function handleBulkStageMove() {
+    if (!selectedIds.size || !bulkStage) return
+    setBulkBusy(true)
+    try {
+      const targets = filteredDemos.filter(d => selectedIds.has(d.id))
+      const { succeeded, failed } = await runBulk(targets, d => moveDemo(d.id, bulkStage))
+      toast.success(`Moved ${succeeded.length} demo${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to move`)
+      setSelectedIds(new Set())
+      setBulkStage('')
+      await loadDemos()
+    } catch (err) {
+      console.error('Bulk stage move failed:', err)
+      toast.error('Bulk move failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!selectedIds.size) return
+    if (!confirm(`Delete ${selectedIds.size} demo entr${selectedIds.size === 1 ? 'y' : 'ies'}? This cannot be undone.`)) return
+    setBulkBusy(true)
+    try {
+      const targets = filteredDemos.filter(d => selectedIds.has(d.id))
+      const { succeeded, failed } = await runBulk(targets, d => deleteDemo(d.id))
+      toast.success(`Deleted ${succeeded.length} demo${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to delete`)
+      setSelectedIds(new Set())
+      await loadDemos()
+    } catch (err) {
+      console.error('Bulk delete failed:', err)
+      toast.error('Bulk delete failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   return (
     <div className="page-container">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -421,10 +489,45 @@ function PEOSBoard() {
           </button>
         )}
 
+        <button className="btn btn-sm btn-secondary" onClick={toggleSelectAll} disabled={filteredDemos.length === 0}>
+          {filteredDemos.length > 0 && filteredDemos.every(d => selectedIds.has(d.id)) ? 'Deselect all' : 'Select all shown'}
+        </button>
+
         <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
           <strong style={{ color: '#111827' }}>{filteredDemos.length}</strong> shown
         </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: '10px 16px', marginBottom: '16px', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            position: 'sticky', top: '8px', zIndex: 5
+          }}
+        >
+          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+            {selectedIds.size} demo{selectedIds.size === 1 ? '' : 's'} selected
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <select value={bulkStage} onChange={(e) => setBulkStage(e.target.value)} className="form-select" disabled={bulkBusy}>
+              <option value="">Move to stage…</option>
+              {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkStageMove} disabled={bulkBusy || !bulkStage}>
+              Apply
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={handleBulkDelete} disabled={bulkBusy}>
+              <Trash2 size={14} /> Delete
+            </button>
+            <button className="btn btn-sm btn-secondary" onClick={() => setSelectedIds(new Set())} disabled={bulkBusy}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
@@ -472,6 +575,8 @@ function PEOSBoard() {
                       onEdit={() => setEditingDemo(d)}
                       onDelete={() => handleDelete(d.id)}
                       onDragStart={handleDragStart}
+                      selected={selectedIds.has(d.id)}
+                      onToggleSelect={() => toggleSelect(d.id)}
                     />
                   ))}
                   {items.length === 0 && (
@@ -515,7 +620,7 @@ function PEOSBoard() {
   )
 }
 
-function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart }) {
+function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, selected, onToggleSelect }) {
   return (
     <div
       draggable
@@ -531,6 +636,17 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart }) 
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={onToggleSelect}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            aria-label="Select demo"
+            style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'pointer', marginTop: '2px' }}
+          />
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           {demo.lead ? (
             <Link

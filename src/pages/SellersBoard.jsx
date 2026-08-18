@@ -6,6 +6,7 @@ import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { istToday } from '../lib/dateUtils'
+import { runBulk } from '../lib/bulkActions'
 
 const todayStr = istToday
 
@@ -60,6 +61,10 @@ function SellersBoard() {
   const [showOnlyDue, setShowOnlyDue] = useSessionState('sb:showOnlyDue', false)
   const [dueExpanded, setDueExpanded] = useSessionState('sb:dueExpanded', false)
   const [searchQuery, setSearchQuery] = useSessionState('sb:searchQuery', '')
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkAssignee, setBulkAssignee] = useState('')
+  const [bulkStage, setBulkStage] = useState('')
 
   const peopleById = useMemo(
     () => Object.fromEntries((people || []).map(p => [p.id, p])),
@@ -112,6 +117,89 @@ function SellersBoard() {
 
   function sellersInStage(stage) {
     return filteredSellers.filter(s => s.stage === stage)
+  }
+
+  // Drop any selected id that's scrolled out of the filtered set.
+  useEffect(() => {
+    const visible = new Set(filteredSellers.map(s => s.id))
+    setSelectedIds(prev => {
+      const next = new Set([...prev].filter(id => visible.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [filteredSellers])
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    const ids = filteredSellers.map(s => s.id)
+    setSelectedIds(prev => {
+      const allSelected = ids.length > 0 && ids.every(id => prev.has(id))
+      return allSelected ? new Set() : new Set(ids)
+    })
+  }
+
+  async function handleBulkReassign() {
+    if (!selectedIds.size || !bulkAssignee) return
+    setBulkBusy(true)
+    try {
+      const targets = filteredSellers.filter(s => selectedIds.has(s.id))
+      const { succeeded, failed } = await runBulk(targets, s => updateSeller(s.id, { assigned_to: parseInt(bulkAssignee, 10) }))
+      toast.success(`Reassigned ${succeeded.length} seller${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to reassign`)
+      setSelectedIds(new Set())
+      setBulkAssignee('')
+      await loadSellers()
+    } catch (err) {
+      console.error('Bulk reassign failed:', err)
+      toast.error('Bulk reassign failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkStageMove() {
+    if (!selectedIds.size || !bulkStage) return
+    setBulkBusy(true)
+    try {
+      const targets = filteredSellers.filter(s => selectedIds.has(s.id))
+      const { succeeded, failed } = await runBulk(targets, s => moveSeller(s.id, bulkStage))
+      toast.success(`Moved ${succeeded.length} seller${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to move`)
+      setSelectedIds(new Set())
+      setBulkStage('')
+      await loadSellers()
+    } catch (err) {
+      console.error('Bulk stage move failed:', err)
+      toast.error('Bulk move failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!selectedIds.size) return
+    if (!confirm(`Delete ${selectedIds.size} seller${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return
+    setBulkBusy(true)
+    try {
+      const targets = filteredSellers.filter(s => selectedIds.has(s.id))
+      const { succeeded, failed } = await runBulk(targets, s => deleteSeller(s.id))
+      toast.success(`Deleted ${succeeded.length} seller${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to delete`)
+      setSelectedIds(new Set())
+      await loadSellers()
+    } catch (err) {
+      console.error('Bulk delete failed:', err)
+      toast.error('Bulk delete failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
   }
 
   function handleDragStart(e, seller) {
@@ -192,10 +280,51 @@ function SellersBoard() {
             style={{ paddingLeft: '34px', fontSize: '13px' }}
           />
         </div>
+        <button className="btn btn-sm btn-secondary" onClick={toggleSelectAll} disabled={filteredSellers.length === 0}>
+          {filteredSellers.length > 0 && filteredSellers.every(s => selectedIds.has(s.id)) ? 'Deselect all' : 'Select all shown'}
+        </button>
         <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
           <strong style={{ color: '#111827' }}>{filteredSellers.length}</strong> shown
         </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: '10px 16px', marginBottom: '16px', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            position: 'sticky', top: '8px', zIndex: 5
+          }}
+        >
+          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+            {selectedIds.size} seller{selectedIds.size === 1 ? '' : 's'} selected
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <select value={bulkAssignee} onChange={(e) => setBulkAssignee(e.target.value)} className="form-select" disabled={bulkBusy}>
+              <option value="">Reassign to…</option>
+              {(people || []).map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkReassign} disabled={bulkBusy || !bulkAssignee}>
+              Apply
+            </button>
+            <select value={bulkStage} onChange={(e) => setBulkStage(e.target.value)} className="form-select" disabled={bulkBusy}>
+              <option value="">Move to stage…</option>
+              {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkStageMove} disabled={bulkBusy || !bulkStage}>
+              Apply
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={handleBulkDelete} disabled={bulkBusy}>
+              <Trash2 size={14} /> Delete
+            </button>
+            <button className="btn btn-sm btn-secondary" onClick={() => setSelectedIds(new Set())} disabled={bulkBusy}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
 
       {dueFollowUps.length > 0 && (
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px' }}>
@@ -283,9 +412,12 @@ function SellersBoard() {
                       key={s.id}
                       seller={s}
                       owner={peopleById[s.assigned_to]}
+                      creator={peopleById[s.created_by]}
                       onEdit={() => setEditingSeller(s)}
                       onDelete={() => handleDelete(s.id)}
                       onDragStart={handleDragStart}
+                      selected={selectedIds.has(s.id)}
+                      onToggleSelect={() => toggleSelect(s.id)}
                     />
                   ))}
                   {items.length === 0 && (
@@ -339,7 +471,7 @@ function SellerMeta({ seller }) {
   )
 }
 
-function SellerCard({ seller, owner, onEdit, onDelete, onDragStart }) {
+function SellerCard({ seller, owner, creator, onEdit, onDelete, onDragStart, selected, onToggleSelect }) {
   const followUp = followUpStatus(seller.next_follow_up_date)
   return (
     <div
@@ -349,7 +481,20 @@ function SellerCard({ seller, owner, onEdit, onDelete, onDragStart }) {
       style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '10px 12px', cursor: 'grab', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-        <div style={{ fontWeight: 600, fontSize: '13px', color: '#111827', lineHeight: 1.3 }}>{seller.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+          {onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={onToggleSelect}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              aria-label={`Select ${seller.name || 'seller'}`}
+              style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'pointer' }}
+            />
+          )}
+          <div style={{ fontWeight: 600, fontSize: '13px', color: '#111827', lineHeight: 1.3 }}>{seller.name}</div>
+        </div>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
           title="Delete"
@@ -360,6 +505,12 @@ function SellerCard({ seller, owner, onEdit, onDelete, onDragStart }) {
       </div>
 
       <SellerMeta seller={seller} />
+
+      {creator?.name && (
+        <div style={{ fontSize: '10px', color: '#9ca3af', fontStyle: 'italic', marginBottom: '4px' }}>
+          Added by {creator.name}
+        </div>
+      )}
 
       {seller.meeting_date && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px', marginRight: '6px', fontSize: '10px', fontWeight: 600, padding: '2px 6px', borderRadius: '999px', background: '#eff6ff', color: '#1d4ed8' }}>

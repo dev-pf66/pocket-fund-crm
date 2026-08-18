@@ -7,6 +7,7 @@ import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { istToday } from '../lib/dateUtils'
+import { runBulk } from '../lib/bulkActions'
 
 const todayStr = istToday
 
@@ -184,8 +185,12 @@ function CategoryChips({ value, onChange, available, onAddCustom, disabled = fal
 }
 
 function PartnersBoard() {
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const { toast } = useToast()
+  const peopleById = useMemo(
+    () => Object.fromEntries((people || []).map(p => [p.id, p])),
+    [people]
+  )
   const isMobile = useIsMobileDevice()
   const [partners, setPartners] = useState([])
   const [loading, setLoading] = useState(true)
@@ -199,6 +204,9 @@ function PartnersBoard() {
 
   const [searchQuery, setSearchQuery] = useSessionState('pb:searchQuery', '')
   const [categoryFilter, setCategoryFilter] = useSessionState('pb:categoryFilter', 'all')
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkStage, setBulkStage] = useState('')
 
   // LinkedIn quick-add: paste a profile URL, toggle one or more categories,
   // hit Add. Multi-select so a contact can be both e.g. Creator + Podcast.
@@ -280,6 +288,70 @@ function PartnersBoard() {
 
   function partnersInStage(stage) {
     return filteredPartners.filter(p => p.stage === stage)
+  }
+
+  // Drop any selected id that's scrolled out of the filtered set.
+  useEffect(() => {
+    const visible = new Set(filteredPartners.map(p => p.id))
+    setSelectedIds(prev => {
+      const next = new Set([...prev].filter(id => visible.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [filteredPartners])
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    const ids = filteredPartners.map(p => p.id)
+    setSelectedIds(prev => {
+      const allSelected = ids.length > 0 && ids.every(id => prev.has(id))
+      return allSelected ? new Set() : new Set(ids)
+    })
+  }
+
+  async function handleBulkStageMove() {
+    if (!selectedIds.size || !bulkStage) return
+    setBulkBusy(true)
+    try {
+      const targets = filteredPartners.filter(p => selectedIds.has(p.id))
+      const { succeeded, failed } = await runBulk(targets, p => movePartner(p.id, bulkStage))
+      toast.success(`Moved ${succeeded.length} partner${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to move`)
+      setSelectedIds(new Set())
+      setBulkStage('')
+      await loadPartners()
+    } catch (err) {
+      console.error('Bulk stage move failed:', err)
+      toast.error('Bulk move failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!selectedIds.size) return
+    if (!confirm(`Delete ${selectedIds.size} partner${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return
+    setBulkBusy(true)
+    try {
+      const targets = filteredPartners.filter(p => selectedIds.has(p.id))
+      const { succeeded, failed } = await runBulk(targets, p => deletePartner(p.id))
+      toast.success(`Deleted ${succeeded.length} partner${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to delete`)
+      setSelectedIds(new Set())
+      await loadPartners()
+    } catch (err) {
+      console.error('Bulk delete failed:', err)
+      toast.error('Bulk delete failed: ' + err.message)
+    } finally {
+      setBulkBusy(false)
+    }
   }
 
   function handleDragStart(e, partner) {
@@ -445,10 +517,45 @@ function PartnersBoard() {
           ))}
         </select>
 
+        <button className="btn btn-sm btn-secondary" onClick={toggleSelectAll} disabled={filteredPartners.length === 0}>
+          {filteredPartners.length > 0 && filteredPartners.every(p => selectedIds.has(p.id)) ? 'Deselect all' : 'Select all shown'}
+        </button>
+
         <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
           <strong style={{ color: '#111827' }}>{filteredPartners.length}</strong> shown
         </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: '10px 16px', marginBottom: '16px', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            position: 'sticky', top: '8px', zIndex: 5
+          }}
+        >
+          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+            {selectedIds.size} partner{selectedIds.size === 1 ? '' : 's'} selected
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <select value={bulkStage} onChange={(e) => setBulkStage(e.target.value)} className="form-select" disabled={bulkBusy}>
+              <option value="">Move to stage…</option>
+              {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkStageMove} disabled={bulkBusy || !bulkStage}>
+              Apply
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={handleBulkDelete} disabled={bulkBusy}>
+              <Trash2 size={14} /> Delete
+            </button>
+            <button className="btn btn-sm btn-secondary" onClick={() => setSelectedIds(new Set())} disabled={bulkBusy}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
 
       {dueFollowUps.length > 0 && (
         <div
@@ -582,9 +689,12 @@ function PartnersBoard() {
                     <PartnerCard
                       key={p.id}
                       partner={p}
+                      creator={peopleById[p.created_by]}
                       onEdit={() => setEditingPartner(p)}
                       onDelete={() => handleDelete(p.id)}
                       onDragStart={handleDragStart}
+                      selected={selectedIds.has(p.id)}
+                      onToggleSelect={() => toggleSelect(p.id)}
                     />
                   ))}
                   {items.length === 0 && (
@@ -628,7 +738,7 @@ function PartnersBoard() {
   )
 }
 
-function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
+function PartnerCard({ partner, creator, onEdit, onDelete, onDragStart, selected, onToggleSelect }) {
   const cats = (partner.categories || []).map(k => ({
     key: k,
     label: labelForCategory(k),
@@ -650,8 +760,21 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-        <div style={{ fontWeight: 600, fontSize: '13px', color: '#111827', lineHeight: 1.3 }}>
-          {partner.name}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+          {onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={onToggleSelect}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              aria-label={`Select ${partner.name || 'partner'}`}
+              style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'pointer' }}
+            />
+          )}
+          <div style={{ fontWeight: 600, fontSize: '13px', color: '#111827', lineHeight: 1.3 }}>
+            {partner.name}
+          </div>
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
@@ -669,6 +792,12 @@ function PartnerCard({ partner, onEdit, onDelete, onDragStart }) {
       {(partner.company_name || partner.industry) && (
         <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
           {[partner.company_name, partner.industry].filter(Boolean).join(' · ')}
+        </div>
+      )}
+
+      {creator?.name && (
+        <div style={{ fontSize: '10px', color: '#9ca3af', fontStyle: 'italic', marginBottom: '4px' }}>
+          Added by {creator.name}
         </div>
       )}
 

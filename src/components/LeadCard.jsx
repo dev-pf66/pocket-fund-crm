@@ -20,9 +20,10 @@ function urgencyForLead(lead, latestOutreachStatus) {
   return null
 }
 
-const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, onDragStart, onClick, onRefresh }) {
-  const { currentPerson } = useApp()
+const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, onDragStart, onClick, onRefresh, selected, onToggleSelect }) {
+  const { currentPerson, people } = useApp()
   const [logging, setLogging] = useState(false)
+  const addedByName = people?.find(p => p.id === lead.created_by)?.name
 
   const handleQuickLog = useCallback(async function handleQuickLog(e, activityType) {
     e.stopPropagation()
@@ -81,6 +82,17 @@ const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, 
     >
       <div className="lead-card-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+          {onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={onToggleSelect}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              aria-label={`Select ${lead.name || 'lead'}`}
+              style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'pointer' }}
+            />
+          )}
           {urgency && (
             <span
               title={urgency.title}
@@ -100,6 +112,12 @@ const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, 
       <div className="lead-card-body">
         {lead.firm_name && (
           <p className="lead-firm">{lead.firm_name}</p>
+        )}
+
+        {addedByName && (
+          <div style={{ fontSize: '10px', color: '#9ca3af', fontStyle: 'italic' }}>
+            Added by {addedByName}
+          </div>
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>

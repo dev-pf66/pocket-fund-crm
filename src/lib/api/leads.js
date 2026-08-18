@@ -192,11 +192,20 @@ export async function createLead(leadData, currentPersonId) {
   const clean = { ...leadData }
   if (clean.outreach_stage === '') clean.outreach_stage = null
 
+  // Default ownership to whoever's adding the lead, so it never sits
+  // unassigned waiting to be swept up by an admin's "Claim all" pass —
+  // that's what was routing every lead to Dev.
+  if (clean.assigned_to === undefined || clean.assigned_to === null || clean.assigned_to === '') {
+    clean.assigned_to = currentPersonId
+    clean.assigned_by = currentPersonId
+  }
+
   const { data, error } = await supabase
     .from('crm_leads')
     .insert([{
       ...clean,
       created_by: currentPersonId,
+      assigned_date: new Date().toISOString(),
       last_activity_date: new Date().toISOString(),
       last_activity_type: 'created'
     }])

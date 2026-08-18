@@ -1,6 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getInvestors, createInvestor, updateInvestor, deleteInvestor, cachePeek } from '../lib/crm-api'
+import {
+  getInvestors,
+  createInvestor,
+  updateInvestor,
+  deleteInvestor,
+  bulkUpdateInvestorStatus,
+  bulkDeleteInvestors,
+  cachePeek
+} from '../lib/crm-api'
 import { useApp } from '../App'
 import { Plus, Search, Edit2, Trash2, X } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -59,7 +67,7 @@ function formatStatusLabel(status) {
 }
 
 function Investors() {
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const { toast } = useToast()
   const navigate = useNavigate()
   // Seed from cache so sidebar nav back to Investors renders instantly.
@@ -71,10 +79,27 @@ function Investors() {
   const [filterType, setFilterType] = useSessionState('inv:filterType', '')
   const [filterStatus, setFilterStatus] = useSessionState('inv:filterStatus', '')
   const [formData, setFormData, clearFormData] = useSessionState('inv:formData', EMPTY_FORM)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkStatus, setBulkStatus] = useState('')
+
+  const peopleById = useMemo(
+    () => Object.fromEntries((people || []).map(p => [p.id, p])),
+    [people]
+  )
 
   useEffect(() => {
     loadInvestors()
   }, [])
+
+  // Drop selected ids that no longer exist (deleted, or filtered out of view).
+  useEffect(() => {
+    const liveIds = new Set(investors.map(inv => inv.id))
+    setSelectedIds(prev => {
+      const next = new Set([...prev].filter(id => liveIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [investors])
 
   async function loadInvestors() {
     try {
@@ -100,6 +125,59 @@ function Investors() {
       if (filterStatus && inv.status !== filterStatus) return false
       return true
     })
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll(ids) {
+    setSelectedIds(prev => {
+      const allSelected = ids.length > 0 && ids.every(id => prev.has(id))
+      const next = new Set(prev)
+      if (allSelected) ids.forEach(id => next.delete(id))
+      else ids.forEach(id => next.add(id))
+      return next
+    })
+  }
+
+  async function handleBulkStatus() {
+    if (!selectedIds.size || !bulkStatus) return
+    setBulkBusy(true)
+    try {
+      const count = await bulkUpdateInvestorStatus([...selectedIds], bulkStatus)
+      toast.success(`Updated ${count} investor${count === 1 ? '' : 's'} to ${formatStatusLabel(bulkStatus)}`)
+      setSelectedIds(new Set())
+      setBulkStatus('')
+      await loadInvestors()
+    } catch (error) {
+      console.error('Bulk status update failed:', error)
+      toast.error('Bulk update failed: ' + error.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!selectedIds.size) return
+    if (!confirm(`Delete ${selectedIds.size} investor${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return
+    setBulkBusy(true)
+    try {
+      const count = await bulkDeleteInvestors([...selectedIds])
+      toast.success(`Deleted ${count} investor${count === 1 ? '' : 's'}`)
+      setSelectedIds(new Set())
+      await loadInvestors()
+    } catch (error) {
+      console.error('Bulk delete failed:', error)
+      toast.error('Bulk delete failed: ' + error.message)
+    } finally {
+      setBulkBusy(false)
+    }
   }
 
   function handleEdit(e, investor) {
@@ -290,17 +368,62 @@ function Investors() {
         </div>
       )}
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: '10px 16px', marginBottom: '12px', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe'
+          }}
+        >
+          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+            {selectedIds.size} investor{selectedIds.size === 1 ? '' : 's'} selected
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <select
+              value={bulkStatus}
+              onChange={(e) => setBulkStatus(e.target.value)}
+              className="form-select"
+              disabled={bulkBusy}
+            >
+              <option value="">Set status…</option>
+              {INVESTOR_STATUSES.map(s => <option key={s} value={s}>{formatStatusLabel(s)}</option>)}
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkStatus} disabled={bulkBusy || !bulkStatus}>
+              Apply
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={handleBulkDelete} disabled={bulkBusy}>
+              <Trash2 size={14} /> Delete
+            </button>
+            <button className="btn btn-sm btn-secondary" onClick={() => setSelectedIds(new Set())} disabled={bulkBusy}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="card">
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table" style={{ width: '100%' }}>
             <thead>
               <tr>
+                <th style={{ width: '32px' }}>
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && filtered.every(inv => selectedIds.has(inv.id))}
+                    onChange={() => toggleSelectAll(filtered.map(inv => inv.id))}
+                    aria-label="Select all"
+                  />
+                </th>
                 <th>Name</th>
                 <th>Firm</th>
                 <th>Type</th>
                 <th>Check Size</th>
                 <th>Status</th>
+                <th>Added By</th>
                 <th>Last Updated</th>
                 <th style={{ width: '100px' }}>Actions</th>
               </tr>
@@ -308,18 +431,27 @@ function Investors() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-400)' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-400)' }}>
                     {investors.length === 0 ? 'No investors yet. Add your first investor contact above.' : 'No investors match your filters.'}
                   </td>
                 </tr>
               ) : (
                 filtered.map(inv => (
                   <tr key={inv.id} onClick={() => navigate(`/investors/${inv.id}`)} style={{ cursor: 'pointer' }}>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(inv.id)}
+                        onChange={() => toggleSelect(inv.id)}
+                        aria-label={`Select ${inv.name}`}
+                      />
+                    </td>
                     <td style={{ fontWeight: 600 }}>{inv.name}</td>
                     <td>{inv.firm || '—'}</td>
                     <td><span className="badge">{inv.investor_type}</span></td>
                     <td>{formatCheckSize(inv.check_size_min, inv.check_size_max)}</td>
                     <td><span className={`status-badge investor-status-${inv.status}`}>{formatStatusLabel(inv.status)}</span></td>
+                    <td style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{peopleById[inv.created_by]?.name || '—'}</td>
                     <td>{inv.updated_at ? new Date(inv.updated_at).toLocaleDateString() : '—'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '4px' }}>

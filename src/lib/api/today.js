@@ -7,6 +7,7 @@ import { supabase } from '../supabase'
 import { istAddDays, istWeekStart } from '../dateUtils'
 import { cacheClear, istDateStr, getDaysBetween } from './core'
 import { logActivity, calculateStaleness, updateLead } from './leads'
+import { runBulk } from '../bulkActions'
 import { advanceFollowUpCadence, clearFollowUp } from './followups'
 import { getCRMSettings } from './misc'
 
@@ -242,23 +243,6 @@ export async function bulkClaimLeads(leadIds, personId) {
   cacheClear('leads')
   cacheClear('dashboard')
   return claimed
-}
-
-/**
- * Bulk versions of the Today-row actions. Each just fans the existing
- * single-lead function out with Promise.allSettled so one bad lead (stale
- * cache, RLS edge case) doesn't sink the whole batch — callers get back
- * which ids actually went through and which failed.
- */
-async function runBulk(leads, fn) {
-  const results = await Promise.allSettled(leads.map(lead => fn(lead)))
-  const succeeded = []
-  const failed = []
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled') succeeded.push(leads[i].id)
-    else failed.push({ id: leads[i].id, error: r.reason })
-  })
-  return { succeeded, failed }
 }
 
 /** Bulk "✓ Touched" — logs a touch (and rolls any cadence) on every lead. */

@@ -1,14 +1,16 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, moveLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus } from '../lib/crm-api'
+import { getLeads, moveLead, updateLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus } from '../lib/crm-api'
 import { useApp } from '../App'
+import { useToast } from '../components/Toast'
 import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
 import QuickAddCard from '../components/QuickAddCard'
-import { Plus, Search, Filter, Upload, Save, ChevronDown, X, Bookmark } from 'lucide-react'
+import { Plus, Search, Filter, Upload, Save, ChevronDown, X, Bookmark, XCircle } from 'lucide-react'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
 import { isAdminUser } from '../lib/admin'
+import { runBulk } from '../lib/bulkActions'
 
 const STAGES = [
   { key: 'new_lead', label: 'New Leads', color: '#a78bfa' },
@@ -106,6 +108,7 @@ function countActiveAdvancedFilters(filters) {
 
 function LeadsBoard() {
   const { currentPerson, people } = useApp()
+  const { toast } = useToast()
   const navigate = useNavigate()
   const leadTypes = useLeadTypes()
   const isAdmin = isAdminUser(currentPerson)
@@ -124,6 +127,10 @@ function LeadsBoard() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [draggedLead, setDraggedLead] = useState(null)
   const [showFilters, setShowFilters] = useSessionState('lb:showFilters', false)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkAssignee, setBulkAssignee] = useState('')
+  const [bulkStage, setBulkStage] = useState('')
 
   // Filter state — persisted to sessionStorage so navigating away and back
   // doesn't reset what the user is looking at.
@@ -422,6 +429,96 @@ function LeadsBoard() {
     () => Object.values(leadsByStage).reduce((sum, list) => sum + list.length, 0),
     [leadsByStage]
   )
+
+  const visibleLeads = useMemo(
+    () => Object.values(leadsByStage).flat(),
+    [leadsByStage]
+  )
+  const visibleLeadIds = useMemo(() => visibleLeads.map(l => l.id), [visibleLeads])
+
+  // Drop any selected id that's scrolled out of the filtered/visible set.
+  useEffect(() => {
+    const visible = new Set(visibleLeadIds)
+    setSelectedIds(prev => {
+      const next = new Set([...prev].filter(id => visible.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [visibleLeadIds])
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(prev => {
+      const allSelected = visibleLeadIds.length > 0 && visibleLeadIds.every(id => prev.has(id))
+      return allSelected ? new Set() : new Set(visibleLeadIds)
+    })
+  }
+
+  async function handleBulkReassign() {
+    if (!selectedIds.size || !bulkAssignee) return
+    setBulkBusy(true)
+    try {
+      const targets = visibleLeads.filter(l => selectedIds.has(l.id))
+      const { succeeded, failed } = await runBulk(targets, lead =>
+        updateLead(lead.id, { assigned_to: parseInt(bulkAssignee, 10), assigned_by: currentPerson.id }, currentPerson.id)
+      )
+      toast.success(`Reassigned ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to reassign`)
+      setSelectedIds(new Set())
+      setBulkAssignee('')
+      await loadLeads()
+    } catch (error) {
+      console.error('Bulk reassign failed:', error)
+      toast.error('Bulk reassign failed: ' + error.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkStageMove() {
+    if (!selectedIds.size || !bulkStage) return
+    setBulkBusy(true)
+    try {
+      const targets = visibleLeads.filter(l => selectedIds.has(l.id))
+      const { succeeded, failed } = await runBulk(targets, lead => moveLead(lead.id, bulkStage, currentPerson.id))
+      toast.success(`Moved ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to move`)
+      setSelectedIds(new Set())
+      setBulkStage('')
+      await loadLeads()
+    } catch (error) {
+      console.error('Bulk stage move failed:', error)
+      toast.error('Bulk move failed: ' + error.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function handleBulkMarkDead() {
+    if (!selectedIds.size) return
+    if (!confirm(`Mark ${selectedIds.size} lead${selectedIds.size === 1 ? '' : 's'} as dead (stage → Passed)?`)) return
+    setBulkBusy(true)
+    try {
+      const targets = visibleLeads.filter(l => selectedIds.has(l.id))
+      const { succeeded, failed } = await runBulk(targets, lead => updateLead(lead.id, { stage: 'passed' }, currentPerson.id))
+      toast.success(`Marked ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'} dead`)
+      if (failed.length) toast.error(`${failed.length} failed to update`)
+      setSelectedIds(new Set())
+      await loadLeads()
+    } catch (error) {
+      console.error('Bulk dismiss failed:', error)
+      toast.error('Bulk dismiss failed: ' + error.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
 
   if (loading && leads.length === 0) {
     return (
@@ -813,6 +910,14 @@ function LeadsBoard() {
               {activeFilterCount + (searchQuery ? 1 : 0)} filter{(activeFilterCount + (searchQuery ? 1 : 0)) === 1 ? '' : 's'} active
             </span>
           )}
+          <button
+            className="btn btn-sm btn-secondary"
+            style={{ marginLeft: (activeFilterCount > 0 || searchQuery) ? 0 : 'auto' }}
+            onClick={toggleSelectAll}
+            disabled={visibleLeadIds.length === 0}
+          >
+            {visibleLeadIds.length > 0 && visibleLeadIds.every(id => selectedIds.has(id)) ? 'Deselect all' : 'Select all shown'}
+          </button>
           {(activeFilterCount > 0 || searchQuery) && (
             <button
               onClick={() => { setSearchQuery(''); clearAllFilters() }}
@@ -830,6 +935,45 @@ function LeadsBoard() {
               Clear all
             </button>
           )}
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: '10px 16px', marginBottom: '12px', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            position: 'sticky', top: '8px', zIndex: 5
+          }}
+        >
+          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+            {selectedIds.size} lead{selectedIds.size === 1 ? '' : 's'} selected
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <select value={bulkAssignee} onChange={(e) => setBulkAssignee(e.target.value)} className="form-select" disabled={bulkBusy}>
+              <option value="">Reassign to…</option>
+              {(people || []).map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkReassign} disabled={bulkBusy || !bulkAssignee}>
+              Apply
+            </button>
+            <select value={bulkStage} onChange={(e) => setBulkStage(e.target.value)} className="form-select" disabled={bulkBusy}>
+              <option value="">Move to stage…</option>
+              {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkStageMove} disabled={bulkBusy || !bulkStage}>
+              Apply
+            </button>
+            <button className="btn btn-sm btn-secondary" onClick={handleBulkMarkDead} disabled={bulkBusy} style={{ color: '#b91c1c' }}>
+              <XCircle size={14} /> Mark dead
+            </button>
+            <button className="btn btn-sm btn-secondary" onClick={() => setSelectedIds(new Set())} disabled={bulkBusy}>
+              Clear
+            </button>
+          </div>
         </div>
       )}
 
@@ -869,6 +1013,8 @@ function LeadsBoard() {
                     onDragStart={handleDragStart}
                     onClick={() => navigate(`/leads/${lead.id}`)}
                     onRefresh={loadLeads}
+                    selected={selectedIds.has(lead.id)}
+                    onToggleSelect={() => toggleSelect(lead.id)}
                   />
                 ))}
               </div>
