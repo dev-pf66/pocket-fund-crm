@@ -7,7 +7,10 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 function authenticate(req) {
   const apiKey = req.headers['x-api-key'] || req.query.api_key
   const validKey = process.env.CRM_API_KEY
-  return apiKey === validKey
+  // Boolean(validKey) first: without it, an unset CRM_API_KEY makes
+  // `undefined === undefined` true and every unauthenticated request
+  // authenticates against the service-role client. Mirrors api/_auth.js.
+  return Boolean(validKey) && apiKey === validKey
 }
 
 // Matches the crm_lead_activities activity_type vocabulary used by the app.
