@@ -6,7 +6,7 @@
 import { supabase } from '../supabase'
 import { normalizeLinkedInUrl } from '../linkedin'
 import { istAddDays, istWeekStart } from '../dateUtils'
-import { cacheClear, fireTTEvent, istDateStr } from './core'
+import { cacheClear, fireTTEvent, istDateStr, fetchAllRows } from './core'
 import { advanceLeadStage, createLead, findLeadByEmailOrNameFirm } from './leads'
 import { logActivityManual } from './misc'
 
@@ -476,19 +476,20 @@ export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
  */
 export async function getLeadTouchData(daysBack = 90) {
   const since = istAddDays(istDateStr(), -daysBack)
-  const [leadsRes, touchesRes] = await Promise.all([
-    supabase
+  // Both sides paginate: an unbounded select stops at PostgREST's 1000-row
+  // cap without erroring, which had this computing the speed/follow-through
+  // metrics on roughly half the outreach log (1000 of ~2000 rows).
+  const [leads, touches] = await Promise.all([
+    fetchAllRows(() => supabase
       .from('crm_leads')
       .select('id, created_at, created_by, assigned_to')
-      .gte('created_at', since),
-    supabase
+      .gte('created_at', since)),
+    fetchAllRows(() => supabase
       .from('crm_outreach_log')
       .select('lead_id, outreach_date')
-      .not('lead_id', 'is', null)
+      .not('lead_id', 'is', null))
   ])
-  if (leadsRes.error) throw leadsRes.error
-  if (touchesRes.error) throw touchesRes.error
-  return { leads: leadsRes.data || [], touches: touchesRes.data || [] }
+  return { leads, touches }
 }
 
 // ============================================================================

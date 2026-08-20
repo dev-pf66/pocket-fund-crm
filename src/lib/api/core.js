@@ -29,6 +29,29 @@ export async function fireTTEvent(event_type, payload) {
   } catch (e) { console.error('fireTTEvent failed', e) }
 }
 
+/**
+ * Fetch every row a query matches, a page at a time.
+ *
+ * PostgREST caps a plain select at the project's max-rows (1000 by default)
+ * and returns the truncated page with NO error — so an unbounded select on a
+ * table that has outgrown 1000 rows silently computes on a fraction of the
+ * data. Pass a factory that builds the query fresh each call, since a
+ * Supabase query builder is single-use:
+ *
+ *   const rows = await fetchAllRows(() =>
+ *     supabase.from('crm_outreach_log').select('lead_id, outreach_date'))
+ */
+export async function fetchAllRows(queryFactory, { pageSize = 1000 } = {}) {
+  const out = []
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await queryFactory().range(from, from + pageSize - 1)
+    if (error) throw error
+    const page = data || []
+    out.push(...page)
+    if (page.length < pageSize) return out
+  }
+}
+
 // ============================================================================
 // IN-MEMORY CACHE
 // ============================================================================
