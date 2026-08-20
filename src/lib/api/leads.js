@@ -546,7 +546,10 @@ export async function getWeeklyStats(personId = null) {
     .from('crm_lead_activities')
     .select('activity_type')
     .gte('activity_date', weekAgo.toISOString())
-  if (personId) activitiesQuery = activitiesQuery.eq('created_by', personId)
+  // logged_by, not created_by — crm_lead_activities has no created_by, so
+  // this filter used to error (42703). The error was never checked, leaving
+  // every non-admin with a permanent "0 discovery calls / 0 proposals".
+  if (personId) activitiesQuery = activitiesQuery.eq('logged_by', personId)
 
   let leadsQuery = supabase
     .from('crm_leads')
