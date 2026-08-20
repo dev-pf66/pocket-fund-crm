@@ -27,3 +27,8 @@ dist-ssr
 .env*.local
 # Added by code-review-graph
 .code-review-graph/
+
+# Local agent/tooling state — never belongs in the repo
+.claude/
+.context/
+.mcp.json
