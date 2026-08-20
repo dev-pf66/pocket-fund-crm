@@ -104,8 +104,13 @@ async function buildDigest() {
 
   const people = (peopleRes.data || []).filter(p => !p.is_archived)
 
+  // Sum only the people the digest actually lists. Summing every entry in
+  // perPerson included departed/archived analysts, so the TEAM line came out
+  // higher than the per-person rows underneath it added up to.
   const team = blank()
-  for (const s of perPerson.values()) {
+  for (const p of people) {
+    const s = perPerson.get(p.id)
+    if (!s) continue
     for (const k of Object.keys(team)) team[k] += s[k]
   }
 
