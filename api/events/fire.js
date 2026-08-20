@@ -34,7 +34,12 @@ export default async function handler(req, res) {
     let result
     switch (event_type) {
       case 'outreach_logged':
-        result = await onOutreachLogged({ outreach: payload })
+        // logged_by comes from the authenticated actor, never the request
+        // body. It used to be taken straight from the client, so any
+        // signed-in user could post someone else's person id and complete
+        // THEIR daily-outreach subtask in the task tracker. The other two
+        // branches already used actor.id.
+        result = await onOutreachLogged({ outreach: { ...payload, logged_by: actor.id } })
         break
       case 'lead_stage_changed':
         result = await onLeadStageChanged({
