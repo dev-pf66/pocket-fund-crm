@@ -63,25 +63,63 @@ export async function deactivateFollowUpCadence(id) {
 // PER-LEAD SCHEDULING
 // ============================================================================
 
+/** Whole calendar days from `from` to `to` (both YYYY-MM-DD). */
+function daysBetween(from, to) {
+  const ms = new Date(to + 'T12:00:00Z') - new Date(from + 'T12:00:00Z')
+  return Math.round(ms / 86400000)
+}
+
 /**
- * Schedule the next reach-out on a lead: an explicit date plus the optional
- * one-line reason. Setting a date by hand clears any running cadence — the
- * manual call wins over the automation.
+ * Schedule an explicit reach-out date. Setting a date by hand ends any
+ * running cadence — the manual call wins over the automation. Deferring
+ * (see snoozeFollowUp) passes keepCadence so it can shift the schedule
+ * instead of destroying it.
  */
-export async function setFollowUp(leadId, { date, note = null }, currentPersonId = null) {
+export async function setFollowUp(leadId, { date, note = null, keepCadence = undefined }, currentPersonId = null) {
   if (!date) throw new Error('setFollowUp needs a date')
-  const updated = await updateLead(leadId, {
+  const updates = {
     next_follow_up_date: date,
-    follow_up_note: note?.trim() ? note.trim() : null,
-    follow_up_cadence: null
-  }, currentPersonId)
+    follow_up_note: note?.trim() ? note.trim() : null
+  }
+  // undefined = leave the column alone; null = explicitly end the cadence.
+  updates.follow_up_cadence = keepCadence === undefined ? null : keepCadence
+  const updated = await updateLead(leadId, updates, currentPersonId)
   cacheClear('leads')
   return updated
 }
 
-/** Schedule N days out from today (the snooze buttons). */
-export async function snoozeFollowUp(leadId, days, { note = null } = {}, currentPersonId = null) {
-  return setFollowUp(leadId, { date: istAddDays(istToday(), Number(days)), note }, currentPersonId)
+/**
+ * Defer a reach-out by `days` — the +1d / +1w / snooze buttons.
+ *
+ * Two rules that the naive version got wrong:
+ *  - It counts from the lead's OWN scheduled date when that's still in the
+ *    future, not from today. "+1w" on something due next month used to drag
+ *    it BACKWARDS to a week from today.
+ *  - A running cadence is shifted, not deleted. The anchor moves by the same
+ *    number of days, so the pending touch lands on the new date and every
+ *    later touch keeps its original spacing. Previously this routed through
+ *    setFollowUp and silently wiped the remaining touches.
+ *
+ * Takes the lead ROW (not just an id) because both rules need its state.
+ */
+export async function snoozeFollowUp(lead, days, { note = null } = {}, currentPersonId = null) {
+  const n = Number(days)
+  if (!Number.isFinite(n)) throw new Error('snoozeFollowUp needs a number of days')
+
+  const today = istToday()
+  const current = lead?.next_follow_up_date
+  // Defer from whichever is later: today, or the date already promised.
+  const base = current && current > today ? current : today
+  const date = istAddDays(base, n)
+
+  const cadence = lead?.follow_up_cadence
+  let keepCadence
+  if (cadence?.offsets?.length && current) {
+    const shift = daysBetween(current, date)
+    keepCadence = { ...cadence, anchor: istAddDays(cadence.anchor, shift) }
+  }
+
+  return setFollowUp(lead.id, { date, note, keepCadence }, currentPersonId)
 }
 
 /** Drop the reminder entirely — no date, no note, no cadence. */
@@ -133,6 +171,15 @@ export async function advanceFollowUpCadence(lead, currentPersonId = null) {
 
   const today = istToday()
   let step = Number(cadence.step) || 0
+
+  // The touch that's currently pending is offsets[step-1]. If it hasn't come
+  // due yet, this touch was early (the lead surfaced in Today on staleness,
+  // not on its reminder) and the cadence should be left exactly where it is —
+  // otherwise the pending touch is silently consumed and the lead gets one
+  // fewer reach-out than the cadence promises.
+  const pending = step > 0 ? istAddDays(cadence.anchor, cadence.offsets[step - 1]) : null
+  if (pending && pending > today) return cadence
+
   let nextDate = null
   while (step < cadence.offsets.length) {
     const candidate = istAddDays(cadence.anchor, cadence.offsets[step])

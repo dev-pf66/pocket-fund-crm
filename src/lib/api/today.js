@@ -8,7 +8,7 @@ import { istAddDays, istWeekStart } from '../dateUtils'
 import { cacheClear, istDateStr, getDaysBetween } from './core'
 import { logActivity, calculateStaleness, updateLead } from './leads'
 import { runBulk } from '../bulkActions'
-import { advanceFollowUpCadence, clearFollowUp } from './followups'
+import { advanceFollowUpCadence, clearFollowUp, snoozeFollowUp } from './followups'
 import { getCRMSettings } from './misc'
 
 // ============================================================================
@@ -250,10 +250,16 @@ export async function bulkMarkTouched(leads, currentPersonId, note = '') {
   return runBulk(leads, lead => markLeadTouched(lead, currentPersonId, note))
 }
 
-/** Bulk snooze — pushes next_follow_up_date out `days` on every lead. */
+/**
+ * Bulk snooze — defers every selected lead by `days`.
+ *
+ * Routes through snoozeFollowUp rather than writing next_follow_up_date
+ * directly: a raw write left any running cadence armed with its old anchor,
+ * so the next touch recomputed from that anchor and silently reverted the
+ * snooze.
+ */
 export async function bulkSnoozeLeads(leads, days, currentPersonId) {
-  const until = istAddDays(istDateStr(), days)
-  return runBulk(leads, lead => updateLead(lead.id, { next_follow_up_date: until }, currentPersonId))
+  return runBulk(leads, lead => snoozeFollowUp(lead, days, {}, currentPersonId))
 }
 
 /** Bulk dismiss — marks every lead dead (stage → passed). */

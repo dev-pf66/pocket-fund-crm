@@ -20,6 +20,7 @@ import {
 } from '../lib/crm-api'
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
 import { useToast } from '../components/Toast'
+import { notifyFollowUpsChanged } from '../hooks/useFollowUpCount'
 import { isAdminUser } from '../lib/admin'
 import StageChip from '../components/StageChip'
 import StalenessBadge from '../components/StalenessBadge'
@@ -170,6 +171,7 @@ function Today() {
     try {
       const { succeeded, failed } = await bulkMarkTouched(selectedLeads, currentPerson.id)
       removeFromQueues(succeeded)
+      notifyFollowUpsChanged()
       setCounters(prev => ({ ...prev, touchesThisWeek: prev.touchesThisWeek + succeeded.length }))
       clearSelection()
       if (succeeded.length) toast.success(`Logged touch on ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'}`)
@@ -189,6 +191,7 @@ function Today() {
     try {
       const { succeeded, failed } = await bulkSnoozeLeads(selectedLeads, days, currentPerson.id)
       removeFromQueues(succeeded)
+      notifyFollowUpsChanged()
       clearSelection()
       if (succeeded.length) toast.success(`Snoozed ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'}`)
       if (failed.length) toast.error(`${failed.length} failed to snooze`)
@@ -207,6 +210,7 @@ function Today() {
     try {
       const { succeeded, failed } = await bulkDismissLeads(selectedLeads, currentPerson.id)
       removeFromQueues(succeeded)
+      notifyFollowUpsChanged()
       clearSelection()
       if (succeeded.length) toast.success(`Marked ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'} dead`)
       if (failed.length) toast.error(`${failed.length} failed to update`)
@@ -222,6 +226,7 @@ function Today() {
     setPendingId(lead.id)
     try {
       await markLeadTouched(lead, currentPerson.id, note)
+      notifyFollowUpsChanged()
       setQueue(prev => ({
         leads: prev.leads.filter(l => l.id !== lead.id),
         total: Math.max(0, prev.total - 1)
@@ -242,6 +247,7 @@ function Today() {
     try {
       const until = istAddDays(istToday(), days)
       await updateLead(lead.id, { next_follow_up_date: until }, currentPerson.id)
+      notifyFollowUpsChanged()
       setQueue(prev => ({
         leads: prev.leads.filter(l => l.id !== lead.id),
         total: Math.max(0, prev.total - 1)

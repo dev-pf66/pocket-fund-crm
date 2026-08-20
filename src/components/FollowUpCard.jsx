@@ -75,8 +75,11 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
   }
 
   function handleQuick(days) {
-    run(`Reach out again ${fmtDate(istAddDays(today, days))}`, () =>
-      snoozeFollowUp(lead.id, days, { note }, currentPerson?.id))
+    // Mirrors snoozeFollowUp: defer from the promised date when it's still
+    // ahead of us, otherwise from today.
+    const base = due && due > today ? due : today
+    run(`Reach out again ${fmtDate(istAddDays(base, days))}`, () =>
+      snoozeFollowUp(lead, days, { note }, currentPerson?.id))
   }
 
   function handleCustomDate() {

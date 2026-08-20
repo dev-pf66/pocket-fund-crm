@@ -40,9 +40,11 @@ function Notifications() {
     return m
   }, [people])
 
-  const load = useCallback(async () => {
+  // silent: refresh in place after a row action without flashing the
+  // full-page spinner.
+  const load = useCallback(async ({ silent = false } = {}) => {
     if (!currentPerson?.id) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       setBoard(await getFollowUpBoard(showAllOwners && isAdmin ? null : currentPerson.id))
     } catch (err) {
@@ -55,24 +57,16 @@ function Notifications() {
 
   useEffect(() => { load() }, [load])
 
-  // Drop a lead from whichever bucket it's in — every action either
-  // reschedules it (new bucket on reload) or retires it.
-  function removeLead(id) {
-    setBoard(b => ({
-      ...b,
-      overdue: b.overdue.filter(l => l.id !== id),
-      dueToday: b.dueToday.filter(l => l.id !== id),
-      upcoming: b.upcoming.filter(l => l.id !== id)
-    }))
-  }
-
   async function act(lead, label, fn) {
     setPendingId(lead.id)
     try {
       await fn()
-      removeLead(lead.id)
       notifyFollowUpsChanged()
       toast.success(label)
+      // Reload rather than optimistically dropping the row: a snoozed lead
+      // genuinely belongs in "Coming up", and stripping it made the page
+      // claim "Nothing scheduled" for something scheduled tomorrow.
+      await load({ silent: true })
     } catch (err) {
       console.error(`${label} failed:`, err)
       toast.error(`Failed: ${err.message}`)
@@ -84,7 +78,7 @@ function Notifications() {
   const handleTouch = lead => act(lead, `Logged reach-out on ${lead.name}`, () =>
     logFollowUpTouch(lead, currentPerson.id))
   const handleSnooze = (lead, days) => act(lead, `${lead.name} pushed ${days} day${days === 1 ? '' : 's'}`, () =>
-    snoozeFollowUp(lead.id, days, { note: lead.follow_up_note }, currentPerson.id))
+    snoozeFollowUp(lead, days, { note: lead.follow_up_note }, currentPerson.id))
   const handleClear = lead => act(lead, `Reminder cleared on ${lead.name}`, () =>
     clearFollowUp(lead.id, currentPerson.id))
 
@@ -123,7 +117,7 @@ function Notifications() {
               All owners
             </label>
           )}
-          <button className="btn btn-sm btn-secondary" onClick={load}>
+          <button className="btn btn-sm btn-secondary" onClick={() => load()}>
             <RefreshCw size={14} /> Refresh
           </button>
         </div>
