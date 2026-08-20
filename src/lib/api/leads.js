@@ -6,7 +6,7 @@
 
 import { supabase } from '../supabase'
 import { normalizeLinkedInUrl } from '../linkedin'
-import { cacheGet, cacheSet, cacheClear, fireTTEvent, istDateStr, getDaysBetween } from './core'
+import { cacheGet, cacheSet, cacheClear, fireTTEvent, istDateStr, getDaysBetween, fetchAllRows } from './core'
 import { getCRMSettings } from './misc'
 
 // ============================================================================
@@ -113,19 +113,24 @@ export async function getLeads(filters = {}, personId = null) {
   const cached = cacheGet(cacheKey, 15000) // 15s TTL
   if (cached) return cached
 
-  let query = supabase
-    .from('crm_leads')
-    .select('*')
-    .order('updated_at', { ascending: false })
+  // Built fresh per page: a Supabase query builder is single-use, so
+  // fetchAllRows needs a factory rather than one shared builder.
+  const buildQuery = () => {
+    let query = supabase
+      .from('crm_leads')
+      .select('*')
+      .order('updated_at', { ascending: false })
 
-  if (filters.stage) query = query.eq('stage', filters.stage)
-  if (filters.lead_type) query = query.eq('lead_type', filters.lead_type)
-  if (filters.needs_sample_deals !== undefined) query = query.eq('needs_sample_deals', filters.needs_sample_deals)
-  if (personId) query = query.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
+    if (filters.stage) query = query.eq('stage', filters.stage)
+    if (filters.lead_type) query = query.eq('lead_type', filters.lead_type)
+    if (filters.needs_sample_deals !== undefined) query = query.eq('needs_sample_deals', filters.needs_sample_deals)
+    if (personId) query = query.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
+    return query
+  }
 
-  const { data, error } = await query
-  if (error) throw error
-  const result = data || []
+  // Paginated — this backs the Pipeline board and the dashboard stage counts,
+  // both of which would silently under-report past 1000 leads.
+  const result = await fetchAllRows(buildQuery)
   cacheSet(cacheKey, result)
   return result
 }
@@ -178,12 +183,14 @@ export async function findLeadByEmailOrNameFirm({ email, name, firm_name }) {
 export async function findLeadByLinkedInUrl(linkedinUrl) {
   if (!linkedinUrl) return null
   const normalized = normalizeLinkedInUrl(linkedinUrl)
-  const { data, error } = await supabase
+  // Paginated: matching happens client-side (URLs need normalising first), so
+  // a truncated page would report "no such lead" for anyone past row 1000 and
+  // the caller would create a duplicate.
+  const data = await fetchAllRows(() => supabase
     .from('crm_leads')
     .select('*')
-    .not('linkedin_url', 'is', null)
-  if (error) throw error
-  return data?.find(l => normalizeLinkedInUrl(l.linkedin_url) === normalized) || null
+    .not('linkedin_url', 'is', null))
+  return data.find(l => normalizeLinkedInUrl(l.linkedin_url) === normalized) || null
 }
 
 export async function createLead(leadData, currentPersonId) {
@@ -379,16 +386,27 @@ export async function logActivity(leadId, activityData, currentPersonId) {
 
   if (activityError) throw activityError
 
-  await supabase
+  // The lead stamp used to be fire-and-forget: neither an error nor a
+  // zero-row RLS no-op was observable, so callers (notably bulk "Mark
+  // touched") reported success while last_activity_date never moved — the
+  // leads reappeared in Today on the next refresh. .select() makes a zero-row
+  // write visible, and it throws so the caller can report the truth.
+  const { data: stamped, error: stampError } = await supabase
     .from('crm_leads')
     .update({
       last_activity_date: activityDate,
       last_activity_type: activityData.activity_type
     })
     .eq('id', leadId)
+    .select('id')
 
   cacheClear('leads')
   cacheClear('dashboard')
+
+  if (stampError) throw stampError
+  if (!stamped?.length) {
+    throw new Error(`Activity logged, but lead ${leadId} could not be updated (not found, or not yours to edit)`)
+  }
   return activity
 }
 
@@ -524,13 +542,16 @@ export async function getPipelineStats(personId = null) {
     stats[lead.stage] = (stats[lead.stage] || 0) + 1
   })
 
-  // Calculate percentages
-  stats.new_pct = (stats.new_lead / stats.total) * 100
-  stats.cold_pct = (stats.cold_outreach / stats.total) * 100
-  stats.responded_pct = (stats.responded / stats.total) * 100
-  stats.warm_pct = (stats.warm_lead / stats.total) * 100
-  stats.active_pct = (stats.active_conversation / stats.total) * 100
-  stats.client_pct = (stats.client / stats.total) * 100
+  // Calculate percentages. The zero guard matters: a newly onboarded analyst
+  // has no leads, and x/0 rendered as "NaN%" across the dashboard and poisoned
+  // the percentage-bar widths.
+  const pct = (n) => (stats.total > 0 ? (n / stats.total) * 100 : 0)
+  stats.new_pct = pct(stats.new_lead)
+  stats.cold_pct = pct(stats.cold_outreach)
+  stats.responded_pct = pct(stats.responded)
+  stats.warm_pct = pct(stats.warm_lead)
+  stats.active_pct = pct(stats.active_conversation)
+  stats.client_pct = pct(stats.client)
 
   return stats
 }
@@ -679,6 +700,11 @@ export async function assignLead(leadId, assignedToPersonId, assignedByPersonId)
     .single()
 
   if (error) throw error
+  // Every other lead-write path clears these; without it a reassignment kept
+  // showing the old owner (and stayed missing from the new owner's scoped
+  // view) until the 15s cache TTL lapsed.
+  cacheClear('leads')
+  cacheClear('dashboard')
   return data
 }
 
