@@ -87,17 +87,23 @@ function HelpAdmin() {
 
     try {
       if (editingArticle) {
-        // Update existing
-        const { error } = await supabase
+        // Update existing. supabase.raw() does not exist in supabase-js v2 —
+        // calling it threw "supabase.raw is not a function" before the request
+        // was built, making Save a dead button on every article. Increment
+        // from the row we already loaded instead.
+        const current = articles.find(a => a.id === editingArticle)
+        const { data, error } = await supabase
           .from('crm_help_articles')
           .update({
             ...formData,
             last_updated_by: currentPerson?.id,
-            version: supabase.raw('version + 1')
+            version: (current?.version || 0) + 1
           })
           .eq('id', editingArticle)
+          .select('id')
 
         if (error) throw error
+        if (!data?.length) throw new Error('Article not found, or you do not have permission to edit it')
       } else {
         // Create new
         const { error } = await supabase
