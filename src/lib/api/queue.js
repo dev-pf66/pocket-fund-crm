@@ -5,7 +5,7 @@
 
 import { supabase } from '../supabase'
 import { normalizeLinkedInUrl, nameFromLinkedInUrl } from '../linkedin'
-import { cacheClear } from './core'
+import { cacheClear, fetchAllRows } from './core'
 import { logOutreach } from './outreach'
 
 // ============================================================================
@@ -34,13 +34,15 @@ export async function bulkCreateLeads(urls, batchLabel, currentPersonId, assigne
     uniqueUrls.push(url)
   }
 
-  const { data: existing, error: existingError } = await supabase
+  // Paginated: a plain select stops at PostgREST's 1000-row cap without
+  // erroring, which would silently defeat the dedupe this function exists for
+  // once crm_leads outgrows it — reimporting existing people as duplicates.
+  const existing = await fetchAllRows(() => supabase
     .from('crm_leads')
     .select('linkedin_url')
-    .not('linkedin_url', 'is', null)
-  if (existingError) throw existingError
+    .not('linkedin_url', 'is', null))
   const existingNormalized = new Set(
-    (existing || []).map(l => normalizeLinkedInUrl(l.linkedin_url)).filter(Boolean)
+    existing.map(l => normalizeLinkedInUrl(l.linkedin_url)).filter(Boolean)
   )
 
   const toInsert = uniqueUrls.filter(url => !existingNormalized.has(normalizeLinkedInUrl(url)))
