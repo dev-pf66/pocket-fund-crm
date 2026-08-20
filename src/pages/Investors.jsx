@@ -92,27 +92,10 @@ function Investors() {
     loadInvestors()
   }, [])
 
-  // Drop selected ids that no longer exist (deleted, or filtered out of view).
-  useEffect(() => {
-    const liveIds = new Set(investors.map(inv => inv.id))
-    setSelectedIds(prev => {
-      const next = new Set([...prev].filter(id => liveIds.has(id)))
-      return next.size === prev.size ? prev : next
-    })
-  }, [investors])
-
-  async function loadInvestors() {
-    try {
-      const data = await getInvestors()
-      setInvestors(data)
-    } catch (error) {
-      console.error('Failed to load investors:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function getFilteredInvestors() {
+  // The visible set. Selection is scoped to THIS list, never the full book:
+  // select-all ticks what's on screen, so a bulk action must not reach rows
+  // the filter has hidden.
+  const filtered = useMemo(() => {
     return investors.filter(inv => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase()
@@ -125,6 +108,34 @@ function Investors() {
       if (filterStatus && inv.status !== filterStatus) return false
       return true
     })
+  }, [investors, searchQuery, filterType, filterStatus])
+
+  // Drop any selected id that's been deleted OR filtered out of view. Pruning
+  // against the FULL list (as this used to) meant selecting rows, changing the
+  // filter, and then bulk-deleting records you could no longer see.
+  useEffect(() => {
+    const visible = new Set(filtered.map(inv => inv.id))
+    setSelectedIds(prev => {
+      const next = new Set([...prev].filter(id => visible.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [filtered])
+
+  // Selected AND still visible — the only ids a bulk action may touch.
+  const selectedVisibleIds = useMemo(
+    () => filtered.filter(inv => selectedIds.has(inv.id)).map(inv => inv.id),
+    [filtered, selectedIds]
+  )
+
+  async function loadInvestors() {
+    try {
+      const data = await getInvestors()
+      setInvestors(data)
+    } catch (error) {
+      console.error('Failed to load investors:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   function toggleSelect(id) {
@@ -147,10 +158,10 @@ function Investors() {
   }
 
   async function handleBulkStatus() {
-    if (!selectedIds.size || !bulkStatus) return
+    if (!selectedVisibleIds.length || !bulkStatus) return
     setBulkBusy(true)
     try {
-      const count = await bulkUpdateInvestorStatus([...selectedIds], bulkStatus)
+      const count = await bulkUpdateInvestorStatus(selectedVisibleIds, bulkStatus)
       toast.success(`Updated ${count} investor${count === 1 ? '' : 's'} to ${formatStatusLabel(bulkStatus)}`)
       setSelectedIds(new Set())
       setBulkStatus('')
@@ -164,11 +175,12 @@ function Investors() {
   }
 
   async function handleBulkDelete() {
-    if (!selectedIds.size) return
-    if (!confirm(`Delete ${selectedIds.size} investor${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return
+    if (!selectedVisibleIds.length) return
+    const n = selectedVisibleIds.length
+    if (!confirm(`Delete ${n} investor${n === 1 ? '' : 's'}? This cannot be undone.`)) return
     setBulkBusy(true)
     try {
-      const count = await bulkDeleteInvestors([...selectedIds])
+      const count = await bulkDeleteInvestors(selectedVisibleIds)
       toast.success(`Deleted ${count} investor${count === 1 ? '' : 's'}`)
       setSelectedIds(new Set())
       await loadInvestors()
@@ -241,8 +253,6 @@ function Investors() {
     clearEditingInvestor()
     clearFormData()
   }
-
-  const filtered = getFilteredInvestors()
 
   if (loading && investors.length === 0) {
     return (
@@ -369,7 +379,7 @@ function Investors() {
       )}
 
       {/* Bulk action bar */}
-      {selectedIds.size > 0 && (
+      {selectedVisibleIds.length > 0 && (
         <div
           className="card"
           style={{
@@ -379,7 +389,7 @@ function Investors() {
           }}
         >
           <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
-            {selectedIds.size} investor{selectedIds.size === 1 ? '' : 's'} selected
+            {selectedVisibleIds.length} investor{selectedVisibleIds.length === 1 ? '' : 's'} selected
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <select

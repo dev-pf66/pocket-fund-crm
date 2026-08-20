@@ -121,14 +121,18 @@ export async function bulkUpdateInvestorStatus(ids, status) {
 /** Bulk delete — used by the Investors table's multi-select bar. */
 export async function bulkDeleteInvestors(ids) {
   if (!ids?.length) return 0
-  const { error } = await supabase
+  // .select() so the count is rows ACTUALLY deleted. Without it PostgREST
+  // reports no error when zero rows match (already deleted, or blocked by
+  // policy) and the UI would cheerfully toast "Deleted 5".
+  const { data, error } = await supabase
     .from('crm_investors')
     .delete()
     .in('id', ids)
+    .select('id')
 
   if (error) throw error
   cacheClear('investors')
-  return ids.length
+  return (data || []).length
 }
 
 /**
