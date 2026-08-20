@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { Fragment, useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, updateLead, promoteOutreachToLead, getLeadById } from '../lib/crm-api'
 import { useApp } from '../App'
@@ -685,7 +685,10 @@ function LeadEditCard({ entry, currentPersonId, onSaved }) {
       })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [linkedLeadId, entry?.id])
+    // entry.* are dependencies because the unlinked branch above seeds from
+    // them: without these, editing Lead Source in the meta panel left this
+    // card showing (and promoting) the pre-edit value.
+  }, [linkedLeadId, entry?.id, entry?.lead_name, entry?.firm_name, entry?.lead_source])
 
   const fv = (k) => edits[k] !== undefined ? edits[k] : (lead?.[k] ?? '')
   const setField = (k, v) => setEdits(prev => ({ ...prev, [k]: v }))
@@ -1246,9 +1249,8 @@ function OutreachAdmin() {
             </thead>
             <tbody>
               {visibleEntries.map(entry => (
-                <>
+                <Fragment key={entry.id}>
                   <tr
-                    key={entry.id}
                     style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
                     onClick={() => toggleExpand(entry.id)}
                   >
@@ -1478,7 +1480,7 @@ function OutreachAdmin() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
