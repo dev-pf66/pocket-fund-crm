@@ -45,32 +45,46 @@ export default async function handler(req, res) {
       .ilike('name', '%aum%')
       .single()
 
-    // Prepare for CRM import
+    // Prepare for CRM import.
+    // Column names must match crm_leads exactly: firm_name / lead_source /
+    // lead_score — NOT company / source / score. Writing the latter made every
+    // insert fail with PGRST204, which silently killed this cron.
+    // The scrapers score 0-5; crm_leads.lead_score is CHECKed 0-100, so scale.
+    // There is no `website` or `tags` column — the URL folds into notes, and
+    // provenance is carried by lead_source.
     const crmLeads = allLeads.map(lead => ({
       name: lead.name,
-      company: lead.company,
+      firm_name: lead.company || null,
       linkedin_url: lead.linkedin_url || null,
-      website: lead.website || null,
-      stage: 'new',
-      lead_type: 'buyer',
-      source: lead.source,
-      score: lead.score,
-      notes: lead.notes,
-      assigned_to: aum?.id,
-      tags: lead.tags
+      stage: 'new_lead',
+      lead_source: lead.source,
+      lead_score: Math.min(100, Math.max(0, (lead.score || 0) * 20)),
+      notes: [lead.notes, lead.website ? `Website: ${lead.website}` : null]
+        .filter(Boolean).join('\n'),
+      assigned_to: aum?.id || null
     }))
 
-    // Check duplicates (by LinkedIn URL or company name)
-    const { data: existing } = await supabase
-      .from('crm_leads')
-      .select('linkedin_url, company')
+    // Check duplicates (by LinkedIn URL or firm name). Paginated: PostgREST
+    // caps a plain select at 1000 rows, which would silently defeat the
+    // dedupe once crm_leads outgrows that. The error is checked now too — it
+    // used to be discarded, so a failed query looked like "no duplicates".
+    const existing = []
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from('crm_leads')
+        .select('linkedin_url, firm_name')
+        .range(from, from + 999)
+      if (error) throw error
+      existing.push(...(data || []))
+      if ((data || []).length < 1000) break
+    }
 
-    const existingLinkedIns = new Set((existing || []).map(e => e.linkedin_url).filter(Boolean))
-    const existingCompanies = new Set((existing || []).map(e => e.company?.toLowerCase()))
+    const existingLinkedIns = new Set(existing.map(e => e.linkedin_url).filter(Boolean))
+    const existingFirms = new Set(existing.map(e => e.firm_name?.toLowerCase()).filter(Boolean))
 
     const newLeads = crmLeads.filter(lead => {
       if (lead.linkedin_url && existingLinkedIns.has(lead.linkedin_url)) return false
-      if (existingCompanies.has(lead.company?.toLowerCase())) return false
+      if (lead.firm_name && existingFirms.has(lead.firm_name.toLowerCase())) return false
       return true
     })
 
@@ -90,7 +104,7 @@ export default async function handler(req, res) {
           linkedin: linkedInLeads.length,
           crunchbase: crunchbaseLeads.length
         },
-        leads: data.map(l => ({ name: l.name, company: l.company, source: l.source }))
+        leads: data.map(l => ({ name: l.name, firm_name: l.firm_name, lead_source: l.lead_source }))
       })
     }
 
