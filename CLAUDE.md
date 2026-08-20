@@ -12,8 +12,9 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 - Vercel deploys from origin/main; live at https://pocket-fund-crm.vercel.app.
 - Never claim a fix is live without verifying the deployed site (global `/ship-verify` skill). A push is not a deploy; a deploy is not a verified fix.
-- Vercel crons (`vercel.json`): `daily-leads-v2` (09:00 UTC daily; v2 is the only version — the old `api/daily-leads.js` was deleted July 2026), `weekly-digest` (Mon 03:30 UTC = 9:00 IST → posts per-analyst rollup as a due-dated Sage task, idempotent via `crm_tt_mappings`). The digest covers **every non-archived person, zeros included** (Dev's call, July 2026) — don't filter it back down to active-only.
-- `TASK_TRACKER_API_URL`/`TASK_TRACKER_API_KEY` + `CRON_SECRET` live in Vercel prod env — they were missing until July 2026, which silently disabled ALL task-tracker automation and the daily-leads cron. If TT automation looks dead, check these first.
+- Vercel crons (`vercel.json`): `weekly-digest` only (Mon 03:30 UTC = 9:00 IST → posts per-analyst rollup as a due-dated Sage task, idempotent via `crm_tt_mappings`). The digest covers **every non-archived person, zeros included** (Dev's call, July 2026) — don't filter it back down to active-only.
+- `TASK_TRACKER_API_URL`/`TASK_TRACKER_API_KEY` + `CRON_SECRET` live in Vercel prod env — they were missing until July 2026, which silently disabled ALL task-tracker automation. If TT automation looks dead, check these first.
+- The `daily-leads-v2` cron was **removed August 2026** (Dev's call). It had never once worked: it inserted columns that don't exist on `crm_leads` (`company`/`source`/`score`/`tags`), and `APIFY_API_TOKEN` was never set in prod, so the scraper returned nothing anyway. Recover from git history if it's ever wanted; it needs an Apify token to do anything.
 
 ## Supabase
 
@@ -47,7 +48,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - `.env` is gitignored — fresh worktrees need the two `VITE_` values (unquoted). `.env.local` comes from `vercel env pull`.
 - Local `npm run dev` runs the SPA only; `api/*` functions do not run locally without `vercel dev`.
 - `@sentry/react` is installed but there is **no Sentry project yet** — don't look for one when debugging production, and don't claim errors are tracked.
-- The Apify lead finder (`scripts/apify-lead-finder.js`, `APIFY-SETUP.md`) is **abandoned** (Dev: good idea, not pursued). Don't revive or maintain it; note `daily-leads-v2` still uses apify-client independently.
+- The Apify lead finder (`scripts/apify-lead-finder.js`, `APIFY-SETUP.md`) is **abandoned** (Dev: good idea, not pursued). Don't revive or maintain it. `apify-client` stays in package.json only because that script imports it — nothing else in the app uses Apify since `daily-leads-v2` was removed.
 - `bot/` is a separate Telegram bot (grammY + Claude + Supabase service key) with its own package.json — **not currently running anywhere** and not part of the Vercel deploy. Dev's call (July 2026): low priority — keep the code but don't maintain, fix, or extend it unless he asks.
 
 ## Related docs

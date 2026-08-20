@@ -4,7 +4,7 @@
  * sidebar bell.
  *
  * The scheduled date itself still lives on crm_leads.next_follow_up_date —
- * the column the Today tab, LeadCard and the daily-leads cron already read.
+ * the column the Today tab, LeadCard and the Notifications page already read.
  * This module adds the note ("what to say"), the cadence state machine, and
  * the due/overdue rollup. Nothing here introduces a second source of truth.
  */

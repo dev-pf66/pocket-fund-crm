@@ -38,8 +38,8 @@ import {
   CheckSquare
 } from 'lucide-react'
 
-// The pipeline owner sees the unassigned banner alongside admins. Matched by
-// name, mirroring how api/daily-leads-v2.js resolves the same person.
+// The pipeline owner sees the unassigned banner alongside admins. Matched
+// by name — the CRM has no explicit "pipeline owner" flag.
 function isPipelineOwner(person) {
   return /\baum\b/i.test(person?.name || '')
 }
