@@ -221,8 +221,22 @@ function LeadDetail() {
 
   async function handleSave() {
     try {
-      const updatedLead = await updateLead(id, editedLead, currentPerson?.id)
+      // Assignment is staged in the draft like any other field (committing it
+      // on change used to refetch the lead mid-edit and silently throw away
+      // every unsaved field). Commit it through assignLead so assigned_by and
+      // assigned_date get stamped, then drop those three keys from the
+      // general update — editedLead still holds the pre-assignment values for
+      // them and would overwrite the fresh stamps.
+      let base = editedLead
+      if (editedLead.assigned_to !== lead.assigned_to) {
+        await assignLead(id, editedLead.assigned_to ?? null, currentPerson?.id)
+        // eslint-disable-next-line no-unused-vars
+        const { assigned_to, assigned_by, assigned_date, ...rest } = editedLead
+        base = rest
+      }
+      const updatedLead = await updateLead(id, base, currentPerson?.id)
       setLead(updatedLead)
+      setEditedLead(updatedLead)
       setIsEditing(false)
     } catch (error) {
       console.error('Failed to update lead:', error)
@@ -575,7 +589,10 @@ function LeadDetail() {
                 </label>
                 <select
                   value={editedLead.assigned_to || ''}
-                  onChange={(e) => handleAssignment(e.target.value)}
+                  onChange={(e) => setEditedLead(l => ({
+                    ...l,
+                    assigned_to: e.target.value ? parseInt(e.target.value) : null
+                  }))}
                 >
                   <option value="">Unassigned</option>
                   {people.map(person => (
