@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, updateLead, promoteOutreachToLead, getLeadById } from '../lib/crm-api'
 import { useApp } from '../App'
 import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2, Plus } from 'lucide-react'
-import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
+import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
@@ -28,7 +28,6 @@ const PLATFORMS = ['cold_email', 'linkedin_message', 'phone_call', 'other']
 // Local aliases — all backed by the shared IST utility in dateUtils.js
 const todayStr   = istToday
 const addDays    = istAddDays
-const weekStart  = istWeekStart
 
 const formatShort = fmtDate
 
@@ -283,7 +282,7 @@ function WeeklyBar({ value, goal }) {
   )
 }
 
-function Nudge({ todayCount, streak, thisWeekCount, bestDay, dailyGoal = DAILY_GOAL }) {
+function Nudge({ todayCount, streak, bestDay, dailyGoal = DAILY_GOAL }) {
   const remaining = dailyGoal - todayCount
   let text, tone
   if (todayCount === 0) {
@@ -364,7 +363,7 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
             </div>
             <WeeklyBar value={thisWeekCount} goal={weeklyGoal} />
           </div>
-          <Nudge todayCount={todayCount} streak={streak} thisWeekCount={thisWeekCount} bestDay={bestDay} dailyGoal={dailyGoal} />
+          <Nudge todayCount={todayCount} streak={streak} bestDay={bestDay} dailyGoal={dailyGoal} />
         </div>
       </div>
 

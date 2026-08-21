@@ -21,12 +21,10 @@ function ImportLeads() {
   const navigate = useNavigate()
   const { currentPerson } = useApp()
   const { toast } = useToast()
-  const [file, setFile] = useState(null)
   const [csvData, setCsvData] = useState([])
   const [headers, setHeaders] = useState([])
   const [mapping, setMapping] = useState({})
   const [step, setStep] = useState(1) // 1=upload, 2=map, 3=preview, 4=importing, 5=complete
-  const [importing, setImporting] = useState(false)
   const [results, setResults] = useState({ success: 0, duplicates: 0, failed: 0, errors: [] })
 
   const fieldOptions = [
@@ -50,7 +48,6 @@ function ImportLeads() {
       return
     }
 
-    setFile(selectedFile)
     parseCSV(selectedFile)
   }
 
@@ -135,7 +132,6 @@ function ImportLeads() {
     }
 
     setStep(4)
-    setImporting(true)
 
     const results = { success: 0, duplicates: 0, failed: 0, errors: [] }
 
@@ -193,7 +189,6 @@ function ImportLeads() {
     }
 
     setResults(results)
-    setImporting(false)
     setStep(5)
   }
 

@@ -25,6 +25,9 @@ export function useSessionState(key, initialValue) {
   }, [key, state])
 
   function clear() {
+    // Empty catch is intentional: clearing storage is best-effort, and a failure
+    // here must not block resetting the in-memory state on the next line.
+    // eslint-disable-next-line no-empty
     try { sessionStorage.removeItem(key) } catch {}
     setState(initialValue)
   }

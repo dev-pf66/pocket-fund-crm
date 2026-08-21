@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead, getEmailTemplates } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
-import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
+import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
@@ -372,13 +372,6 @@ function OutreachTracker() {
     linkedin_message: <Linkedin size={16} />,
     phone_call: <Phone size={16} />,
     other: <MessageSquare size={16} />
-  }
-
-  const statusIcons = {
-    sent: <Clock size={14} />,
-    replied: <CheckCircle size={14} />,
-    no_response: <XCircle size={14} />,
-    bounced: <XCircle size={14} />
   }
 
   const dailyTarget = currentPerson?.daily_outreach_target || 10

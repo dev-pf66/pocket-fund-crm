@@ -9,6 +9,8 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { tt } from '../src/lib/integrations/task-tracker.js'
+import { requireEnv } from './_env.js'
+import { fetchAllRows } from './_db.js'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -40,30 +42,21 @@ const delta = (curr, prev) => {
   return diff > 0 ? `▲${diff}` : `▼${Math.abs(diff)}`
 }
 
-async function buildDigest() {
-  const today = istDateStr()
+/**
+ * Pure aggregation — no DB. Split out from the fetching so the accountability
+ * rules (everyone listed zeros included, TEAM line sums only the listed rows)
+ * are unit-testable. See test/weekly-digest.test.js.
+ */
+export function composeDigest({ people: allPeople, outreach, meetings, demos, today }) {
   const lastStart = addDays(weekStart(today), -7)
   const lastEnd = addDays(lastStart, 6)
   const prevStart = addDays(lastStart, -7)
   const prevEnd = addDays(lastStart, -1)
 
-  const [peopleRes, outreachRes, meetingsRes, demosRes] = await Promise.all([
-    supabase.from('people').select('id, name, is_archived'),
-    supabase.from('crm_outreach_log')
-      .select('logged_by, outreach_date, status')
-      .gte('outreach_date', prevStart).lte('outreach_date', lastEnd),
-    supabase.from('crm_lead_activities')
-      .select('logged_by, activity_date')
-      .in('activity_type', ['call', 'meeting'])
-      .gte('activity_date', prevStart).lt('activity_date', addDays(lastEnd, 1)),
-    supabase.from('crm_demos')
-      .select('created_by, demo_date, stage')
-      .not('demo_date', 'is', null)
-      .gte('demo_date', prevStart).lte('demo_date', lastEnd)
-  ])
-  for (const r of [peopleRes, outreachRes, meetingsRes, demosRes]) {
-    if (r.error) throw r.error
-  }
+  const outreachRes = { data: outreach }
+  const meetingsRes = { data: meetings }
+  const demosRes = { data: demos }
+  const peopleRes = { data: allPeople }
 
   const inLast = (d) => d >= lastStart && d <= lastEnd
   const inPrev = (d) => d >= prevStart && d <= prevEnd
@@ -142,14 +135,117 @@ async function buildDigest() {
   return { weekKey: lastStart, title: `Weekly Outreach Digest — w/o ${lastStart}`, body: lines.join('\n') }
 }
 
+async function buildDigest() {
+  const today = istDateStr()
+  const lastStart = addDays(weekStart(today), -7)
+  const lastEnd = addDays(lastStart, 6)
+  const prevStart = addDays(lastStart, -7)
+
+  // Paged: two weeks of team-wide outreach clears PostgREST's 1000-row cap on
+  // a busy fortnight, and a truncated page comes back with no error — the
+  // digest would just quietly under-report everyone.
+  const [people, outreach, meetings, demos] = await Promise.all([
+    fetchAllRows(() => supabase.from('people').select('id, name, is_archived')),
+    fetchAllRows(() => supabase.from('crm_outreach_log')
+      .select('logged_by, outreach_date, status')
+      .gte('outreach_date', prevStart).lte('outreach_date', lastEnd)),
+    fetchAllRows(() => supabase.from('crm_lead_activities')
+      .select('logged_by, activity_date')
+      .in('activity_type', ['call', 'meeting'])
+      .gte('activity_date', prevStart).lt('activity_date', addDays(lastEnd, 1))),
+    fetchAllRows(() => supabase.from('crm_demos')
+      .select('created_by, demo_date, stage')
+      .not('demo_date', 'is', null)
+      .gte('demo_date', prevStart).lte('demo_date', lastEnd))
+  ])
+
+  return composeDigest({ people, outreach, meetings, demos, today })
+}
+
+// Heartbeat. Best-effort by design: a logging failure must never be the reason
+// the digest itself fails.
+async function recordRun(runKey, status, detail) {
+  try {
+    await supabase.from('crm_cron_runs').insert({
+      job: 'weekly-digest', run_key: runKey, status, detail: detail ? String(detail).slice(0, 500) : null
+    })
+  } catch (e) {
+    console.error('weekly-digest: could not record run', e)
+  }
+}
+
+// Dev's task-tracker person id, by email.
+async function resolveAssignee() {
+  const ttUrl = process.env.TASK_TRACKER_API_URL
+  const ttKey = process.env.TASK_TRACKER_API_KEY
+  const teamRes = await fetch(`${ttUrl}/team`, { headers: { 'x-api-key': ttKey } })
+  const ttTeam = teamRes.ok ? await teamRes.json() : []
+  return ttTeam.find(p => (p.email || '').toLowerCase() === DIGEST_ASSIGNEE_EMAIL)?.id || null
+}
+
+/**
+ * A failed run must be as visible as a successful one. Success shows up as the
+ * Monday digest task; failure used to show up as nothing at all (a 500 in the
+ * Vercel log nobody reads). Now it files its own task, idempotent per week so
+ * a retrying cron can't spam the tracker.
+ *
+ * Note the remaining gap, by design: if the cron never fires at all, nothing
+ * here runs. The digest task's own absence is the signal — no task in Sage on
+ * a Monday morning means the automation is dead.
+ */
+async function alertFailure(weekKey, err) {
+  const key = weekKey || istDateStr()
+  try {
+    const { data: existing } = await supabase
+      .from('crm_tt_mappings')
+      .select('tt_task_id')
+      .eq('entity_type', 'weekly_digest_failure')
+      .eq('entity_key', key)
+      .maybeSingle()
+    if (existing?.tt_task_id) return
+
+    const assignee = await resolveAssignee()
+    const task = await tt.createTask({
+      title: `⚠️ Weekly Outreach Digest FAILED — w/o ${key}`,
+      description:
+        `The weekly digest cron (/api/weekly-digest) errored and no digest was filed.\n\n` +
+        `Error: ${err.message}\n\n` +
+        `Check the Vercel function log, then re-run manually:\n` +
+        `  curl -H "Authorization: Bearer $CRON_SECRET" https://pocket-fund-crm.vercel.app/api/weekly-digest`,
+      priority: 'high',
+      status: 'not_started',
+      due_date: istDateStr(),
+      assigned_to: assignee,
+      created_by: assignee
+    })
+
+    await supabase.from('crm_tt_mappings').upsert({
+      entity_type: 'weekly_digest_failure',
+      entity_key: key,
+      tt_task_id: task.id,
+      metadata: { error: err.message }
+    }, { onConflict: 'entity_type,entity_key' })
+  } catch (e) {
+    // The tracker being down is a plausible cause of the original failure.
+    console.error('weekly-digest: could not file failure alert', e)
+  }
+}
+
 export default async function handler(req, res) {
+  if (!requireEnv(res, [
+    'VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CRON_SECRET',
+    'TASK_TRACKER_API_URL', 'TASK_TRACKER_API_KEY'
+  ])) return
+
   const authHeader = req.headers.authorization
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
+  let weekKey = null
   try {
     const digest = await buildDigest()
+    weekKey = digest.weekKey
     const dryRun = req.query?.dry_run === '1'
     if (dryRun) return res.status(200).json({ ok: true, dry_run: true, ...digest })
 
@@ -161,15 +257,11 @@ export default async function handler(req, res) {
       .eq('entity_key', digest.weekKey)
       .maybeSingle()
     if (existing?.tt_task_id) {
+      await recordRun(digest.weekKey, 'skipped', 'already_sent')
       return res.status(200).json({ ok: true, skipped: 'already_sent', tt_task_id: existing.tt_task_id })
     }
 
-    // Resolve Dev's task-tracker person id by email.
-    const ttUrl = process.env.TASK_TRACKER_API_URL
-    const ttKey = process.env.TASK_TRACKER_API_KEY
-    const teamRes = await fetch(`${ttUrl}/team`, { headers: { 'x-api-key': ttKey } })
-    const ttTeam = teamRes.ok ? await teamRes.json() : []
-    const assignee = ttTeam.find(p => (p.email || '').toLowerCase() === DIGEST_ASSIGNEE_EMAIL)?.id || null
+    const assignee = await resolveAssignee()
 
     const task = await tt.createTask({
       title: digest.title,
@@ -188,9 +280,12 @@ export default async function handler(req, res) {
       metadata: { title: digest.title }
     }, { onConflict: 'entity_type,entity_key' })
 
+    await recordRun(digest.weekKey, 'ok', `tt_task_id=${task.id}`)
     return res.status(200).json({ ok: true, tt_task_id: task.id, week: digest.weekKey })
   } catch (e) {
     console.error('weekly-digest error:', e)
+    await recordRun(weekKey, 'failed', e.message)
+    await alertFailure(weekKey, e)
     return res.status(500).json({ error: e.message })
   }
 }

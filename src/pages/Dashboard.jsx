@@ -206,7 +206,7 @@ function Dashboard() {
 
   if (!data) return <div>Error loading dashboard</div>
 
-  const { pipelineStats, staleLeads, followUps, needsSamples, activeStale, settings } = data
+  const { pipelineStats, staleLeads, followUps, needsSamples, activeStale } = data
   const hasAlerts = activeStale.length || staleLeads.length || followUps.length || needsSamples.length
 
   return (

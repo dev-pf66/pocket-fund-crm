@@ -97,13 +97,14 @@ export async function getOutreachQueue(currentPersonId) {
   const batchIds = [...new Set((queue || []).map(l => l.import_batch_id).filter(Boolean))]
   const batchStats = {}
   if (batchIds.length > 0) {
-    const { data: batchLeads, error: statsError } = await supabase
+    // Paged: import batches are bulk by definition, so a >1000-lead import
+    // would report wrong "x of y contacted" progress.
+    const batchLeads = await fetchAllRows(() => supabase
       .from('crm_leads')
       .select('import_batch_id, stage')
       .eq('assigned_to', currentPersonId)
-      .in('import_batch_id', batchIds)
-    if (statsError) throw statsError
-    for (const row of batchLeads || []) {
+      .in('import_batch_id', batchIds))
+    for (const row of batchLeads) {
       const id = row.import_batch_id
       if (!batchStats[id]) batchStats[id] = { total: 0, contacted: 0 }
       batchStats[id].total += 1

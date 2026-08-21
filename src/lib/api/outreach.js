@@ -10,6 +10,13 @@ import { cacheClear, fireTTEvent, istDateStr, fetchAllRows } from './core'
 import { advanceLeadStage, createLead, findLeadByEmailOrNameFirm } from './leads'
 import { logActivityManual } from './misc'
 
+// Explicit ceiling for the two "give me the whole log" readers below. Both
+// feed a scrollable table that Analytics also re-aggregates, so they want a
+// generous bound rather than every row ever — but left unbounded they were
+// silently getting PostgREST's 1000-row max-rows instead of a number we chose,
+// and Analytics was aggregating that truncated slice. This is a cap we picked.
+const MAX_LOG_ROWS = 5000
+
 // ============================================================================
 // OUTREACH TRACKER
 // ============================================================================
@@ -18,40 +25,43 @@ import { logActivityManual } from './misc'
  * Get outreach log entries
  */
 export async function getOutreachLog(filters = {}, personId = null) {
-  let query = supabase
-    .from('crm_outreach_log')
-    .select(`
-      *,
-      lead:crm_leads(id, name, firm_name, stage, outreach_stage),
-      logged_by_person:logged_by(id, name)
-    `)
-    .order('outreach_date', { ascending: false })
-    .order('created_at', { ascending: false })
+  // Built inside the factory: fetchAllRows calls it once per page and a
+  // Supabase query builder is single-use.
+  const build = () => {
+    let query = supabase
+      .from('crm_outreach_log')
+      .select(`
+        *,
+        lead:crm_leads(id, name, firm_name, stage, outreach_stage),
+        logged_by_person:logged_by(id, name)
+      `)
+      .order('outreach_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
-  if (filters.outreach_date) {
-    query = query.eq('outreach_date', filters.outreach_date)
+    if (filters.outreach_date) {
+      query = query.eq('outreach_date', filters.outreach_date)
+    }
+
+    if (filters.outreach_type) {
+      query = query.eq('outreach_type', filters.outreach_type)
+    }
+
+    if (filters.status) {
+      query = query.eq('status', filters.status)
+    }
+
+    if (filters.days_back) {
+      query = query
+        .gte('outreach_date', istAddDays(istDateStr(), -filters.days_back))
+        .lte('outreach_date', istDateStr())
+    }
+
+    if (personId) query = query.eq('logged_by', personId)
+    return query
   }
 
-  if (filters.outreach_type) {
-    query = query.eq('outreach_type', filters.outreach_type)
-  }
-
-  if (filters.status) {
-    query = query.eq('status', filters.status)
-  }
-
-  if (filters.days_back) {
-    query = query
-      .gte('outreach_date', istAddDays(istDateStr(), -filters.days_back))
-      .lte('outreach_date', istDateStr())
-  }
-
-  if (personId) query = query.eq('logged_by', personId)
-
-  const { data, error } = await query
-
-  if (error) throw error
-  return data || []
+  return fetchAllRows(build, { maxRows: MAX_LOG_ROWS })
 }
 
 /**
@@ -343,35 +353,39 @@ export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGo
  * filters: { platform, days_back, has_response }
  */
 export async function getAllOutreachLogs(filters = {}) {
-  let query = supabase
-    .from('crm_outreach_log')
-    .select(`
-      *,
-      lead:crm_leads(id, name, firm_name, stage, outreach_stage),
-      logged_by_person:logged_by(id, name)
-    `)
-    .order('outreach_date', { ascending: false })
-    .order('created_at', { ascending: false })
+  // Built inside the factory: fetchAllRows calls it once per page and a
+  // Supabase query builder is single-use.
+  const build = () => {
+    let query = supabase
+      .from('crm_outreach_log')
+      .select(`
+        *,
+        lead:crm_leads(id, name, firm_name, stage, outreach_stage),
+        logged_by_person:logged_by(id, name)
+      `)
+      .order('outreach_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
-  if (filters.platform) {
-    query = query.eq('outreach_type', filters.platform)
+    if (filters.platform) {
+      query = query.eq('outreach_type', filters.platform)
+    }
+
+    if (filters.has_response === true) {
+      query = query.eq('status', 'replied')
+    } else if (filters.has_response === false) {
+      query = query.neq('status', 'replied')
+    }
+
+    if (filters.days_back) {
+      query = query.gte('outreach_date', istAddDays(istDateStr(), -filters.days_back))
+    }
+
+    if (filters.logged_by) query = query.eq('logged_by', filters.logged_by)
+    return query
   }
 
-  if (filters.has_response === true) {
-    query = query.eq('status', 'replied')
-  } else if (filters.has_response === false) {
-    query = query.neq('status', 'replied')
-  }
-
-  if (filters.days_back) {
-    query = query.gte('outreach_date', istAddDays(istDateStr(), -filters.days_back))
-  }
-
-  if (filters.logged_by) query = query.eq('logged_by', filters.logged_by)
-
-  const { data, error } = await query
-  if (error) throw error
-  return data || []
+  return fetchAllRows(build, { maxRows: MAX_LOG_ROWS })
 }
 
 /**
@@ -403,30 +417,36 @@ export async function getWeeklyFunnel(weeksBack = 8, personId = null) {
   const thisWeekStart = istWeekStart(istDateStr())
   const rangeStart = istAddDays(thisWeekStart, -7 * (weeksBack - 1))
 
-  let outreachQ = supabase
-    .from('crm_outreach_log')
-    .select('outreach_date, status')
-    .gte('outreach_date', rangeStart)
-  if (personId) outreachQ = outreachQ.eq('logged_by', personId)
-
-  let meetingsQ = supabase
-    .from('crm_lead_activities')
-    .select('activity_date, activity_type')
-    .in('activity_type', ['call', 'meeting'])
-    .gte('activity_date', rangeStart)
-  if (personId) meetingsQ = meetingsQ.eq('logged_by', personId)
-
-  let demosQ = supabase
-    .from('crm_demos')
-    .select('demo_date, stage')
-    .not('demo_date', 'is', null)
-    .gte('demo_date', rangeStart)
-  if (personId) demosQ = demosQ.eq('created_by', personId)
-
-  const [outreach, meetings, demos] = await Promise.all([outreachQ, meetingsQ, demosQ])
-  for (const res of [outreach, meetings, demos]) {
-    if (res.error) throw res.error
-  }
+  // All three paged — 8 weeks of team-wide outreach passes 1000 rows and a
+  // truncated page would just under-count the earliest weeks with no error.
+  const [outreach, meetings, demos] = await Promise.all([
+    fetchAllRows(() => {
+      let q = supabase
+        .from('crm_outreach_log')
+        .select('outreach_date, status')
+        .gte('outreach_date', rangeStart)
+      if (personId) q = q.eq('logged_by', personId)
+      return q
+    }),
+    fetchAllRows(() => {
+      let q = supabase
+        .from('crm_lead_activities')
+        .select('activity_date, activity_type')
+        .in('activity_type', ['call', 'meeting'])
+        .gte('activity_date', rangeStart)
+      if (personId) q = q.eq('logged_by', personId)
+      return q
+    }),
+    fetchAllRows(() => {
+      let q = supabase
+        .from('crm_demos')
+        .select('demo_date, stage')
+        .not('demo_date', 'is', null)
+        .gte('demo_date', rangeStart)
+      if (personId) q = q.eq('created_by', personId)
+      return q
+    })
+  ])
 
   // Seed every week in range so quiet weeks still render as zeros.
   const weeks = new Map()
@@ -436,17 +456,17 @@ export async function getWeeklyFunnel(weeksBack = 8, personId = null) {
   }
   const bucket = (dateStr) => weeks.get(istWeekStart(String(dateStr).slice(0, 10)))
 
-  for (const r of outreach.data || []) {
+  for (const r of outreach) {
     const w = bucket(r.outreach_date)
     if (!w) continue
     w.outreach += 1
     if (r.status === 'replied') w.replies += 1
   }
-  for (const r of meetings.data || []) {
+  for (const r of meetings) {
     const w = bucket(r.activity_date)
     if (w) w.meetings += 1
   }
-  for (const r of demos.data || []) {
+  for (const r of demos) {
     const w = bucket(r.demo_date)
     if (!w) continue
     w.demos += 1
@@ -457,16 +477,36 @@ export async function getWeeklyFunnel(weeksBack = 8, personId = null) {
 }
 
 export async function getOutreachStatsByPerson(daysBack = 90, personId = null) {
-  let q = supabase
-    .from('crm_outreach_log')
-    .select('logged_by, outreach_date, status, outreach_type, lead_source')
-    .gte('outreach_date', istAddDays(istDateStr(), -daysBack))
-  if (personId) q = q.eq('logged_by', personId)
+  // Paged: 90 days of team-wide outreach is comfortably past 1000 rows, and
+  // every per-person number, heatmap and leaderboard is derived from this.
+  const since = istAddDays(istDateStr(), -daysBack)
+  return fetchAllRows(() => {
+    let q = supabase
+      .from('crm_outreach_log')
+      .select('logged_by, outreach_date, status, outreach_type, lead_source')
+      .gte('outreach_date', since)
+    if (personId) q = q.eq('logged_by', personId)
+    return q
+  })
+}
 
-  const { data, error } = await q
-
-  if (error) throw error
-  return data || []
+/**
+ * Call/meeting activity rows for the last N days, per person. The twin of
+ * getOutreachStatsByPerson — Analytics used to run this query inline against
+ * supabase, which meant it sat outside the api layer and couldn't inherit the
+ * paging fix. Every list query belongs behind fetchAllRows.
+ */
+export async function getMeetingActivityByPerson(daysBack = 90, personId = null) {
+  const since = istAddDays(istDateStr(), -daysBack)
+  return fetchAllRows(() => {
+    let q = supabase
+      .from('crm_lead_activities')
+      .select('logged_by, activity_date, activity_type')
+      .in('activity_type', ['call', 'meeting'])
+      .gte('activity_date', since)
+    if (personId) q = q.eq('logged_by', personId)
+    return q
+  })
 }
 
 /**
@@ -521,14 +561,21 @@ export async function analyzeOutreach(entries) {
 // "Latest" is by outreach_date descending — replies override an earlier
 // 'sent' on the same lead, which is the behavior we want.
 export async function getLeadLatestOutreachStatus(personId = null) {
-  let q = supabase
-    .from('crm_outreach_log')
-    .select('lead_id, status, outreach_date')
-    .not('lead_id', 'is', null)
-    .order('outreach_date', { ascending: false })
-  if (personId) q = q.eq('logged_by', personId)
-  const { data, error } = await q
-  if (error) throw error
+  // Paged, with `id` as a tiebreaker. This is the whole outreach log with no
+  // date bound — the first query in the app to cross PostgREST's 1000-row cap,
+  // and a truncated page silently drops leads out of the response-status
+  // filters. The tiebreaker makes the sort total so paging can't duplicate or
+  // skip rows at a page boundary.
+  const data = await fetchAllRows(() => {
+    let q = supabase
+      .from('crm_outreach_log')
+      .select('id, lead_id, status, outreach_date')
+      .not('lead_id', 'is', null)
+      .order('outreach_date', { ascending: false })
+      .order('id', { ascending: false })
+    if (personId) q = q.eq('logged_by', personId)
+    return q
+  })
   const map = new Map()
   for (const row of data || []) {
     // First row per lead_id wins because we ordered desc.

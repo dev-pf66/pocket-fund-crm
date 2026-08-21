@@ -5,7 +5,7 @@
 
 import { supabase } from '../supabase'
 import { istAddDays, istWeekStart } from '../dateUtils'
-import { cacheClear, istDateStr, getDaysBetween } from './core'
+import { cacheClear, istDateStr, getDaysBetween, fetchAllRows } from './core'
 import { logActivity, calculateStaleness, updateLead } from './leads'
 import { runBulk } from '../bulkActions'
 import { advanceFollowUpCadence, clearFollowUp, snoozeFollowUp } from './followups'
@@ -117,11 +117,14 @@ export async function getTodayQueue(personId, { limit = 25 } = {}) {
  * next step — that's what makes a cadence self-sustaining instead of
  * something you re-arm by hand after every reach-out.
  */
-export async function markLeadTouched(lead, currentPersonId, note = '') {
+export async function markLeadTouched(lead, currentPersonId, note = '', { source = 'Today tab' } = {}) {
   const trimmed = (note || '').trim()
   const activity = await logActivity(lead.id, {
     activity_type: 'note',
-    notes: trimmed ? `Touched — ${trimmed}` : 'Touched (Today tab)'
+    // `source` names the surface in the audit trail. The Pipeline board logs
+    // touches too now, and "Touched (Today tab)" on a lead nobody opened in
+    // Today would be a lie in that lead's history.
+    notes: trimmed ? `Touched — ${trimmed}` : `Touched (${source})`
   }, currentPersonId)
 
   if (lead.follow_up_cadence?.offsets?.length) {
@@ -178,15 +181,19 @@ export async function getFollowUpsDue(personId) {
 export async function getEscalations(personId = null, { limit = 10 } = {}) {
   const t = await getTodayThresholds()
 
-  let q = supabase
-    .from('crm_leads')
-    .select('*')
-    .not('stage', 'in', '(passed,client)')
-  if (personId) q = q.eq('assigned_to', personId)
-  const { data, error } = await q
-  if (error) throw error
+  // Paged: team-wide this is every open lead, and the sort below runs over
+  // the whole set — a truncated page wouldn't just shorten the list, it would
+  // hand back the wrong top 10.
+  const data = await fetchAllRows(() => {
+    let q = supabase
+      .from('crm_leads')
+      .select('*')
+      .not('stage', 'in', '(passed,client)')
+    if (personId) q = q.eq('assigned_to', personId)
+    return q
+  })
 
-  const escalations = (data || []).filter(lead => {
+  const escalations = data.filter(lead => {
     const days = daysStaleFor(lead)
     if (lead.stage === 'active_conversation' && days > t.active) return true
     const dealSignals = lead.budget_discussed || lead.expected_close_date
@@ -212,13 +219,13 @@ export async function pingDevOnLead(lead, currentPersonId, currentPersonName) {
 
 /** Unassigned, still-workable leads (id + name only — feeds the banner). */
 export async function getUnassignedLeads() {
-  const { data, error } = await supabase
+  // Paged: a bulk import drops thousands of unassigned leads in at once, and
+  // the banner's count would stick at 1000.
+  return fetchAllRows(() => supabase
     .from('crm_leads')
     .select('id, name, stage')
     .is('assigned_to', null)
-    .not('stage', 'in', '(passed,client)')
-  if (error) throw error
-  return data || []
+    .not('stage', 'in', '(passed,client)'))
 }
 
 /**
@@ -246,8 +253,8 @@ export async function bulkClaimLeads(leadIds, personId) {
 }
 
 /** Bulk "✓ Touched" — logs a touch (and rolls any cadence) on every lead. */
-export async function bulkMarkTouched(leads, currentPersonId, note = '') {
-  return runBulk(leads, lead => markLeadTouched(lead, currentPersonId, note))
+export async function bulkMarkTouched(leads, currentPersonId, note = '', opts = {}) {
+  return runBulk(leads, lead => markLeadTouched(lead, currentPersonId, note, opts))
 }
 
 /**

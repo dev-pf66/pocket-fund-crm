@@ -47,6 +47,7 @@ function sanitizeInput(text) {
   // Strip control characters (except newlines/tabs)
   // Cap length to prevent prompt injection via very long messages
   return text
+    // eslint-disable-next-line no-control-regex -- deliberate: this IS the control-character strip
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     .slice(0, MAX_INPUT_LENGTH);
 }

@@ -14,6 +14,8 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Never claim a fix is live without verifying the deployed site (global `/ship-verify` skill). A push is not a deploy; a deploy is not a verified fix.
 - Vercel crons (`vercel.json`): `weekly-digest` only (Mon 03:30 UTC = 9:00 IST → posts per-analyst rollup as a due-dated Sage task, idempotent via `crm_tt_mappings`). The digest covers **every non-archived person, zeros included** (Dev's call, July 2026) — don't filter it back down to active-only.
 - `TASK_TRACKER_API_URL`/`TASK_TRACKER_API_KEY` + `CRON_SECRET` live in Vercel prod env — they were missing until July 2026, which silently disabled ALL task-tracker automation. If TT automation looks dead, check these first.
+- **Fail-loud config (Aug 2026):** every `api/*` handler opens with `requireEnv(res, [...])` from `api/_env.js` — missing env is now a 500 naming the vars, never a silent degrade. `GET /api/health` (auth: `Bearer $CRON_SECRET`) reports missing env + the digest's last run. Adding a handler? Add its `requireEnv` line and its vars to `REQUIRED` in `api/health.js`.
+- **Cron heartbeat (Aug 2026):** every digest run writes a row to `crm_cron_runs` (ok/failed/skipped), and a FAILED run files its own high-priority Sage task, idempotent per week via `crm_tt_mappings` entity_type `weekly_digest_failure`. Remaining gap by design: if the cron never fires at all, nothing alerts — the digest task's absence on a Monday IS the signal.
 - The `daily-leads-v2` cron was **removed August 2026** (Dev's call). It had never once worked: it inserted columns that don't exist on `crm_leads` (`company`/`source`/`score`/`tags`), and `APIFY_API_TOKEN` was never set in prod, so the scraper returned nothing anyway. Recover from git history if it's ever wanted; it needs an Apify token to do anything.
 
 ## Supabase
@@ -21,7 +23,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Project ref: `lzydgdzjrgvqglxmyfjk` (https://lzydgdzjrgvqglxmyfjk.supabase.co).
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 035). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 039). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
 - `crm_investors` RLS is deliberately "Allow all access" (open to the team as the shared contact book) — do not "fix" it.
 
 ## CRM API (preferred access path for CRM data)
@@ -34,6 +36,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 - Stage order lives in `STAGE_ORDER` in `src/lib/api/leads.js`: new_lead → cold_outreach → responded → warm_lead → active_conversation → meeting_booked → client; `passed` is terminal/outside.
 - `src/lib/crm-api.js` is a **pure re-export barrel** over `src/lib/api/*` modules — edit the modules, not the barrel.
+- **Pagination:** `fetchAllRows()` (`src/lib/api/core.js`, mirrored for serverless in `api/_db.js`) is the ONLY sanctioned way to read a list that gets counted/aggregated. PostgREST truncates a plain select at 1000 rows with NO error, and this repo has shipped that bug three separate times. `.limit(n)` is NOT an escape hatch — PostgREST clamps it to max-rows, so `.limit(5000)` quietly returns 1000; use `fetchAllRows(f, { maxRows })`. Pass a FACTORY (a query builder is single-use), and give any ordered query a total sort (add `.order('id')`) or paging can skip/duplicate rows at a page boundary.
 - All stage automation is **forward-only** (`advanceLeadStage`) — never regresses a lead, never touches client/passed. It deliberately skips `runStageSideEffects` to avoid double-counting.
 - Reply↔pipeline sync is bidirectional: outreach marked 'replied' advances the lead to `responded`; lead dragged to responded+ flips its latest un-replied outreach entry to 'replied'.
 - Entering `meeting_booked` auto-logs a 'meeting' activity — that's what the Dashboard Funnel counts as meetings.
@@ -43,7 +46,9 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 ## Dev environment
 
-- Stack: Vite 7 + React 19 + react-router 7 + supabase-js; serverless functions in `api/` (plain JS, Vercel style). No test suite — `npm run lint` is the only check.
+- Stack: Vite 7 + React 19 + react-router 7 + supabase-js; serverless functions in `api/` (plain JS, Vercel style).
+- Checks: `npm run lint` (0 errors, warnings remain), `npm test` (vitest), `npm run build`. All three run on every PR to main via `.github/workflows/ci.yml` — Vercel deploys from origin/main with no gate of its own, so CI is the gate.
+- The test suite (`test/`) is **guardrails, not coverage** (Aug 2026). It pins the trap-prone machinery that keeps getting broken: forward-only `advanceLeadStage`, the reply↔pipeline sync and meeting auto-log in `moveLead`, the digest's "everyone, zeros included" + TEAM-sums-only-listed-rows rules, and `fetchAllRows` paging. Don't chase coverage; do add a guardrail when you fix a silent-failure bug. `test/helpers/fake-supabase.js` is a recording mock, not a query engine — it records operations, it does not filter or sort.
 - Run: `npm install && npm run dev`. Build: `npm run build`. Lint: `npm run lint`.
 - `.env` is gitignored — fresh worktrees need the two `VITE_` values (unquoted). `.env.local` comes from `vercel env pull`.
 - Local `npm run dev` runs the SPA only; `api/*` functions do not run locally without `vercel dev`.

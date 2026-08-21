@@ -509,14 +509,16 @@ export async function getWeeklyCallCount() {
   const weekAgo = new Date()
   weekAgo.setDate(weekAgo.getDate() - 7)
 
-  const { data, error } = await supabase
+  // count:exact/head:true — counting via data.length silently stopped at
+  // PostgREST's 1000-row cap, and no rows need to cross the wire for a count.
+  const { count, error } = await supabase
     .from('crm_lead_activities')
-    .select('id')
+    .select('id', { count: 'exact', head: true })
     .in('activity_type', ['call', 'meeting'])
     .gte('activity_date', weekAgo.toISOString())
 
   if (error) throw error
-  return data?.length || 0
+  return count || 0
 }
 
 /**
@@ -563,35 +565,43 @@ export async function getWeeklyStats(personId = null) {
   const weekAgo = new Date()
   weekAgo.setDate(weekAgo.getDate() - 7)
 
-  let activitiesQuery = supabase
-    .from('crm_lead_activities')
-    .select('activity_type')
-    .gte('activity_date', weekAgo.toISOString())
-  // logged_by, not created_by — crm_lead_activities has no created_by, so
-  // this filter used to error (42703). The error was never checked, leaving
-  // every non-admin with a permanent "0 discovery calls / 0 proposals".
-  if (personId) activitiesQuery = activitiesQuery.eq('logged_by', personId)
-
-  let leadsQuery = supabase
-    .from('crm_leads')
-    .select('stage, created_at, updated_at')
-  if (personId) leadsQuery = leadsQuery.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
-
-  const [activities, leads] = await Promise.all([activitiesQuery, leadsQuery])
+  // Both paged. The leads side has no date predicate at all — the week
+  // filtering happens in JS below — so it reads the whole crm_leads table and
+  // would freeze permanently at the first 1000 rows without erroring.
+  const [activities, leads] = await Promise.all([
+    fetchAllRows(() => {
+      let q = supabase
+        .from('crm_lead_activities')
+        .select('activity_type')
+        .gte('activity_date', weekAgo.toISOString())
+      // logged_by, not created_by — crm_lead_activities has no created_by, so
+      // this filter used to error (42703). The error was never checked, leaving
+      // every non-admin with a permanent "0 discovery calls / 0 proposals".
+      if (personId) q = q.eq('logged_by', personId)
+      return q
+    }),
+    fetchAllRows(() => {
+      let q = supabase
+        .from('crm_leads')
+        .select('stage, created_at, updated_at')
+      if (personId) q = q.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
+      return q
+    })
+  ])
 
   const stats = {
-    discovery_calls: activities.data?.filter(a =>
+    discovery_calls: activities.filter(a =>
       ['call', 'meeting'].includes(a.activity_type)
-    ).length || 0,
-    proposals_sent: activities.data?.filter(a =>
+    ).length,
+    proposals_sent: activities.filter(a =>
       a.activity_type === 'proposal_sent'
-    ).length || 0,
-    new_leads: leads.data?.filter(l =>
+    ).length,
+    new_leads: leads.filter(l =>
       new Date(l.created_at) >= weekAgo
-    ).length || 0,
-    closed_clients: leads.data?.filter(l =>
+    ).length,
+    closed_clients: leads.filter(l =>
       l.stage === 'client' && new Date(l.updated_at) >= weekAgo
-    ).length || 0
+    ).length
   }
 
   return stats

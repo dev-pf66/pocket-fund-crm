@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { isAuthorized } from './_auth.js'
+import { requireEnv } from './_env.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -18,6 +19,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  if (!requireEnv(res, ['ANTHROPIC_API_KEY', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'])) return
   if (!(await isAuthorized(req))) return res.status(401).json({ error: 'Unauthorized' })
 
   const { entries } = req.body

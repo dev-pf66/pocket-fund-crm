@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireEnv } from './_env.js'
+import { fetchAllRows } from './_db.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -22,16 +24,18 @@ export default async function handler(req, res) {
     return res.status(200).end()
   }
 
+  if (!requireEnv(res, ['VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CRM_API_KEY'])) return
+
   if (!authenticate(req)) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
   try {
-    const { data: leads, error } = await supabase
+    // Paged: every number below is a .filter().length over this array, so a
+    // silent 1000-row truncation would report wrong conversion rates.
+    const leads = await fetchAllRows(() => supabase
       .from('crm_leads')
-      .select('*')
-
-    if (error) throw error
+      .select('id, stage, lead_source'))
 
     // Calculate analytics
     const stages = {

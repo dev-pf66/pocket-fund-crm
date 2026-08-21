@@ -40,16 +40,26 @@ export async function fireTTEvent(event_type, payload) {
  *
  *   const rows = await fetchAllRows(() =>
  *     supabase.from('crm_outreach_log').select('lead_id, outreach_date'))
+ *
+ * Note that `.limit(n)` is NOT an alternative: PostgREST clamps any limit to
+ * the server's max-rows, so `.limit(5000)` quietly returns 1000. Paging is the
+ * only way to get more, and `maxRows` is the only honest way to want less.
+ *
+ * If the query is ordered, make sure the sort is total (add a tiebreaker like
+ * `.order('id')`) — paging a query with ties can duplicate or skip rows at a
+ * page boundary.
  */
-export async function fetchAllRows(queryFactory, { pageSize = 1000 } = {}) {
+export async function fetchAllRows(queryFactory, { pageSize = 1000, maxRows = Infinity } = {}) {
   const out = []
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await queryFactory().range(from, from + pageSize - 1)
+  for (let from = 0; from < maxRows; from += pageSize) {
+    const size = Math.min(pageSize, maxRows - from)
+    const { data, error } = await queryFactory().range(from, from + size - 1)
     if (error) throw error
     const page = data || []
     out.push(...page)
-    if (page.length < pageSize) return out
+    if (page.length < size) break
   }
+  return out
 }
 
 // ============================================================================

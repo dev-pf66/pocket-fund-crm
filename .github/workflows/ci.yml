@@ -3,6 +3,12 @@ name: CI
 # Catches broken builds before they reach production. Exists because a
 # "dead code cleanup" once deleted functions still imported by live pages
 # and nothing flagged it until users hit blank screens.
+#
+# Lint and test were added Aug 2026. Until then this ran build only — lint
+# had ~79 pre-existing errors so it could never have gated anything, and
+# there was no test suite. Both are now clean and blocking. The tests are
+# guardrails on the trap-prone machinery (stage automation, reply sync,
+# digest rules, pagination), not coverage for its own sake.
 on:
   push:
     branches: [main]
@@ -18,4 +24,6 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run lint
+      - run: npm test
       - run: npm run build

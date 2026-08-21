@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, moveLead, updateLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus } from '../lib/crm-api'
+import { getLeads, moveLead, updateLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus, bulkMarkTouched } from '../lib/crm-api'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import LeadCard from '../components/LeadCard'
 import LeadForm from './LeadForm'
 import QuickAddCard from '../components/QuickAddCard'
-import { Plus, Search, Filter, Upload, Save, ChevronDown, X, Bookmark, XCircle } from 'lucide-react'
+import { Plus, Search, Filter, Upload, Save, ChevronDown, X, Bookmark, XCircle, Check } from 'lucide-react'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
 import { isAdminUser } from '../lib/admin'
@@ -501,6 +501,29 @@ function LeadsBoard() {
     }
   }
 
+  // Reuses the Today tab's touch path verbatim (logs the activity, stamps
+  // last_activity_date, rolls any follow-up cadence) — the Pipeline board had
+  // the selection UI already but no way to record that you'd worked the leads.
+  async function handleBulkTouch() {
+    if (!selectedIds.size) return
+    setBulkBusy(true)
+    try {
+      const targets = visibleLeads.filter(l => selectedIds.has(l.id))
+      const { succeeded, failed } = await bulkMarkTouched(
+        targets, currentPerson.id, '', { source: 'Pipeline' }
+      )
+      toast.success(`Logged a touch on ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'}`)
+      if (failed.length) toast.error(`${failed.length} failed to log`)
+      setSelectedIds(new Set())
+      await loadLeads()
+    } catch (error) {
+      console.error('Bulk touch failed:', error)
+      toast.error('Bulk touch failed: ' + error.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   async function handleBulkMarkDead() {
     if (!selectedIds.size) return
     if (!confirm(`Mark ${selectedIds.size} lead${selectedIds.size === 1 ? '' : 's'} as dead (stage → Passed)?`)) return
@@ -966,6 +989,9 @@ function LeadsBoard() {
             </select>
             <button className="btn btn-sm btn-primary" onClick={handleBulkStageMove} disabled={bulkBusy || !bulkStage}>
               Apply
+            </button>
+            <button className="btn btn-sm btn-secondary" onClick={handleBulkTouch} disabled={bulkBusy}>
+              <Check size={14} /> Mark touched
             </button>
             <button className="btn btn-sm btn-secondary" onClick={handleBulkMarkDead} disabled={bulkBusy} style={{ color: '#b91c1c' }}>
               <XCircle size={14} /> Mark dead

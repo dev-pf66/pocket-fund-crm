@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../App'
-import { getOutreachStatsByPerson, getAllOutreachLogs, analyzeOutreach, getLeadTouchData } from '../lib/crm-api'
-import { supabase } from '../lib/supabase'
+import { getOutreachStatsByPerson, getAllOutreachLogs, analyzeOutreach, getLeadTouchData, getMeetingActivityByPerson } from '../lib/crm-api'
 import { Send, MessageSquare, Calendar, TrendingUp, Sparkles, Tag, Zap } from 'lucide-react'
 import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 import { isAdminUser } from '../lib/admin'
@@ -61,16 +60,9 @@ function Analytics() {
   async function load() {
     setLoading(true)
     try {
-      const sinceDate = istAddDays(istToday(), -90)
-
       const [outreach, meetings, touch] = await Promise.all([
         getOutreachStatsByPerson(90),
-        supabase
-          .from('crm_lead_activities')
-          .select('logged_by, activity_date, activity_type')
-          .in('activity_type', ['call', 'meeting'])
-          .gte('activity_date', sinceDate)
-          .then(({ data, error }) => { if (error) throw error; return data || [] }),
+        getMeetingActivityByPerson(90),
         getLeadTouchData(90).catch(() => ({ leads: [], touches: [] }))
       ])
       setOutreachRows(outreach)

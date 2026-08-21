@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
-import { getPeople, setUserAdmin, deleteUser, sendPasswordResetEmail, adminSetUserPassword, generateTempPassword, setUserArchived, setUserTargets } from '../lib/supabase'
+import { getPeople, setUserAdmin, deleteUser, adminSetUserPassword, generateTempPassword, setUserArchived, setUserTargets } from '../lib/supabase'
 import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
 import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound, Archive, ArchiveRestore, Target } from 'lucide-react'
