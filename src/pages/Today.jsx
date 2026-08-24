@@ -194,7 +194,6 @@ function Today() {
       const { succeeded, failed } = await bulkMarkTouched(selectedLeads, currentPerson.id)
       removeFromQueues(succeeded)
       notifyFollowUpsChanged()
-      setCounters(prev => ({ ...prev, touchesThisWeek: prev.touchesThisWeek + succeeded.length }))
       clearSelection()
       if (succeeded.length) toast.success(`Logged touch on ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'}`)
       if (failed.length) toast.error(`${failed.length} failed to log`)
@@ -233,6 +232,11 @@ function Today() {
       const { succeeded, failed } = await bulkDismissLeads(selectedLeads, currentPerson.id)
       removeFromQueues(succeeded)
       notifyFollowUpsChanged()
+      // Marking leads dead can drop them out of active_conversation /
+      // meeting_booked, so the "live conversations" headline is now stale.
+      getMovementWeekOverWeek(currentPerson.id)
+        .then(r => { if (r) { setMovement(r.current); setPrevMovement(r.previous) } })
+        .catch(err => console.error('Movement refresh failed:', err))
       clearSelection()
       if (succeeded.length) toast.success(`Marked ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'} dead`)
       if (failed.length) toast.error(`${failed.length} failed to update`)
@@ -254,7 +258,6 @@ function Today() {
         total: Math.max(0, prev.total - 1)
       }))
       setFollowUps(prev => prev.filter(l => l.id !== lead.id))
-      setCounters(prev => ({ ...prev, touchesThisWeek: prev.touchesThisWeek + 1 }))
       toast.success(`Logged touch on ${lead.name}`)
     } catch (err) {
       console.error('Failed to log touch:', err)
