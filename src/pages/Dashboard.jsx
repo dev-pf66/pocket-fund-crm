@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { getCRMDashboardData, getOutreachStatsByPerson, getWeeklyFunnel, getCareerOutreachCount, cachePeek } from '../lib/crm-api'
+import { getCRMDashboardData, getOutreachStatsByPerson, getWeeklyFunnel, getMovementWeekOverWeek, cachePeek } from '../lib/crm-api'
 import { useApp } from '../App'
 import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
-import { TrendingUp, AlertCircle, Calendar, Activity, Clock, FlaskConical, Flame, Trophy, Award, Target } from 'lucide-react'
+import { TrendingUp, AlertCircle, Calendar, Activity, Clock, FlaskConical, Target } from 'lucide-react'
 import { isAdminUser } from '../lib/admin'
-import { buildDailyCounts, computeMetrics, milestoneFor, replyRateColor } from '../lib/outreachMetrics'
+import { buildDailyCounts, computeMetrics, replyRateColor } from '../lib/outreachMetrics'
 import StageChip from '../components/StageChip'
 
 const FUNNEL_WEEK_OPTIONS = [4, 8, 12]
@@ -102,9 +102,9 @@ function Dashboard() {
   const [data, setData] = useState(() => cachePeek(cacheKey) || null)
   const [outreachRows, setOutreachRows] = useState([])
   // Gamification (self-only): 90 days of own rows for streak/bests, plus
-  // all-time count for the milestone badge.
   const [personalRows, setPersonalRows] = useState([])
-  const [careerTotal, setCareerTotal] = useState(0)
+  const [movement, setMovement] = useState({ advanced: 0, replies: 0, meetings: 0, live: 0, sampleFrom: null })
+  const [prevMovement, setPrevMovement] = useState(null)
   // Admin-only weekly funnel (outreach → replies → meetings → demos).
   const [funnel, setFunnel] = useState([])
   const [funnelWeeks, setFunnelWeeks] = useState(8)
@@ -124,18 +124,24 @@ function Dashboard() {
   async function loadData() {
     if (!currentPerson?.id) return
     try {
-      const [dashboardData, rows, myRows, career] = await Promise.all([
+      const [dashboardData, rows, myRows, moveRes] = await Promise.all([
         getCRMDashboardData(currentPerson.id),
         // Admins get all-team rows; non-admins only their own. Fetched wide
         // enough for every summary-range preset, filtered client-side.
         getOutreachStatsByPerson(SUMMARY_FETCH_DAYS, isAdmin ? null : currentPerson.id).catch(() => []),
         getOutreachStatsByPerson(90, currentPerson.id).catch(() => []),
-        getCareerOutreachCount(currentPerson.id).catch(() => 0)
+        getMovementWeekOverWeek(currentPerson.id).catch(err => {
+          console.error('Movement stats failed:', err)
+          return null
+        })
       ])
       setData(dashboardData)
       setOutreachRows(rows)
       setPersonalRows(myRows)
-      setCareerTotal(career)
+      if (moveRes) {
+        setMovement(moveRes.current)
+        setPrevMovement(moveRes.previous)
+      }
     } catch (error) {
       console.error('Failed to load dashboard:', error)
     } finally {
@@ -144,12 +150,10 @@ function Dashboard() {
   }
 
   const myDailyTarget = dailyTargetOf(currentPerson)
-  const myWeeklyTarget = weeklyTargetOf(currentPerson)
   const myMetrics = useMemo(
     () => computeMetrics(buildDailyCounts(personalRows), myDailyTarget),
     [personalRows, myDailyTarget]
   )
-  const milestone = useMemo(() => milestoneFor(careerTotal), [careerTotal])
 
   const today = istToday()
   const { start: rangeStart, end: rangeEnd } = summaryRangeBounds(summaryRange, today)
@@ -222,8 +226,8 @@ function Dashboard() {
         <Link to="/outreach" className="btn btn-primary">Log Outreach</Link>
       </div>
 
-      {/* My Week — personal gamification, self-only data */}
-      <MyWeekCard metrics={myMetrics} careerTotal={careerTotal} milestone={milestone} dailyGoal={myDailyTarget} weeklyGoal={myWeeklyTarget} />
+      {/* My Week — what moved, self-only data */}
+      <MyWeekCard movement={movement} prevMovement={prevMovement} touchesThisWeek={myMetrics.thisWeekCount} />
 
       {/* Today's Outreach */}
       <div className="card dashboard-card">
@@ -390,87 +394,61 @@ function Dashboard() {
 
 // Personal gamification block. Everything here is the signed-in user's own
 // numbers — no teammate data, consistent with the isolation rules.
-function MyWeekCard({ metrics, careerTotal, milestone, dailyGoal, weeklyGoal }) {
-  const { todayCount, streak, thisWeekCount, bestDay, bestWeek } = metrics
-  // No target → the ring shows the count with no goal arc, instead of
-  // dividing by zero into Infinity.
-  const ringPct = hasTarget(dailyGoal) ? Math.min(1, todayCount / dailyGoal) : 0
-  const weekPct = hasTarget(weeklyGoal) ? Math.min(100, (thisWeekCount / weeklyGoal) * 100) : 0
-  const ringHit = hasTarget(dailyGoal) && todayCount >= dailyGoal
-  const size = 76, stroke = 8
-  const r = (size - stroke) / 2
-  const circ = 2 * Math.PI * r
+/**
+ * "My Week" — what moved, not how much was sent.
+ *
+ * This replaced a gamified volume card (daily goal ring, day streak, best
+ * day/week, career milestone badges). Sales went deliberately low-volume and
+ * high-targeting in Aug 2026, so rewarding send count was rewarding the wrong
+ * behaviour. Leads advanced / replies / meetings / live conversations are the
+ * four numbers that actually say whether the week went anywhere.
+ *
+ * `advanced` and `meetings` come from crm_lead_stage_events, which only
+ * started recording at migration 040 — hence the "tracking since" note rather
+ * than a delta that would imply a comparison we can't make yet.
+ */
+function MyWeekCard({ movement, prevMovement, touchesThisWeek }) {
+  const cells = [
+    { label: 'moved forward', value: movement.advanced, prev: prevMovement?.advanced, hint: 'leads that advanced a stage' },
+    { label: 'replies', value: movement.replies, prev: prevMovement?.replies, hint: 'outreach marked replied' },
+    { label: 'meetings', value: movement.meetings, prev: prevMovement?.meetings, hint: 'leads that reached Meeting Booked' },
+    { label: 'live now', value: movement.live, prev: null, hint: 'in active conversation or meeting booked' }
+  ]
+  const nothingMoved = !movement.advanced && !movement.replies && !movement.meetings
 
   return (
     <div className="card dashboard-card">
       <div className="dashboard-card-header">
         <h2><Target size={20} /> My Week</h2>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: '6px',
-          padding: '4px 12px', borderRadius: '999px',
-          background: streak > 0 ? '#fff7ed' : '#f3f4f6',
-          border: `1px solid ${streak > 0 ? '#fed7aa' : '#e5e7eb'}`,
-          fontSize: '13px', fontWeight: 600,
-          color: streak > 0 ? '#9a3412' : '#6b7280'
-        }}>
-          <Flame size={14} style={{ color: streak > 0 ? '#ea580c' : '#9ca3af' }} />
-          {streak} day{streak === 1 ? '' : 's'} streak
+        <span style={{ fontSize: '12px', color: '#6b7280' }}>
+          {touchesThisWeek} touch{touchesThisWeek === 1 ? '' : 'es'} logged
         </span>
       </div>
 
-      <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-        {/* Today ring */}
-        <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-          <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
-            <circle
-              cx={size / 2} cy={size / 2} r={r} fill="none"
-              stroke={ringHit ? '#16a34a' : '#2563eb'} strokeWidth={stroke} strokeLinecap="round"
-              strokeDasharray={`${circ * ringPct} ${circ * (1 - ringPct)}`}
-              style={{ transition: 'stroke-dasharray 0.4s ease' }}
-            />
-          </svg>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: '17px', fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{todayCount}</span>
-            <span style={{ fontSize: '10px', color: '#6b7280' }}>{hasTarget(dailyGoal) ? `/ ${dailyGoal} today` : 'today'}</span>
+      <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        {cells.map(c => (
+          <div key={c.label} style={{ minWidth: '110px' }} title={c.hint}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+              <span style={{ fontSize: '26px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: c.value > 0 ? '#111827' : '#9ca3af' }}>
+                {c.value}
+              </span>
+              <Delta curr={c.value} prev={c.prev} />
+            </div>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{c.label}</div>
           </div>
-        </div>
-
-        {/* Weekly progress */}
-        <div style={{ flex: '1 1 220px', minWidth: '200px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              This Week
-            </span>
-            <span style={{ fontSize: '13px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-              {thisWeekCount} <span style={{ color: '#6b7280', fontWeight: 500 }}>/ {weeklyGoal}</span>
-            </span>
-          </div>
-          <div style={{ height: '10px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden' }}>
-            <div style={{
-              width: `${weekPct}%`, height: '100%',
-              background: thisWeekCount >= weeklyGoal ? '#16a34a' : 'linear-gradient(90deg, #3b82f6, #2563eb)',
-              transition: 'width 0.4s ease'
-            }} />
-          </div>
-          <div style={{ display: 'flex', gap: '14px', marginTop: '8px', fontSize: '12px', color: '#6b7280', flexWrap: 'wrap' }}>
-            <span><Trophy size={12} style={{ verticalAlign: '-2px' }} /> Best day: <strong style={{ color: '#111827' }}>{bestDay.count || 0}</strong>{bestDay.date ? ` (${fmtDate(bestDay.date)})` : ''}</span>
-            <span>Best week: <strong style={{ color: '#111827' }}>{bestWeek.count || 0}</strong></span>
-          </div>
-        </div>
-
-        {/* Career milestone */}
-        <div style={{ flexShrink: 0, textAlign: 'center', padding: '10px 16px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: milestone.reached?.color || '#6b7280' }}>
-            <Award size={15} />
-            {milestone.reached ? milestone.reached.label : 'Rookie'}
-          </div>
-          <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
-            {careerTotal.toLocaleString()} all-time
-            {milestone.next && <> · {milestone.toNext} to {milestone.next.label}</>}
-          </div>
-        </div>
+        ))}
       </div>
+
+      {nothingMoved && (
+        <div style={{ marginTop: '12px', fontSize: '13px', color: '#6b7280' }}>
+          Nothing moved yet this week — replies, stage changes and meetings show up here.
+        </div>
+      )}
+      {movement.sampleFrom && (
+        <div style={{ marginTop: '10px', fontSize: '11px', color: '#9ca3af' }}>
+          Stage movement tracked since {fmtDate(movement.sampleFrom)}.
+        </div>
+      )}
     </div>
   )
 }

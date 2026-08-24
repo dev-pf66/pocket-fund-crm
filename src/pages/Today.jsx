@@ -8,7 +8,8 @@ import {
   getTodayCounters,
   getTodayThresholds,
   getUnassignedLeads,
-  getTeamTouchesThisWeek,
+  getMovementWeekOverWeek,
+  getTeamMovementThisWeek,
   bulkClaimLeads,
   bulkMarkTouched,
   bulkSnoozeLeads,
@@ -58,6 +59,8 @@ function Today() {
   const [settings, setSettings] = useState(null)
   const [unassigned, setUnassigned] = useState([])
   const [rollup, setRollup] = useState([])
+  const [movement, setMovement] = useState({ advanced: 0, replies: 0, meetings: 0, live: 0 })
+  const [prevMovement, setPrevMovement] = useState(null)
   const [pendingId, setPendingId] = useState(null)
   const [pingedIds, setPingedIds] = useState(() => new Set())
   const [claiming, setClaiming] = useState(false)
@@ -75,25 +78,34 @@ function Today() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [queueRes, fuRes, escRes, ctrRes, thresholds] = await Promise.all([
+      const [queueRes, fuRes, escRes, ctrRes, thresholds, moveRes] = await Promise.all([
         getTodayQueue(currentPerson.id),
         getFollowUpsDue(currentPerson.id),
         // Dev/admin sees escalations across every owner's book.
         getEscalations(isAdmin ? null : currentPerson.id),
         getTodayCounters(currentPerson.id),
-        getTodayThresholds()
+        getTodayThresholds(),
+        // Outcome metrics — what moved, vs last week.
+        getMovementWeekOverWeek(currentPerson.id).catch(err => {
+          console.error('Movement stats failed:', err)
+          return null
+        })
       ])
       setQueue(queueRes)
       setFollowUps(fuRes)
       setEscalations(escRes)
       setCounters(ctrRes)
       setSettings(thresholds.raw)
+      if (moveRes) {
+        setMovement(moveRes.current)
+        setPrevMovement(moveRes.previous)
+      }
 
       if (showUnassigned) {
         getUnassignedLeads().then(setUnassigned).catch(err => console.error('Unassigned load failed:', err))
       }
       if (isAdmin) {
-        getTeamTouchesThisWeek().then(setRollup).catch(err => console.error('Rollup load failed:', err))
+        getTeamMovementThisWeek().then(setRollup).catch(err => console.error('Rollup load failed:', err))
       }
     } catch (err) {
       console.error('Failed to load Today tab:', err)
@@ -323,7 +335,11 @@ function Today() {
     }
   }
 
-  const touchDelta = counters.touchesThisWeek - counters.touchesLastWeek
+  // null = no prior week recorded yet. Stage history only starts at migration
+  // 040, so week one must not imply a flat comparison against zero.
+  const movementDelta = prevMovement && movement.sampleFrom && movement.sampleFrom < movement.from
+    ? movement.advanced - prevMovement.advanced
+    : null
 
   if (loading) {
     return (
@@ -348,28 +364,39 @@ function Today() {
       </div>
 
       {/* Header counters */}
+      {/* Outcomes lead. The queue size and touch count still matter — they're
+          just not the score any more (Dev, Aug 2026). */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-value">{queue.total}</div>
-          <div className="stat-label">To touch today</div>
+          <div className="stat-value">{movement.advanced}</div>
+          <div className="stat-label">Moved forward this wk</div>
           <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
-            {counters.touchesThisWeek} touched this wk
-            <span style={{ color: touchDelta >= 0 ? '#16a34a' : '#dc2626', marginLeft: '4px' }}>
-              ({touchDelta >= 0 ? '+' : ''}{touchDelta} WoW)
-            </span>
+            {movementDelta === null ? 'first week of tracking'
+              : <>vs last wk <span style={{ color: movementDelta >= 0 ? '#16a34a' : '#dc2626' }}>
+                  {movementDelta >= 0 ? '+' : ''}{movementDelta}
+                </span></>}
           </div>
         </div>
-        <div className={`stat-card ${counters.overdueSLA > 0 ? 'danger' : ''}`}>
-          <div className="stat-value">{counters.overdueSLA}</div>
-          <div className="stat-label">Overdue SLA</div>
+        <div className="stat-card">
+          <div className="stat-value">{movement.replies}</div>
+          <div className="stat-label">Replies this wk</div>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+            {movement.meetings} meeting{movement.meetings === 1 ? '' : 's'} booked
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{followUps.length}</div>
-          <div className="stat-label">Follow-ups due</div>
+          <div className="stat-value">{movement.live}</div>
+          <div className="stat-label">Live conversations</div>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+            {followUps.length} follow-up{followUps.length === 1 ? '' : 's'} due
+          </div>
         </div>
         <div className={`stat-card ${escalations.length > 0 ? 'warning' : ''}`}>
           <div className="stat-value">{escalations.length}</div>
           <div className="stat-label">Escalations</div>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+            {queue.total} to touch · {counters.overdueSLA} overdue
+          </div>
         </div>
       </div>
 
@@ -377,7 +404,7 @@ function Today() {
       {isAdmin && rollup.length > 0 && (
         <div className="card" style={{ padding: '12px 16px', marginBottom: '16px' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-            Touches this week — team
+            What moved this week — team
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {rollup.map(r => (
@@ -388,7 +415,9 @@ function Today() {
                   fontSize: '13px', color: '#374151'
                 }}
               >
-                {r.name} · <strong>{r.count}</strong>
+                {r.name} · <strong>{r.advanced}</strong> moved
+                {r.meetings ? ` · ${r.meetings} mtg` : ''}
+                {r.replies ? ` · ${r.replies} replies` : ''}
               </span>
             ))}
           </div>

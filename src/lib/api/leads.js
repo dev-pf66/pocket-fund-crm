@@ -20,6 +20,40 @@ const STAGE_ORDER = ['new_lead', 'cold_outreach', 'responded', 'warm_lead', 'act
 const stageRank = (stage) => STAGE_ORDER.indexOf(stage)
 
 /**
+ * Append a stage transition to the audit trail.
+ *
+ * crm_leads.stage only holds where a lead is NOW — the old value is
+ * overwritten — so without this, "how many leads moved forward this week"
+ * cannot be answered at all. Called from the three paths that change a
+ * stage: updateLead, moveLead and advanceLeadStage.
+ *
+ * Never throws. A missing audit row must not fail the stage change the user
+ * actually asked for; it's a metric, not the transaction.
+ */
+async function recordStageChange(leadId, fromStage, toStage, currentPersonId = null) {
+  if (!leadId || !toStage || fromStage === toStage) return
+  try {
+    const { error } = await supabase.from('crm_lead_stage_events').insert({
+      lead_id: leadId,
+      from_stage: fromStage ?? null,
+      to_stage: toStage,
+      changed_by: currentPersonId ?? null
+    })
+    if (error) throw error
+  } catch (e) {
+    console.error('recordStageChange failed (stage change itself succeeded):', e)
+  }
+}
+
+/** Did this transition move the lead FORWARD along STAGE_ORDER? */
+export function isForwardMove(fromStage, toStage) {
+  const to = stageRank(toStage)
+  if (to < 0) return false            // client/passed handled by caller; unknown = not forward
+  const from = stageRank(fromStage)
+  return to > from                    // from === -1 (new/unknown) counts as forward
+}
+
+/**
  * Move a lead forward to targetStage only if it currently sits at an earlier
  * stage. Used by the reply→pipeline sync so an analyst marking "replied" on
  * an old entry can never drag a warm/meeting/client lead backwards.
@@ -50,6 +84,8 @@ export async function advanceLeadStage(leadId, targetStage, currentPersonId = nu
     activity_type: 'note',
     notes: `Moved to ${targetStage.replace(/_/g, ' ')} (auto — outreach reply)`
   }, currentPersonId)
+
+  await recordStageChange(leadId, oldStage, targetStage, currentPersonId)
 
   cacheClear('leads')
   cacheClear('dashboard')
@@ -288,6 +324,7 @@ export async function updateLead(id, updates, currentPersonId = null) {
   // same TT tasks regardless of whether the stage moved via drag-drop
   // (moveLead) or an inline edit / form save (updateLead).
   if (cleanUpdates.stage !== undefined && priorStage !== data.stage) {
+    await recordStageChange(id, priorStage, data.stage, currentPersonId)
     fireTTEvent('lead_stage_changed', { lead: data, oldStage: priorStage })
     await runStageSideEffects(data, priorStage, data.stage, currentPersonId)
   }
@@ -321,6 +358,8 @@ export async function moveLead(id, newStage, currentPersonId) {
     activity_date: new Date().toISOString(),
     notes: `Moved to ${newStage.replace(/_/g, ' ')}`
   }, currentPersonId)
+
+  await recordStageChange(id, oldStage, newStage, currentPersonId)
 
   cacheClear('leads')
   cacheClear('dashboard')
