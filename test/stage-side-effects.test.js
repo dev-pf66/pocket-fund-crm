@@ -46,8 +46,21 @@ describe('moveLead — reply↔pipeline sync', () => {
 
     const update = h.db.opsFor('crm_outreach_log', 'update')[0]
     expect(update).toBeDefined()
-    expect(update.payload).toEqual({ status: 'replied' })
+    expect(update.payload.status).toBe('replied')
     expect(update.filters).toContainEqual(['eq', 'id', 'o-1'])
+  })
+
+  it('stamps replied_at on the back-synced row', async () => {
+    // The reply metrics key off replied_at, not outreach_date (the SEND
+    // date). This back-sync is a main way rows become 'replied', so leaving
+    // the stamp null made those replies invisible to every "what moved"
+    // number — a silent zero, which is the worst failure for a metric.
+    h.db = db({ priorStage: 'cold_outreach' })
+    await moveLead('lead-1', 'responded', 'p1')
+
+    const update = h.db.opsFor('crm_outreach_log', 'update')[0]
+    expect(update.payload.replied_at).toBeTruthy()
+    expect(Number.isNaN(Date.parse(update.payload.replied_at))).toBe(false)
   })
 
   it('fires when jumping straight past responded to a later stage', async () => {

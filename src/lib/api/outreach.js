@@ -73,7 +73,12 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
     .insert([{
       ...outreachData,
       logged_by: currentPersonId,
-      outreach_date: outreachData.outreach_date || istDateStr()
+      outreach_date: outreachData.outreach_date || istDateStr(),
+      // Logged as already-replied means the reply just came in. Without the
+      // stamp it never counts toward "replies this week".
+      ...(outreachData.status === 'replied' && !outreachData.replied_at
+        ? { replied_at: new Date().toISOString() }
+        : {})
     }])
     .select()
     .single()
@@ -127,6 +132,10 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
 export async function logOutreachBatch(rows, currentPersonId) {
   if (!rows || rows.length === 0) return 0
   const today = istDateStr()
+  // replied_at is deliberately NOT stamped here. A CSV import is historical
+  // backfill and the date those replies actually arrived is unknown —
+  // stamping import time would spike "replies this week" with months of old
+  // replies. They stay uncounted, like every other pre-migration-041 reply.
   const records = rows.map(r => ({
     ...r,
     logged_by: currentPersonId,

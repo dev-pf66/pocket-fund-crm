@@ -133,8 +133,13 @@ async function runStageSideEffects(lead, oldStage, newStage, currentPersonId = n
         .limit(1)
       if (rows?.length) {
         // Direct update (not updateOutreach) — the reply→stage hook would
-        // otherwise re-enter here for no reason.
-        await supabase.from('crm_outreach_log').update({ status: 'replied' }).eq('id', rows[0].id)
+        // otherwise re-enter here for no reason. replied_at must be stamped
+        // here too: this back-sync is a MAIN way rows become 'replied', and
+        // the reply metrics key off that timestamp, so leaving it null makes
+        // the reply invisible to every "what moved" number.
+        await supabase.from('crm_outreach_log')
+          .update({ status: 'replied', replied_at: new Date().toISOString() })
+          .eq('id', rows[0].id)
       }
     }
 
