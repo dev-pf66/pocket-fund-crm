@@ -24,16 +24,26 @@ export function buildDailyCounts(rows) {
 }
 
 // Compute dashboard metrics from a person's daily count buckets.
-export function computeMetrics(dailyCounts, dailyGoal = 10) {
+export function computeMetrics(dailyCounts, dailyGoal = 0) {
   const today = istToday()
   const todayCount = dailyCounts.get(today) || 0
 
   // Streak: consecutive days meeting the daily goal. Include today if hit;
   // otherwise count backward from yesterday so a mid-day lull doesn't erase
   // the streak.
+  //
+  // The bar MUST floor at 1. A goal of 0 means "no target" (targets were
+  // zeroed Aug 2026) and with a literal 0 the condition
+  // `(count || 0) >= 0` is true for EVERY day — including days with no data —
+  // so this loop never terminates and hard-freezes the browser tab on both
+  // the Dashboard and the Log. At no target, "streak" means consecutive days
+  // with any outreach at all. The counter bound is a second belt: a streak
+  // can't outrun the data it was handed.
+  const streakBar = dailyGoal > 0 ? dailyGoal : 1
+  const maxStreak = dailyCounts.size + 1
   let streak = 0
-  let cursor = todayCount >= dailyGoal ? today : istAddDays(today, -1)
-  while ((dailyCounts.get(cursor) || 0) >= dailyGoal) {
+  let cursor = todayCount >= streakBar ? today : istAddDays(today, -1)
+  while ((dailyCounts.get(cursor) || 0) >= streakBar && streak < maxStreak) {
     streak += 1
     cursor = istAddDays(cursor, -1)
   }
