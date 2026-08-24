@@ -13,8 +13,11 @@ import LeadForm from './LeadForm'
 import { isAdminUser } from '../lib/admin'
 import { computeMetrics } from '../lib/outreachMetrics'
 
-const DAILY_GOAL = 10
-const WEEKLY_GOAL = 50
+// 0 = no target. Targets were zeroed Aug 2026 when sales went low-volume /
+// high-targeting; goal rings, bars and nudges hide rather than divide by 0.
+const DAILY_GOAL = 0
+const WEEKLY_GOAL = 0
+const hasGoal = (g) => Number(g) > 0
 
 const PLATFORM_LABELS = {
   cold_email: 'Email',
@@ -43,11 +46,11 @@ function FitStars({ score }) {
 }
 
 function ProgressRing({ value, goal, size = 96, stroke = 8, color = '#2563eb' }) {
-  const pct = Math.min(1, value / goal)
+  const pct = hasGoal(goal) ? Math.min(1, value / goal) : 0
   const r = (size - stroke) / 2
   const circ = 2 * Math.PI * r
   const dash = circ * pct
-  const hit = value >= goal
+  const hit = hasGoal(goal) && value >= goal
   return (
     <div style={{ position: 'relative', width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
@@ -70,7 +73,7 @@ function ProgressRing({ value, goal, size = 96, stroke = 8, color = '#2563eb' })
           {value}
         </div>
         <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
-          / {goal}
+          {hasGoal(goal) ? `/ ${goal}` : 'logged'}
         </div>
       </div>
     </div>
@@ -111,7 +114,7 @@ function DailyChart({ rows, days, goal = DAILY_GOAL, showDetails }) {
   const padTop = 12
   const padBottom = 28
   const chartH = height - padTop - padBottom
-  const max = Math.max(goal + 2, ...data.map(d => d.total))
+  const max = Math.max(hasGoal(goal) ? goal + 2 : 2, ...data.map(d => d.total))
   const barGap = 6
   const colWidth = 100 / data.length // pct
   const barWidthPct = colWidth - (barGap / 6) // visual gap between bars
@@ -130,7 +133,7 @@ function DailyChart({ rows, days, goal = DAILY_GOAL, showDetails }) {
     }
     const nonEmptyDays = data.filter(d => d.total > 0).length
     const avg = nonEmptyDays > 0 ? (summary.total / nonEmptyDays).toFixed(1) : '0'
-    const hitDays = data.filter(d => d.total >= goal).length
+    const hitDays = hasGoal(goal) ? data.filter(d => d.total >= goal).length : 0
     return { ...summary, avg, hitDays, rangeDays: data.length, nonEmptyDays }
   }, [data, goal])
 
@@ -141,13 +144,13 @@ function DailyChart({ rows, days, goal = DAILY_GOAL, showDetails }) {
     <div>
       <svg width="100%" height={height} style={{ display: 'block', overflow: 'visible' }} viewBox={`0 0 100 ${height}`} preserveAspectRatio="none">
         {/* Goal reference line */}
-        <line x1="0" x2="100" y1={goalY} y2={goalY} stroke="#d1d5db" strokeDasharray="2 2" strokeWidth="0.25" vectorEffect="non-scaling-stroke" />
+        {hasGoal(goal) && <line x1="0" x2="100" y1={goalY} y2={goalY} stroke="#d1d5db" strokeDasharray="2 2" strokeWidth="0.25" vectorEffect="non-scaling-stroke" />}
 
         {data.map((d, i) => {
           const h = max > 0 ? (d.total / max) * chartH : 0
           const y = padTop + chartH - h
           const x = i * colWidth + barGap / 12
-          const hit = d.total >= goal
+          const hit = hasGoal(goal) && d.total >= goal
           const isToday = d.date === today
           const w = barWidthPct
           return (
@@ -265,8 +268,8 @@ function PlatformBars({ types, total }) {
 }
 
 function WeeklyBar({ value, goal }) {
-  const pct = Math.min(100, (value / goal) * 100)
-  const hit = value >= goal
+  const pct = hasGoal(goal) ? Math.min(100, (value / goal) * 100) : 0
+  const hit = hasGoal(goal) && value >= goal
   return (
     <div>
       <div style={{
@@ -283,7 +286,7 @@ function WeeklyBar({ value, goal }) {
 }
 
 function Nudge({ todayCount, streak, bestDay, dailyGoal = DAILY_GOAL }) {
-  const remaining = dailyGoal - todayCount
+  const remaining = hasGoal(dailyGoal) ? dailyGoal - todayCount : 0
   let text, tone
   if (todayCount === 0) {
     text = 'Log your first outreach to get on the board today.'
@@ -923,8 +926,8 @@ function OutreachAdmin() {
   // Targets follow the viewing scope: a person's own admin-set targets, or
   // the sum of everyone's when viewing the whole team.
   const viewingTargets = useMemo(() => {
-    const daily = (p) => p?.daily_outreach_target || DAILY_GOAL
-    const weekly = (p) => p?.weekly_outreach_target || WEEKLY_GOAL
+    const daily = (p) => p?.daily_outreach_target ?? DAILY_GOAL
+    const weekly = (p) => p?.weekly_outreach_target ?? WEEKLY_GOAL
     if (!isAdmin || viewing === 'me') return { daily: daily(currentPerson), weekly: weekly(currentPerson) }
     if (viewing === 'all') {
       const list = people || []

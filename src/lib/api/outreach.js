@@ -327,9 +327,18 @@ export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGo
 
   // Streak: consecutive days hitting the goal. Include today if hit;
   // otherwise start from yesterday so a mid-day lull doesn't reset it.
+  //
+  // A goal of 0 means "no target" (targets were zeroed Aug 2026). Floor the
+  // bar at 1 so the streak becomes "days with any outreach" — with a literal
+  // 0 the condition `count >= 0` is always true and this loop never
+  // terminates, walking backwards through dates forever.
+  const streakBar = dailyGoal > 0 ? dailyGoal : 1
   let streak = 0
-  let cursor = todayCount >= dailyGoal ? today : istAddDays(today, -1)
-  while ((byDate.get(cursor) || 0) >= dailyGoal) {
+  let cursor = todayCount >= streakBar ? today : istAddDays(today, -1)
+  // Bounded as a backstop: a streak can't be longer than the window we
+  // fetched, so this can never spin.
+  const maxStreak = Math.max(daysBack, weekDays) + 1
+  while ((byDate.get(cursor) || 0) >= streakBar && streak < maxStreak) {
     streak += 1
     cursor = istAddDays(cursor, -1)
   }
@@ -338,7 +347,7 @@ export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGo
   for (let i = 0; i < weekDays; i += 1) {
     const date = istAddDays(today, -i)
     const count = byDate.get(date) || 0
-    dailyStats.push({ date, total_outreaches: count, goal_met: count >= dailyGoal })
+    dailyStats.push({ date, total_outreaches: count, goal_met: count >= streakBar })
   }
 
   return { todayCount, streak, dailyStats }

@@ -59,11 +59,17 @@ function RangePills({ options, value, onChange }) {
 }
 
 // Per-user outreach targets are set by the admin (Admin → All Users).
-// These are only the fallbacks for users who haven't had one set yet.
-export const DEFAULT_DAILY_TARGET = 10
-export const DEFAULT_WEEKLY_TARGET = 50
-export const dailyTargetOf = (person) => person?.daily_outreach_target || DEFAULT_DAILY_TARGET
-export const weeklyTargetOf = (person) => person?.weekly_outreach_target || DEFAULT_WEEKLY_TARGET
+// Zero — or unset — means NO target, and every goal ring, progress bar and
+// "N to go" line hides rather than dividing by it. Sales moved to a
+// deliberately low-volume, high-targeting motion (Dev, Aug 2026), so holding
+// everyone to a daily send quota measured the wrong thing. The old 10/50
+// fallbacks are gone; `?? ` not `||` so an explicit 0 survives.
+export const DEFAULT_DAILY_TARGET = 0
+export const DEFAULT_WEEKLY_TARGET = 0
+export const dailyTargetOf = (person) => person?.daily_outreach_target ?? DEFAULT_DAILY_TARGET
+export const weeklyTargetOf = (person) => person?.weekly_outreach_target ?? DEFAULT_WEEKLY_TARGET
+/** True when this person has a real quota to be measured against. */
+export const hasTarget = (t) => Number(t) > 0
 
 const PIPELINE_SEGMENTS = [
   { key: 'new_lead',             label: 'New',       color: '#a78bfa' },
@@ -229,8 +235,8 @@ function Dashboard() {
           {todayPeople.map(person => {
             const todayCount = todayCounts.get(person.id) || 0
             const personTarget = dailyTargetOf(person)
-            const pct = Math.min(100, (todayCount / personTarget) * 100)
-            const hit = todayCount >= personTarget
+            const pct = hasTarget(personTarget) ? Math.min(100, (todayCount / personTarget) * 100) : 0
+            const hit = hasTarget(personTarget) && todayCount >= personTarget
             const isMe = person.id === currentPerson?.id
             return (
               <div key={person.id} className={`today-outreach-row${isMe ? ' today-outreach-row-me' : ''}`}>
@@ -386,9 +392,11 @@ function Dashboard() {
 // numbers — no teammate data, consistent with the isolation rules.
 function MyWeekCard({ metrics, careerTotal, milestone, dailyGoal, weeklyGoal }) {
   const { todayCount, streak, thisWeekCount, bestDay, bestWeek } = metrics
-  const ringPct = Math.min(1, todayCount / dailyGoal)
-  const weekPct = Math.min(100, (thisWeekCount / weeklyGoal) * 100)
-  const ringHit = todayCount >= dailyGoal
+  // No target → the ring shows the count with no goal arc, instead of
+  // dividing by zero into Infinity.
+  const ringPct = hasTarget(dailyGoal) ? Math.min(1, todayCount / dailyGoal) : 0
+  const weekPct = hasTarget(weeklyGoal) ? Math.min(100, (thisWeekCount / weeklyGoal) * 100) : 0
+  const ringHit = hasTarget(dailyGoal) && todayCount >= dailyGoal
   const size = 76, stroke = 8
   const r = (size - stroke) / 2
   const circ = 2 * Math.PI * r
@@ -424,7 +432,7 @@ function MyWeekCard({ metrics, careerTotal, milestone, dailyGoal, weeklyGoal }) 
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: '17px', fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{todayCount}</span>
-            <span style={{ fontSize: '10px', color: '#6b7280' }}>/ {dailyGoal} today</span>
+            <span style={{ fontSize: '10px', color: '#6b7280' }}>{hasTarget(dailyGoal) ? `/ ${dailyGoal} today` : 'today'}</span>
           </div>
         </div>
 

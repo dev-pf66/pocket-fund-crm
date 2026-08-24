@@ -92,14 +92,17 @@ export async function setUserArchived(id, archived) {
 }
 
 // Admin-set outreach targets. Drive the Dashboard rings/bars and the
-// Tracker/Log progress displays for that user. Null/0 falls back to the
-// app-wide defaults (10/day, 50/week).
+// Tracker/Log progress displays for that user. 0 means NO target — the goal
+// rings, bars and nudges hide instead of measuring against a quota. `|| null`
+// used to coerce a saved 0 back to null, which made it impossible to turn a
+// target off from the UI at all.
 export async function setUserTargets(id, dailyTarget, weeklyTarget) {
+  const num = (v) => (v === '' || v === null || v === undefined ? null : Number(v))
   const { data, error } = await supabase
     .from('people')
     .update({
-      daily_outreach_target: dailyTarget || null,
-      weekly_outreach_target: weeklyTarget || null
+      daily_outreach_target: num(dailyTarget),
+      weekly_outreach_target: num(weeklyTarget)
     })
     .eq('id', id)
     .select()

@@ -5,6 +5,7 @@ import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useToast } from '../components/Toast'
+import { dailyTargetOf, hasTarget } from './Dashboard'
 import { useSessionState } from '../hooks/useSessionState'
 import { istToday } from '../lib/dateUtils'
 import { parseCSVText, parseDateCell } from '../lib/csv'
@@ -97,7 +98,7 @@ function OutreachTracker() {
     setLoading(true)
     try {
       const [dashStats, leadsData, templateData] = await Promise.all([
-        getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30, dailyGoal: currentPerson.daily_outreach_target || 10 }),
+        getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30, dailyGoal: dailyTargetOf(currentPerson) }),
         getLeads({ stage: 'cold_outreach' }, currentPerson.id),
         getEmailTemplates().catch(() => [])
       ])
@@ -374,9 +375,10 @@ function OutreachTracker() {
     other: <MessageSquare size={16} />
   }
 
-  const dailyTarget = currentPerson?.daily_outreach_target || 10
-  const goalPercentage = Math.min((todayCount / dailyTarget) * 100, 100)
-  const goalMet = todayCount >= dailyTarget
+  // 0 / unset = no target: show the count, hide the goal framing.
+  const dailyTarget = dailyTargetOf(currentPerson)
+  const goalPercentage = hasTarget(dailyTarget) ? Math.min((todayCount / dailyTarget) * 100, 100) : 0
+  const goalMet = hasTarget(dailyTarget) && todayCount >= dailyTarget
 
   if (loading && outreaches.length === 0) {
     return <div className="loading">Loading outreach tracker...</div>
@@ -448,7 +450,7 @@ function OutreachTracker() {
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: goalMet ? 'var(--success)' : 'var(--primary)' }}>
             {todayCount}
-            <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/{dailyTarget}</span>
+            {hasTarget(dailyTarget) && <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/{dailyTarget}</span>}
           </div>
           <div style={{
             width: '100%',
@@ -483,7 +485,9 @@ function OutreachTracker() {
             <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}> days</span>
           </div>
           <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--gray-600)' }}>
-            {streak > 0 ? `${streak} consecutive days with ${dailyTarget}+ outreaches` : `Hit ${dailyTarget} today to start a streak!`}
+            {hasTarget(dailyTarget)
+              ? (streak > 0 ? `${streak} consecutive days with ${dailyTarget}+ outreaches` : `Hit ${dailyTarget} today to start a streak!`)
+              : (streak > 0 ? `${streak} consecutive days with outreach logged` : 'No daily target set')}
           </div>
         </div>
 

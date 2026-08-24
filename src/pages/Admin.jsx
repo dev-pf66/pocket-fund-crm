@@ -245,8 +245,10 @@ function Admin() {
 
   function openTargetsModal(user) {
     setTargetsUser(user)
-    setTargetsDaily(user.daily_outreach_target || 10)
-    setTargetsWeekly(user.weekly_outreach_target || 50)
+    // ?? not || — an explicit 0 ("no target") must load as 0, not snap back
+    // to the old 10/50 defaults.
+    setTargetsDaily(user.daily_outreach_target ?? 0)
+    setTargetsWeekly(user.weekly_outreach_target ?? 0)
   }
 
   async function handleSaveTargets() {
@@ -489,7 +491,9 @@ function Admin() {
                           title="Set daily/weekly outreach targets — drives their Dashboard rings and streaks"
                           style={{ fontVariantNumeric: 'tabular-nums' }}
                         >
-                          <Target size={13} /> {u.daily_outreach_target || 10}/day · {u.weekly_outreach_target || 50}/wk
+                          <Target size={13} /> {Number(u.daily_outreach_target) > 0 || Number(u.weekly_outreach_target) > 0
+                            ? `${u.daily_outreach_target ?? 0}/day · ${u.weekly_outreach_target ?? 0}/wk`
+                            : 'No target'}
                         </button>
                       </td>
                       <td style={{ padding: '10px 8px', color: '#6b7280' }}>
