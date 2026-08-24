@@ -141,12 +141,26 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
       pct(b[1].replies, b[1].outreach) - pct(a[1].replies, a[1].outreach) ||
       a[0].localeCompare(b[0])
     )
-  for (const [name, s] of rows) {
+  // Anyone with nothing at all collapses into a single named line. Dev's rule
+  // still holds — a silent week stays visible, every person is still named —
+  // but at a 14-person roster and a targeted motion, a dozen identical
+  // "0 meetings · 0 replies" rows every Monday just trains you to skip the
+  // digest. Doing real work with no outcome yet is NOT silence: anyone with
+  // touches logged keeps their own line (Dev's call, Aug 2026).
+  const didSomething = (s) => s.outreach > 0 || s.replies > 0 || s.meetings > 0 || s.demos > 0
+  const active = rows.filter(([, s]) => didSomething(s))
+  const quiet = rows.filter(([, s]) => !didSomething(s)).map(([name]) => name).sort()
+
+  for (const [name, s] of active) {
     lines.push(
       `${name}: ${s.meetings} meetings (${delta(s.meetings, s.prevMeetings)}) · ` +
       `${s.replies} replies (${pct(s.replies, s.outreach)}% of ${s.outreach} touches, ${delta(s.outreach, s.prevOutreach)})` +
       `${s.demos ? ` · ${s.demos} demos` : ''}${s.signups ? ` · ${s.signups} signups` : ''}`
     )
+  }
+  if (quiet.length) {
+    if (active.length) lines.push('')
+    lines.push(`No activity (${quiet.length}): ${quiet.join(', ')}`)
   }
   // A quiet week is only worth calling out when nothing MOVED. Low send volume
   // is the plan now, so it is no longer the thing to flag.

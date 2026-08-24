@@ -44,13 +44,27 @@ describe('composeDigest', () => {
     expect(d.body).toContain('Week of 2026-08-10 – 2026-08-16')
   })
 
-  it('lists every non-archived person, zeros included', () => {
+  it('names every non-archived person, silent ones included', () => {
     // Dev's call, July 2026 — the digest is the accountability view, so an
-    // analyst who did nothing must still appear.
+    // analyst who did nothing must still appear by name. Aug 2026: they appear
+    // in a single collapsed line rather than a row of zeros each.
     const d = digest({ outreach: [outreach('aum', LAST.mid)] })
     expect(d.body).toContain('Aum:')
-    expect(d.body).toContain('Gaurav:')
-    expect(d.body).toMatch(/Quiet Analyst: 0 meetings .* 0 replies \(0% of 0 touches/)
+    expect(d.body).toMatch(/No activity \(2\): Gaurav, Quiet Analyst/)
+  })
+
+  it('gives anyone who logged work their own row, outcome or not', () => {
+    // Touches with no reply yet is real work, not silence — it must not be
+    // collapsed into the no-activity line.
+    const d = digest({ outreach: [outreach('gaurav', LAST.mid), outreach('gaurav', LAST.mid)] })
+    expect(d.body).toMatch(/Gaurav: 0 meetings .* 0 replies \(0% of 2 touches/)
+    expect(d.body).not.toMatch(/No activity[^\n]*Gaurav/)
+  })
+
+  it('collapses the whole roster when nobody did anything', () => {
+    const d = digest()
+    expect(d.body).toMatch(/No activity \(3\): Aum, Gaurav, Quiet Analyst/)
+    expect(d.body).not.toContain('Aum:')
   })
 
   it('excludes archived people', () => {
@@ -119,6 +133,7 @@ describe('composeDigest', () => {
       meetings: [{ logged_by: 'aum', activity_date: `${LAST.mid}T09:30:00Z` }]
     })
     expect(d.body.indexOf('Aum:')).toBeLessThan(d.body.indexOf('Gaurav:'))
+    expect(d.body).not.toMatch(/No activity[^\n]*Gaurav/) // he worked, just no outcome
   })
 
   it('leads with what moved, and demotes volume to its own line', () => {
