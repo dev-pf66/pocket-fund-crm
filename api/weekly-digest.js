@@ -1,8 +1,12 @@
-// Weekly outreach digest → Sage task tracker.
+// Weekly sales digest → Sage task tracker.
 // Vercel cron hits this Monday 9:00 IST (03:30 UTC). Computes last IST week
-// (Mon–Sun) per analyst — outreach, replies, reply rate, meetings, demos —
-// with deltas vs the week before, and files it as a due-dated task assigned
-// to Dev in the task tracker. Idempotent per week via crm_tt_mappings.
+// (Mon–Sun) per analyst — meetings, replies, reply rate, demos, and outreach
+// volume — with deltas vs the week before, and files it as a due-dated task
+// assigned to Dev in the task tracker. Idempotent per week via crm_tt_mappings.
+//
+// Reports OUTCOMES first, volume second (Dev, Aug 2026): sales moved to a
+// smaller, more targeted motion, so a digest ranked by send count read the
+// strategy as failure. Don't re-sort this by outreach.
 //
 // Manual runs: GET/POST with Authorization: Bearer $CRON_SECRET.
 //   ?dry_run=1  → returns the digest text without creating the task.
@@ -110,27 +114,45 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
   const lines = []
   lines.push(`Week of ${lastStart} – ${lastEnd} (vs prior week)`)
   lines.push('')
+
+  // Outcomes lead, volume is context (Dev's call, Aug 2026). Sales moved to a
+  // deliberately smaller, more targeted motion, so ranking by raw send count
+  // reported the new strategy as a decline. Meetings are the strongest signal
+  // available here — entering meeting_booked auto-logs a meeting activity — so
+  // they head the line, then replies, with touch count kept only as the
+  // denominator that makes the reply rate meaningful.
   lines.push(
-    `TEAM: ${team.outreach} outreach (${delta(team.outreach, team.prevOutreach)}) · ` +
-    `${team.replies} replies (${pct(team.replies, team.outreach)}% rate, ${delta(team.replies, team.prevReplies)}) · ` +
-    `${team.meetings} meetings (${delta(team.meetings, team.prevMeetings)}) · ` +
+    `TEAM — what moved: ${team.meetings} meetings (${delta(team.meetings, team.prevMeetings)}) · ` +
+    `${team.replies} replies (${pct(team.replies, team.outreach)}% of ${team.outreach} touches, ${delta(team.replies, team.prevReplies)}) · ` +
     `${team.demos} demos${team.signups ? ` (${team.signups} signed up)` : ''}`
   )
+  lines.push(`Volume: ${team.outreach} outreach (${delta(team.outreach, team.prevOutreach)})`)
   lines.push('')
 
   // Every active person appears, zeros included — the digest is the
   // accountability view, so a silent week must be visible (Dev, July 2026).
+  // Ranked by what moved (meetings, then replies, then reply rate) rather than
+  // who sent most.
   const rows = people
     .map(p => [p.name, perPerson.get(p.id) || blank()])
-    .sort((a, b) => b[1].outreach - a[1].outreach || a[0].localeCompare(b[0]))
+    .sort((a, b) =>
+      b[1].meetings - a[1].meetings ||
+      b[1].replies - a[1].replies ||
+      pct(b[1].replies, b[1].outreach) - pct(a[1].replies, a[1].outreach) ||
+      a[0].localeCompare(b[0])
+    )
   for (const [name, s] of rows) {
     lines.push(
-      `${name}: ${s.outreach} outreach (${delta(s.outreach, s.prevOutreach)}) · ` +
-      `${s.replies} replies (${pct(s.replies, s.outreach)}%) · ` +
-      `${s.meetings} meetings${s.demos ? ` · ${s.demos} demos` : ''}${s.signups ? ` · ${s.signups} signups` : ''}`
+      `${name}: ${s.meetings} meetings (${delta(s.meetings, s.prevMeetings)}) · ` +
+      `${s.replies} replies (${pct(s.replies, s.outreach)}% of ${s.outreach} touches, ${delta(s.outreach, s.prevOutreach)})` +
+      `${s.demos ? ` · ${s.demos} demos` : ''}${s.signups ? ` · ${s.signups} signups` : ''}`
     )
   }
-  if (team.outreach === 0) lines.push('', 'No outreach logged by anyone last week.')
+  // A quiet week is only worth calling out when nothing MOVED. Low send volume
+  // is the plan now, so it is no longer the thing to flag.
+  if (team.meetings === 0 && team.replies === 0 && team.demos === 0) {
+    lines.push('', `Nothing moved last week — no replies, meetings or demos logged${team.outreach ? ` (${team.outreach} touches went out).` : '.'}`)
+  }
 
   return { weekKey: lastStart, title: `Weekly Outreach Digest — w/o ${lastStart}`, body: lines.join('\n') }
 }
