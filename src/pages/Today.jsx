@@ -59,8 +59,14 @@ function Today() {
   const [settings, setSettings] = useState(null)
   const [unassigned, setUnassigned] = useState([])
   const [rollup, setRollup] = useState([])
-  const [movement, setMovement] = useState({ advanced: 0, replies: 0, meetings: 0, live: 0 })
+  // null = not loaded / failed. Distinguishing that from a genuine zero week
+  // matters now that these are the headline numbers: a silent RLS or network
+  // failure used to render as "0 moved forward", indistinguishable from a
+  // dead week, with the only trace in the console.
+  const [movement, setMovement] = useState(null)
   const [prevMovement, setPrevMovement] = useState(null)
+  const [comparableFrom, setComparableFrom] = useState(null)
+  const [movementFailed, setMovementFailed] = useState(false)
   const [pendingId, setPendingId] = useState(null)
   const [pingedIds, setPingedIds] = useState(() => new Set())
   const [claiming, setClaiming] = useState(false)
@@ -99,6 +105,10 @@ function Today() {
       if (moveRes) {
         setMovement(moveRes.current)
         setPrevMovement(moveRes.previous)
+        setComparableFrom(moveRes.comparableFrom)
+        setMovementFailed(false)
+      } else {
+        setMovementFailed(true)
       }
 
       if (showUnassigned) {
@@ -335,11 +345,13 @@ function Today() {
     }
   }
 
-  // null = no prior week recorded yet. Stage history only starts at migration
-  // 040, so week one must not imply a flat comparison against zero.
-  const movementDelta = prevMovement && movement.sampleFrom && movement.sampleFrom < movement.from
-    ? movement.advanced - prevMovement.advanced
-    : null
+  // null = the comparison isn't honest yet. Stage history starts when
+  // migration 040 shipped, so the delta stays blank until tracking covers the
+  // WHOLE previous window — not merely "some event exists before Monday",
+  // which would compare a full week against a partial one.
+  const canCompare = !!(prevMovement && movement?.sampleFrom && comparableFrom &&
+    movement.sampleFrom <= comparableFrom)
+  const movementDelta = canCompare ? movement.advanced - prevMovement.advanced : null
 
   if (loading) {
     return (
@@ -368,24 +380,25 @@ function Today() {
           just not the score any more (Dev, Aug 2026). */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-value">{movement.advanced}</div>
+          <div className="stat-value">{movementFailed ? '—' : movement?.advanced ?? '…'}</div>
           <div className="stat-label">Moved forward this wk</div>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
-            {movementDelta === null ? 'first week of tracking'
+          <div style={{ fontSize: '12px', color: movementFailed ? '#b91c1c' : '#6b7280', marginTop: '6px' }}>
+            {movementFailed ? "couldn't load — retry"
+              : movementDelta === null ? 'first week of tracking'
               : <>vs last wk <span style={{ color: movementDelta >= 0 ? '#16a34a' : '#dc2626' }}>
                   {movementDelta >= 0 ? '+' : ''}{movementDelta}
                 </span></>}
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{movement.replies}</div>
+          <div className="stat-value">{movementFailed ? '—' : movement?.replies ?? '…'}</div>
           <div className="stat-label">Replies this wk</div>
           <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
-            {movement.meetings} meeting{movement.meetings === 1 ? '' : 's'} booked
+            {movementFailed ? '' : `${movement?.meetings ?? 0} meeting${movement?.meetings === 1 ? '' : 's'} booked`}
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{movement.live}</div>
+          <div className="stat-value">{movementFailed ? '—' : movement?.live ?? '…'}</div>
           <div className="stat-label">Live conversations</div>
           <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
             {followUps.length} follow-up{followUps.length === 1 ? '' : 's'} due

@@ -190,9 +190,15 @@ export async function logOutreachBatch(rows, currentPersonId) {
  * without anyone re-entering the contact.
  */
 export async function updateOutreach(id, updates, currentPersonId = null) {
+  // Stamp when the reply actually arrived. outreach_date is the SEND date, so
+  // without this the reply metrics bucket a reply into the week the message
+  // went out — which in a targeted motion is routinely weeks earlier.
+  const patch = updates.status === 'replied' && updates.replied_at === undefined
+    ? { ...updates, replied_at: new Date().toISOString() }
+    : updates
   const { data, error } = await supabase
     .from('crm_outreach_log')
-    .update(updates)
+    .update(patch)
     .eq('id', id)
     .select()
     .single()

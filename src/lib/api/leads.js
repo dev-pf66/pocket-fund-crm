@@ -30,7 +30,7 @@ const stageRank = (stage) => STAGE_ORDER.indexOf(stage)
  * Never throws. A missing audit row must not fail the stage change the user
  * actually asked for; it's a metric, not the transaction.
  */
-async function recordStageChange(leadId, fromStage, toStage, currentPersonId = null) {
+export async function recordStageChange(leadId, fromStage, toStage, currentPersonId = null) {
   if (!leadId || !toStage || fromStage === toStage) return
   try {
     const { error } = await supabase.from('crm_lead_stage_events').insert({
@@ -45,12 +45,23 @@ async function recordStageChange(leadId, fromStage, toStage, currentPersonId = n
   }
 }
 
-/** Did this transition move the lead FORWARD along STAGE_ORDER? */
+/**
+ * Did this transition move the lead FORWARD along STAGE_ORDER?
+ *
+ * Two stages sit outside STAGE_ORDER and both rank -1 via indexOf, so they
+ * need deciding explicitly rather than by accident:
+ *  - `passed` is terminal and dead. Moving INTO it is a loss, and moving OUT
+ *    of it is housekeeping — un-passing six stale leads on a Friday must not
+ *    read as six leads advanced, which is what a bare `to > from` did.
+ *  - `reach_out_later` is parked, not dead. Picking a parked lead back up is
+ *    genuine forward motion, as is a brand-new lead entering the pipeline.
+ */
 export function isForwardMove(fromStage, toStage) {
   const to = stageRank(toStage)
-  if (to < 0) return false            // client/passed handled by caller; unknown = not forward
+  if (to < 0) return false            // into passed/unknown is never forward
+  if (fromStage === 'passed') return false
   const from = stageRank(fromStage)
-  return to > from                    // from === -1 (new/unknown) counts as forward
+  return to > from                    // from === -1 (new/parked) counts as forward
 }
 
 /**

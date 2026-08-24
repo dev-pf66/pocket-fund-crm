@@ -192,6 +192,18 @@ async function handlePatch(req, res) {
       })
     }
 
+    // Capture the prior stage before writing, so a stage change made through
+    // the API lands in crm_lead_stage_events like one made in the UI. CLAUDE.md
+    // designates this endpoint the preferred access path (the /crm skill and
+    // agents use it), so without this the "leads moved forward" metric
+    // undercounts every move made through the front door.
+    let priorStage = null
+    if (updates.stage !== undefined) {
+      const { data: prior } = await supabase
+        .from('crm_leads').select('stage').eq('id', id).single()
+      priorStage = prior?.stage ?? null
+    }
+
     const { data, error } = await supabase
       .from('crm_leads')
       .update(updates)
@@ -204,6 +216,20 @@ async function handlePatch(req, res) {
         return res.status(404).json({ success: false, error: 'Lead not found' })
       }
       throw error
+    }
+
+    // changed_by stays null: this endpoint authenticates a machine via API
+    // key, not a person, so attributing the move to someone would be a lie —
+    // the team strip renders those as "Unattributed". Best-effort: a missing
+    // audit row must not fail the caller's update.
+    if (updates.stage !== undefined && priorStage !== data.stage) {
+      const { error: evErr } = await supabase.from('crm_lead_stage_events').insert({
+        lead_id: Number(id),
+        from_stage: priorStage,
+        to_stage: data.stage,
+        changed_by: null
+      })
+      if (evErr) console.error('stage event insert failed (lead update succeeded):', evErr)
     }
 
     return res.status(200).json({ success: true, data })

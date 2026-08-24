@@ -6,6 +6,7 @@
 import { supabase } from '../supabase'
 import { normalizeLinkedInUrl, nameFromLinkedInUrl } from '../linkedin'
 import { cacheClear, fetchAllRows } from './core'
+import { recordStageChange } from './leads'
 import { logOutreach } from './outreach'
 
 // ============================================================================
@@ -126,6 +127,8 @@ export async function markLeadReachedOut(lead, currentPersonId, currentPersonNam
     platform_details: lead.linkedin_url || ''
   }, currentPersonId, currentPersonName)
 
+  const priorStage = lead.stage ?? null
+
   const { data, error } = await supabase
     .from('crm_leads')
     .update({
@@ -137,6 +140,12 @@ export async function markLeadReachedOut(lead, currentPersonId, currentPersonNam
     .select()
     .single()
   if (error) throw error
+
+  // This is the highest-volume stage transition in the product — working the
+  // queue is how new_lead becomes cold_outreach. It writes crm_leads directly
+  // rather than going through updateLead/moveLead, so without this the
+  // "leads moved forward" metric misses an analyst's entire morning.
+  await recordStageChange(lead.id, priorStage, 'cold_outreach', currentPersonId)
 
   cacheClear('leads')
   cacheClear('dashboard')

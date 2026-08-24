@@ -45,4 +45,13 @@ describe('isForwardMove', () => {
     expect(isForwardMove('reach_out_later', 'responded')).toBe(true)
     expect(isForwardMove(null, 'new_lead')).toBe(true)
   })
+
+  it('does NOT count resurrecting a dead lead as progress', () => {
+    // `passed` ranks -1 like the parked stages, so a bare `to > from` scored
+    // un-passing as an advance: dismiss a batch on Thursday, reinstate it on
+    // Friday, and top the team leaderboard for undoing your own dismissal.
+    expect(isForwardMove('passed', 'cold_outreach')).toBe(false)
+    expect(isForwardMove('passed', 'new_lead')).toBe(false)
+    expect(isForwardMove('passed', 'meeting_booked')).toBe(false)
+  })
 })

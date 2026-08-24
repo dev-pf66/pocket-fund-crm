@@ -103,8 +103,10 @@ function Dashboard() {
   const [outreachRows, setOutreachRows] = useState([])
   // Gamification (self-only): 90 days of own rows for streak/bests, plus
   const [personalRows, setPersonalRows] = useState([])
-  const [movement, setMovement] = useState({ advanced: 0, replies: 0, meetings: 0, live: 0, sampleFrom: null })
+  // null = not loaded / failed, deliberately distinct from a zero week.
+  const [movement, setMovement] = useState(null)
   const [prevMovement, setPrevMovement] = useState(null)
+  const [comparableFrom, setComparableFrom] = useState(null)
   // Admin-only weekly funnel (outreach → replies → meetings → demos).
   const [funnel, setFunnel] = useState([])
   const [funnelWeeks, setFunnelWeeks] = useState(8)
@@ -141,6 +143,7 @@ function Dashboard() {
       if (moveRes) {
         setMovement(moveRes.current)
         setPrevMovement(moveRes.previous)
+        setComparableFrom(moveRes.comparableFrom)
       }
     } catch (error) {
       console.error('Failed to load dashboard:', error)
@@ -227,7 +230,12 @@ function Dashboard() {
       </div>
 
       {/* My Week — what moved, self-only data */}
-      <MyWeekCard movement={movement} prevMovement={prevMovement} touchesThisWeek={myMetrics.thisWeekCount} />
+      <MyWeekCard
+        movement={movement}
+        prevMovement={prevMovement}
+        comparableFrom={comparableFrom}
+        touchesThisWeek={myMetrics.thisWeekCount}
+      />
 
       {/* Today's Outreach */}
       <div className="card dashboard-card">
@@ -407,11 +415,25 @@ function Dashboard() {
  * started recording at migration 040 — hence the "tracking since" note rather
  * than a delta that would imply a comparison we can't make yet.
  */
-function MyWeekCard({ movement, prevMovement, touchesThisWeek }) {
+function MyWeekCard({ movement, prevMovement, comparableFrom, touchesThisWeek }) {
+  if (!movement) {
+    return (
+      <div className="card dashboard-card">
+        <div className="dashboard-card-header"><h2><Target size={20} /> My Week</h2></div>
+        <div style={{ fontSize: '13px', color: '#6b7280' }}>Loading — or couldn't load. Refresh to retry.</div>
+      </div>
+    )
+  }
+  // Only show week-over-week arrows once tracking covered the WHOLE previous
+  // week. Otherwise the first week renders "4 ▲4" against a week that was
+  // never measured, and the Monday after renders a red decline from it.
+  const canCompare = !!(prevMovement && movement.sampleFrom && comparableFrom &&
+    movement.sampleFrom <= comparableFrom)
+  const prevOf = (v) => (canCompare ? v : null)
   const cells = [
-    { label: 'moved forward', value: movement.advanced, prev: prevMovement?.advanced, hint: 'leads that advanced a stage' },
-    { label: 'replies', value: movement.replies, prev: prevMovement?.replies, hint: 'outreach marked replied' },
-    { label: 'meetings', value: movement.meetings, prev: prevMovement?.meetings, hint: 'leads that reached Meeting Booked' },
+    { label: 'moved forward', value: movement.advanced, prev: prevOf(prevMovement?.advanced), hint: 'leads that advanced a stage' },
+    { label: 'replies', value: movement.replies, prev: prevOf(prevMovement?.replies), hint: 'outreach marked replied' },
+    { label: 'meetings', value: movement.meetings, prev: prevOf(prevMovement?.meetings), hint: 'leads that reached Meeting Booked' },
     { label: 'live now', value: movement.live, prev: null, hint: 'in active conversation or meeting booked' }
   ]
   const nothingMoved = !movement.advanced && !movement.replies && !movement.meetings

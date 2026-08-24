@@ -19,11 +19,17 @@
  */
 
 import { supabase } from '../supabase'
-import { istToday, istAddDays, istWeekStart } from '../dateUtils'
+import { istToday, istAddDays, istWeekStart, IST_OFFSET_MS } from '../dateUtils'
 import { fetchAllRows } from './core'
 import { isForwardMove } from './leads'
 
 const LIVE_STAGES = ['active_conversation', 'meeting_booked']
+
+/** IST calendar day (YYYY-MM-DD) of a timestamptz string, or null. */
+function istDayOf(ts) {
+  if (!ts) return null
+  return new Date(new Date(ts).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10)
+}
 
 /** Start of the current IST week (Monday), as YYYY-MM-DD. */
 export function currentWeekStart() {
@@ -45,23 +51,33 @@ export async function getMovementStats(personId = null, { since, until } = {}) {
   const fromTs = `${from}T00:00:00+05:30`
   const toTs = `${istAddDays(to, 1)}T00:00:00+05:30`
 
+  // Every paged query carries a total sort: fetchAllRows walks ranges, and
+  // without a deterministic order Postgres can skip or repeat rows at a page
+  // boundary. This repo has shipped that bug three times.
   const eventsQ = () => {
     let q = supabase
       .from('crm_lead_stage_events')
       .select('lead_id, from_stage, to_stage, changed_by, changed_at')
       .gte('changed_at', fromTs)
       .lt('changed_at', toTs)
+      .order('id')
     if (personId) q = q.eq('changed_by', personId)
     return q
   }
 
+  // Keyed on replied_at — when the reply ARRIVED — not outreach_date, which
+  // is when the message was sent. A reply to a three-week-old message is this
+  // week's win, and counting it against the send week made it invisible.
+  // Rows replied to before migration 041 have no replied_at and are excluded;
+  // that date was never recorded and can't be recovered.
   const repliesQ = () => {
     let q = supabase
       .from('crm_outreach_log')
-      .select('id, logged_by, outreach_date, status')
+      .select('id, logged_by, replied_at, status')
       .eq('status', 'replied')
-      .gte('outreach_date', from)
-      .lte('outreach_date', to)
+      .gte('replied_at', fromTs)
+      .lt('replied_at', toTs)
+      .order('id')
     if (personId) q = q.eq('logged_by', personId)
     return q
   }
@@ -71,6 +87,7 @@ export async function getMovementStats(personId = null, { since, until } = {}) {
       .from('crm_leads')
       .select('id, assigned_to, stage')
       .in('stage', LIVE_STAGES)
+      .order('id')
     if (personId) q = q.eq('assigned_to', personId)
     return q
   }
@@ -87,8 +104,11 @@ export async function getMovementStats(personId = null, { since, until } = {}) {
   const advancedLeads = new Set()
   const meetingLeads = new Set()
   for (const e of events) {
-    if (e.to_stage === 'meeting_booked') meetingLeads.add(e.lead_id)
-    if (isForwardMove(e.from_stage, e.to_stage)) advancedLeads.add(e.lead_id)
+    const forward = isForwardMove(e.from_stage, e.to_stage)
+    // Forward-only: a stalled deal dragged back from `client` to
+    // meeting_booked is a loss, not a meeting booked this week.
+    if (forward && e.to_stage === 'meeting_booked') meetingLeads.add(e.lead_id)
+    if (forward) advancedLeads.add(e.lead_id)
   }
 
   return {
@@ -96,7 +116,10 @@ export async function getMovementStats(personId = null, { since, until } = {}) {
     meetings: meetingLeads.size,
     advanced: advancedLeads.size,
     live: live.length,
-    sampleFrom: earliest?.data?.[0]?.changed_at?.slice(0, 10) || null,
+    // IST calendar day, like every other date here. Slicing the raw UTC
+    // string reported "tracked since Aug 24" for a row created 02:10 IST on
+    // Aug 25, and tripped the first-week delta guard a day early.
+    sampleFrom: istDayOf(earliest?.data?.[0]?.changed_at),
     from,
     to
   }
@@ -108,11 +131,24 @@ export async function getMovementStats(personId = null, { since, until } = {}) {
 export async function getMovementWeekOverWeek(personId = null) {
   const thisStart = currentWeekStart()
   const lastStart = istAddDays(thisStart, -7)
+  const today = istToday()
+
+  // Compare like with like. The current week is partial — on Tuesday it's two
+  // days old — so measuring it against a FULL previous week made every
+  // Monday and Tuesday render a red decline for everyone, regardless of pace.
+  // The previous window is truncated to the same day-of-week offset.
+  const daysIn = Math.round(
+    (new Date(`${today}T12:00:00Z`) - new Date(`${thisStart}T12:00:00Z`)) / 86400000
+  )
+  const prevUntil = istAddDays(lastStart, daysIn)
+
   const [current, previous] = await Promise.all([
-    getMovementStats(personId, { since: thisStart, until: istToday() }),
-    getMovementStats(personId, { since: lastStart, until: istAddDays(thisStart, -1) })
+    getMovementStats(personId, { since: thisStart, until: today }),
+    getMovementStats(personId, { since: lastStart, until: prevUntil })
   ])
-  return { current, previous }
+  // comparableFrom: the delta is only honest once tracking covers the whole
+  // previous window. Consumers blank the arrows until then.
+  return { current, previous, comparableFrom: lastStart }
 }
 
 /**
@@ -127,26 +163,35 @@ export async function getTeamMovementThisWeek() {
     fetchAllRows(() => supabase
       .from('crm_lead_stage_events')
       .select('lead_id, from_stage, to_stage, changed_by')
-      .gte('changed_at', `${since}T00:00:00+05:30`)),
+      .gte('changed_at', `${since}T00:00:00+05:30`)
+      .order('id')),
     fetchAllRows(() => supabase
       .from('crm_outreach_log')
       .select('logged_by')
       .eq('status', 'replied')
-      .gte('outreach_date', since)
-      .lte('outreach_date', today)),
-    fetchAllRows(() => supabase.from('people').select('id, name, is_archived'))
+      .gte('replied_at', `${since}T00:00:00+05:30`)
+      .lt('replied_at', `${istAddDays(today, 1)}T00:00:00+05:30`)
+      .order('id')),
+    fetchAllRows(() => supabase.from('people').select('id, name, is_archived').order('id'))
   ])
 
+  let unattributed = 0
   const byPerson = new Map()
   const statsFor = (id) => {
     if (!byPerson.has(id)) byPerson.set(id, { advanced: new Set(), meetings: new Set(), replies: 0 })
     return byPerson.get(id)
   }
   for (const e of events) {
-    if (!e.changed_by) continue
+    // Auto-advances from a reply with no logged_by have no actor. Counting
+    // them nowhere made the strip fail to add up to the team headline.
+    if (!e.changed_by) {
+      if (isForwardMove(e.from_stage, e.to_stage)) unattributed += 1
+      continue
+    }
     const s = statsFor(e.changed_by)
-    if (isForwardMove(e.from_stage, e.to_stage)) s.advanced.add(e.lead_id)
-    if (e.to_stage === 'meeting_booked') s.meetings.add(e.lead_id)
+    const forward = isForwardMove(e.from_stage, e.to_stage)
+    if (forward) s.advanced.add(e.lead_id)
+    if (forward && e.to_stage === 'meeting_booked') s.meetings.add(e.lead_id)
   }
   for (const r of replies) {
     if (!r.logged_by) continue
@@ -154,7 +199,7 @@ export async function getTeamMovementThisWeek() {
   }
 
   const nameById = new Map(people.filter(p => !p.is_archived).map(p => [p.id, p.name]))
-  return [...byPerson.entries()]
+  const rows = [...byPerson.entries()]
     .filter(([id]) => nameById.has(id))
     .map(([id, s]) => ({
       personId: id,
@@ -165,4 +210,9 @@ export async function getTeamMovementThisWeek() {
     }))
     .filter(r => r.advanced || r.meetings || r.replies)
     .sort((a, b) => b.advanced - a.advanced || b.meetings - a.meetings || b.replies - a.replies)
+
+  if (unattributed) {
+    rows.push({ personId: 'unattributed', name: 'Unattributed', advanced: unattributed, meetings: 0, replies: 0 })
+  }
+  return rows
 }
