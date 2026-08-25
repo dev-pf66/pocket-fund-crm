@@ -44,7 +44,7 @@ export function currentWeekStart() {
  * the earliest stage event on record, so the UI can be honest that the
  * history only goes back so far.
  */
-export async function getMovementStats(personId = null, { since, until } = {}) {
+export async function getMovementStats(personId = null, { since, until, includeSnapshot = true } = {}) {
   const from = since || currentWeekStart()
   const to = until || istToday()
   // Stage events are timestamps; bound the day range inclusively.
@@ -92,12 +92,17 @@ export async function getMovementStats(personId = null, { since, until } = {}) {
     return q
   }
 
+  // `live` and `earliest` describe the present, not the window, so the
+  // previous-week call skips them rather than computing and discarding two
+  // extra round-trips on every page load.
   const [events, replies, live, earliest] = await Promise.all([
     fetchAllRows(eventsQ),
     fetchAllRows(repliesQ),
-    fetchAllRows(liveQ),
-    supabase.from('crm_lead_stage_events')
-      .select('changed_at').order('changed_at', { ascending: true }).limit(1)
+    includeSnapshot ? fetchAllRows(liveQ) : Promise.resolve([]),
+    includeSnapshot
+      ? supabase.from('crm_lead_stage_events')
+          .select('changed_at').order('changed_at', { ascending: true }).limit(1)
+      : Promise.resolve({ data: [] })
   ])
 
   // One lead moving twice in a week is one lead that moved.
@@ -144,7 +149,7 @@ export async function getMovementWeekOverWeek(personId = null) {
 
   const [current, previous] = await Promise.all([
     getMovementStats(personId, { since: thisStart, until: today }),
-    getMovementStats(personId, { since: lastStart, until: prevUntil })
+    getMovementStats(personId, { since: lastStart, until: prevUntil, includeSnapshot: false })
   ])
   // comparableFrom: the delta is only honest once tracking covers the whole
   // previous window. Consumers blank the arrows until then.
@@ -175,7 +180,7 @@ export async function getTeamMovementThisWeek() {
     fetchAllRows(() => supabase.from('people').select('id, name, is_archived').order('id'))
   ])
 
-  let unattributed = 0
+  const unattributedLeads = new Set()
   const byPerson = new Map()
   const statsFor = (id) => {
     if (!byPerson.has(id)) byPerson.set(id, { advanced: new Set(), meetings: new Set(), replies: 0 })
@@ -185,7 +190,12 @@ export async function getTeamMovementThisWeek() {
     // Auto-advances from a reply with no logged_by have no actor. Counting
     // them nowhere made the strip fail to add up to the team headline.
     if (!e.changed_by) {
-      if (isForwardMove(e.from_stage, e.to_stage)) unattributed += 1
+      // A Set of lead ids, not a tally — every other row de-dupes ("a lead
+      // that moves twice in a week is one lead"), and the whole point of this
+      // row is that the strip reconciles with the team headline. Every move
+      // made through the HTTP API lands here (changed_by is null for a
+      // machine caller), so a lead PATCHed twice would otherwise read as 2.
+      if (isForwardMove(e.from_stage, e.to_stage)) unattributedLeads.add(e.lead_id)
       continue
     }
     const s = statsFor(e.changed_by)
@@ -211,8 +221,8 @@ export async function getTeamMovementThisWeek() {
     .filter(r => r.advanced || r.meetings || r.replies)
     .sort((a, b) => b.advanced - a.advanced || b.meetings - a.meetings || b.replies - a.replies)
 
-  if (unattributed) {
-    rows.push({ personId: 'unattributed', name: 'Unattributed', advanced: unattributed, meetings: 0, replies: 0 })
+  if (unattributedLeads.size) {
+    rows.push({ personId: 'unattributed', name: 'Unattributed', advanced: unattributedLeads.size, meetings: 0, replies: 0 })
   }
   return rows
 }

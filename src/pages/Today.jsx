@@ -81,6 +81,29 @@ function Today() {
     return map
   }, [people])
 
+  // Every movement update goes through here. Writing the refresh separately
+  // from the initial load is what let them drift: the refresh set `movement`
+  // but neither `movementFailed` nor `comparableFrom`, so a transient error on
+  // page load pinned the cards to "couldn't load" for the whole session even
+  // as later refreshes succeeded.
+  const applyMovement = useCallback((res) => {
+    if (!res) { setMovementFailed(true); return }
+    setMovement(res.current)
+    setPrevMovement(res.previous)
+    setComparableFrom(res.comparableFrom)
+    setMovementFailed(false)
+  }, [])
+
+  const refreshMovement = useCallback(() => {
+    if (!currentPerson?.id) return
+    getMovementWeekOverWeek(currentPerson.id)
+      .then(applyMovement)
+      .catch(err => {
+        console.error('Movement refresh failed:', err)
+        setMovementFailed(true)
+      })
+  }, [currentPerson?.id, applyMovement])
+
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -102,14 +125,7 @@ function Today() {
       setEscalations(escRes)
       setCounters(ctrRes)
       setSettings(thresholds.raw)
-      if (moveRes) {
-        setMovement(moveRes.current)
-        setPrevMovement(moveRes.previous)
-        setComparableFrom(moveRes.comparableFrom)
-        setMovementFailed(false)
-      } else {
-        setMovementFailed(true)
-      }
+      applyMovement(moveRes)
 
       if (showUnassigned) {
         getUnassignedLeads().then(setUnassigned).catch(err => console.error('Unassigned load failed:', err))
@@ -123,11 +139,12 @@ function Today() {
     } finally {
       setLoading(false)
     }
-  }, [currentPerson?.id, isAdmin, showUnassigned]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentPerson?.id, isAdmin, showUnassigned, applyMovement]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (currentPerson?.id) loadAll()
   }, [currentPerson?.id, loadAll])
+
 
   // A lead due for follow-up renders once, in Follow-ups — not again in Touches.
   const followUpIds = useMemo(() => new Set(followUps.map(l => l.id)), [followUps])
@@ -234,9 +251,7 @@ function Today() {
       notifyFollowUpsChanged()
       // Marking leads dead can drop them out of active_conversation /
       // meeting_booked, so the "live conversations" headline is now stale.
-      getMovementWeekOverWeek(currentPerson.id)
-        .then(r => { if (r) { setMovement(r.current); setPrevMovement(r.previous) } })
-        .catch(err => console.error('Movement refresh failed:', err))
+      refreshMovement()
       clearSelection()
       if (succeeded.length) toast.success(`Marked ${succeeded.length} lead${succeeded.length === 1 ? '' : 's'} dead`)
       if (failed.length) toast.error(`${failed.length} failed to update`)
