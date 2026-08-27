@@ -543,7 +543,7 @@ function Today() {
       <SectionCard
         icon={<Check size={16} />}
         title="Today's touches"
-        subtitle={`Top ${touchLeads.length} of ${queue.total} — ranked by stage weight × days stale × lead score`}
+        subtitle={`Top ${touchLeads.length} of ${queue.total} — active in the last 2 weeks, ranked by stage weight × days stale × lead score`}
         headerExtra={touchLeads.length > 0 && (
           <SelectAllCheckbox
             ids={touchLeads.map(l => l.id)}
@@ -583,7 +583,7 @@ function Today() {
       <SectionCard
         icon={<AlarmClock size={16} />}
         title="Follow-ups due"
-        subtitle="Engaged leads hitting the day 3 / 7 / 14 marks, or scheduled for today"
+        subtitle="Engaged leads hitting the day 3 / 7 / 14 marks, plus anything scheduled in the next 2 weeks"
         headerExtra={followUps.length > 0 && (
           <SelectAllCheckbox
             ids={followUps.map(l => l.id)}
@@ -702,10 +702,12 @@ function followUpContext(lead) {
   const cadence = lead.follow_up_cadence?.offsets?.length
     ? ` · ${lead.follow_up_cadence.name} ${Math.min(lead.follow_up_cadence.step, lead.follow_up_cadence.offsets.length)}/${lead.follow_up_cadence.offsets.length}`
     : ''
-  if (lead.next_follow_up_date && lead.next_follow_up_date <= today) {
+  if (lead.next_follow_up_date) {
     const when = lead.next_follow_up_date === today
       ? 'follow-up scheduled for today'
-      : `follow-up was scheduled for ${fmtDate(lead.next_follow_up_date)}`
+      : lead.next_follow_up_date < today
+        ? `follow-up was scheduled for ${fmtDate(lead.next_follow_up_date)}`
+        : `follow-up coming up ${fmtDate(lead.next_follow_up_date)}`
     return when + cadence + note
   }
   return `day ${daysStaleFor(lead)} since last touch — cadence mark`

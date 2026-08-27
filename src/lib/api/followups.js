@@ -17,6 +17,12 @@ import { updateLead, logActivity } from './leads'
 // A lead that's won or dead never nags.
 const TERMINAL_STAGES = ['client', 'passed']
 
+// Notifications (bell + Notifications page) only nag about the last 2
+// weeks of overdue — a follow-up missed months ago shouldn't nag forever.
+// It's still fully there on the lead and reachable via Pipeline; it just
+// stops pinging. Mirrors RECENT_WINDOW_DAYS in lib/api/today.js.
+const OVERDUE_WINDOW_DAYS = 14
+
 // ============================================================================
 // CADENCE LIBRARY
 // ============================================================================
@@ -229,19 +235,23 @@ export async function logFollowUpTouch(lead, currentPersonId, { note = '', activ
 
 /**
  * Follow-ups that should be nagging someone right now: assigned to personId,
- * still workable, scheduled on or before today. Feeds the sidebar bell —
- * overdue and due-today are counted separately so the bell can go red only
- * when something has actually slipped.
+ * still workable, scheduled on or before today and no more than
+ * OVERDUE_WINDOW_DAYS (2 weeks) overdue. Feeds the sidebar bell — overdue
+ * and due-today are counted separately so the bell can go red only when
+ * something has actually slipped. Anything overdue longer than that stops
+ * nagging (it's still on the lead, just not surfaced here).
  *
  * personId null aggregates across every owner (admin view).
  */
 export async function getFollowUpNotifications(personId = null, { limit = 8 } = {}) {
   const today = istToday()
+  const floor = istAddDays(today, -OVERDUE_WINDOW_DAYS)
   let q = supabase
     .from('crm_leads')
     .select('id, name, firm_name, stage, assigned_to, next_follow_up_date, follow_up_note, follow_up_cadence')
     .not('next_follow_up_date', 'is', null)
     .lte('next_follow_up_date', today)
+    .gte('next_follow_up_date', floor)
     .not('stage', 'in', `(${TERMINAL_STAGES.join(',')})`)
     .order('next_follow_up_date')
   if (personId) q = q.eq('assigned_to', personId)
@@ -262,19 +272,23 @@ export async function getFollowUpNotifications(personId = null, { limit = 8 } = 
  * Everything scheduled, bucketed — what the Notifications page renders.
  * Unlike getFollowUpNotifications (counts + a preview, for the bell), this
  * returns full lead rows and looks forward as well as back, so the page can
- * answer "what's coming" and not just "what have I missed".
+ * answer "what's coming" and not just "what have I missed" — but same as the
+ * bell, overdue is capped at OVERDUE_WINDOW_DAYS so an ancient miss doesn't
+ * dominate the page forever.
  *
  * personId null aggregates across every owner (admin view).
  */
-export async function getFollowUpBoard(personId = null, { upcomingDays = 14 } = {}) {
+export async function getFollowUpBoard(personId = null, { upcomingDays = 14, overdueWindowDays = OVERDUE_WINDOW_DAYS } = {}) {
   const today = istToday()
   const horizon = istAddDays(today, upcomingDays)
+  const floor = istAddDays(today, -overdueWindowDays)
 
   let q = supabase
     .from('crm_leads')
     .select('*')
     .not('next_follow_up_date', 'is', null)
     .lte('next_follow_up_date', horizon)
+    .gte('next_follow_up_date', floor)
     .not('stage', 'in', `(${TERMINAL_STAGES.join(',')})`)
     .order('next_follow_up_date')
   if (personId) q = q.eq('assigned_to', personId)

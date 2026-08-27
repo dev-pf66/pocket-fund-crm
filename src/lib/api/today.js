@@ -34,6 +34,12 @@ export const TODAY_STAGE_WEIGHTS = {
 const TODAY_QUEUE_STAGES = Object.keys(TODAY_STAGE_WEIGHTS)
 const TODAY_ENGAGED_STAGES = ['responded', 'warm_lead', 'active_conversation', 'meeting_booked']
 
+// Today only surfaces what's live: activity in the last 2 weeks, or
+// follow-ups due in the next 2 weeks. Older neglected leads stop flooding
+// the queue and pinging notifications — they're still fully there in
+// Pipeline, just not shoved in front of a rep every morning.
+const RECENT_WINDOW_DAYS = 14
+
 /**
  * Staleness thresholds for the Today tab. Reads crm_settings (the same
  * source calculateStaleness uses) and falls back to 3/7/14 if the settings
@@ -95,6 +101,9 @@ export async function getTodayQueue(personId, { limit = 25 } = {}) {
   const candidates = (data || []).filter(lead => {
     // Touched today already (any surface) — done, not due.
     if (lead.last_activity_date && istDateStr(new Date(lead.last_activity_date).getTime()) === today) return false
+    // Gone quiet longer than the recent window — still fully reachable via
+    // Pipeline, just not surfaced here to nag about leads sitting for months.
+    if (daysStaleFor(lead) > RECENT_WINDOW_DAYS) return false
     return true
   })
 
@@ -143,15 +152,23 @@ export async function markLeadTouched(lead, currentPersonId, note = '', { source
 /**
  * Follow-ups due: assigned engaged leads (responded/warm/active/meeting)
  * hitting the day-3/7/14 cadence marks (thresholds from settings), plus any
- * non-terminal lead with next_follow_up_date ≤ today — an explicitly
- * scheduled reach-out surfaces whatever stage the lead sits in, so a
- * "circle back in a month" on a cold lead isn't silently dropped.
- * Sorted most-stale first.
+ * non-terminal lead with next_follow_up_date within the next
+ * RECENT_WINDOW_DAYS (overdue, today, or coming up) — the forward-looking
+ * half of the window, so a rep sees what's coming, not just what's slipped.
+ * A "circle back in a month" scheduled beyond that horizon isn't dropped —
+ * it just isn't due YET, so it correctly waits until it's within 2 weeks out.
+ * A follow-up missed more than RECENT_WINDOW_DAYS ago also drops off —
+ * mirrors the notification bell's cap so Today doesn't nag about a reminder
+ * set months ago and forgotten (still on the lead, still in Pipeline).
+ * Sorted by next_follow_up_date (overdue-oldest first); cadence-mark-only
+ * entries (no explicit date) sort after, most-stale first.
  */
 export async function getFollowUpsDue(personId) {
   if (!personId) return []
   const t = await getTodayThresholds()
   const today = istDateStr()
+  const horizon = istAddDays(today, RECENT_WINDOW_DAYS)
+  const floor = istAddDays(today, -RECENT_WINDOW_DAYS)
 
   const { data, error } = await supabase
     .from('crm_leads')
@@ -163,11 +180,18 @@ export async function getFollowUpsDue(personId) {
   const marks = new Set([t.cold, t.warm, t.active])
   return (data || [])
     .filter(lead => {
-      if (lead.next_follow_up_date && lead.next_follow_up_date <= today) return true
+      if (lead.next_follow_up_date) return lead.next_follow_up_date <= horizon && lead.next_follow_up_date >= floor
       if (!TODAY_ENGAGED_STAGES.includes(lead.stage)) return false
       return marks.has(daysStaleFor(lead))
     })
-    .sort((a, b) => daysStaleFor(b) - daysStaleFor(a))
+    .sort((a, b) => {
+      if (a.next_follow_up_date && b.next_follow_up_date) {
+        return a.next_follow_up_date.localeCompare(b.next_follow_up_date)
+      }
+      if (a.next_follow_up_date) return -1
+      if (b.next_follow_up_date) return 1
+      return daysStaleFor(b) - daysStaleFor(a)
+    })
 }
 
 /**
