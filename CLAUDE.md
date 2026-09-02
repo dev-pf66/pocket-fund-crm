@@ -24,6 +24,11 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 - Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 039). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- **Auth email redirects (Sept 2026):** password reset, signup confirmation, and magic links all depend on Supabase Auth → URL Configuration, which is invisible from the code. If `redirectTo` is not in the **Redirect URLs** allowlist, Supabase *silently discards it* and falls back to the **Site URL** — the link still works, it just lands somewhere useless. This is what broke forgot-password for everyone: Site URL was `http://localhost:3000` and the prod domain was not allowlisted, so every reset email dropped the user on a dead localhost address. `Login.jsx` was correct the whole time. Correct values: Site URL `https://pocket-fund-crm.vercel.app`, Redirect URLs `https://pocket-fund-crm.vercel.app/**` + `http://localhost:5173/**`.
+  - Probe it without sending mail (anon key only, no secrets):
+    `curl -sD- -o/dev/null "https://lzydgdzjrgvqglxmyfjk.supabase.co/auth/v1/verify?token=probe&type=recovery&redirect_to=<urlencoded-url>" -H "apikey: $VITE_SUPABASE_ANON_KEY" | grep -i ^location:`
+    If the `location` comes back as your requested URL, it is allowlisted; if it comes back as something else, it is not.
+  - Do **not** "fix" this with `supabase config push` — with no `config.toml` in this repo it pushes CLI defaults and overwrites the project's entire auth config.
 - `crm_investors` RLS is deliberately "Allow all access" (open to the team as the shared contact book) — do not "fix" it.
 
 ## CRM API (preferred access path for CRM data)
