@@ -155,10 +155,10 @@ export async function onLeadStageChanged({ lead, oldStage, actorPersonId }) {
       description: `Lead ${firm} responded — send a reply. CRM lead #${lead.id}.`
     })
   }
-  if (newStage === 'active_conversation') {
+  if (newStage === 'meeting_booked') {
     return await createLeadTask({
       entityType: 'lead_followup', title: `Follow up on ${firm}`, priority: 'high', dueDays: 3,
-      description: `Follow up on active conversation with ${firm}. CRM lead #${lead.id}.`
+      description: `Meeting booked with ${firm} — confirm and follow up. CRM lead #${lead.id}.`
     })
   }
   if (newStage === 'client') {

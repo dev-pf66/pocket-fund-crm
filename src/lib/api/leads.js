@@ -16,7 +16,11 @@ import { getCRMSettings } from './misc'
 // Pipeline stage progression. Forward-only automation: replies and stage
 // syncs may move a lead RIGHT along this list, never left. 'passed' is
 // terminal and outside the order — automation never touches passed leads.
-const STAGE_ORDER = ['new_lead', 'cold_outreach', 'responded', 'warm_lead', 'active_conversation', 'meeting_booked', 'client']
+// 'outreach' merges the old new_lead + cold_outreach (first-touch through
+// no-reply); 'meeting_booked' sits right after 'responded' and means the
+// lead has AGREED to meet, not that the meeting happened — the meeting
+// itself moves the lead on into 'warm_active' (old warm_lead + active_conversation).
+const STAGE_ORDER = ['outreach', 'responded', 'meeting_booked', 'warm_active', 'client']
 const stageRank = (stage) => STAGE_ORDER.indexOf(stage)
 
 /**
@@ -109,9 +113,10 @@ export async function advanceLeadStage(leadId, targetStage, currentPersonId = nu
  * honest whichever surface the analyst updates first:
  * - Lead reaches 'responded' (or beyond): its latest un-replied outreach
  *   entry flips to 'replied', keeping reply rate in sync with the pipeline.
- * - Lead enters 'meeting_booked': auto-log a 'meeting' activity — exactly
- *   what the Dashboard funnel counts — so meetings no longer depend on
- *   someone remembering the quick-log button.
+ * - Lead LEAVES 'meeting_booked' moving forward: auto-log a 'meeting'
+ *   activity — exactly what the Dashboard funnel counts. 'meeting_booked'
+ *   means the meeting is scheduled but hasn't happened yet, so the log fires
+ *   on the way OUT (into warm_active or beyond), not on the way in.
  * Never throws: metrics side effects must not break the stage change itself.
  */
 async function runStageSideEffects(lead, oldStage, newStage, currentPersonId = null) {
@@ -143,8 +148,8 @@ async function runStageSideEffects(lead, oldStage, newStage, currentPersonId = n
       }
     }
 
-    // Meeting sync: entering the Meeting stage logs the meeting itself.
-    if (newStage === 'meeting_booked' && oldStage !== 'meeting_booked') {
+    // Meeting sync: leaving Meeting forward means the meeting actually happened.
+    if (oldStage === 'meeting_booked' && stageRank(newStage) > stageRank('meeting_booked')) {
       await logActivity(lead.id, {
         activity_type: 'meeting',
         notes: 'Meeting — auto-logged from pipeline stage change'
@@ -487,12 +492,10 @@ export async function getStaleLeads(personId = null) {
     )
 
     const thresholds = {
-      new_lead: 999, // New leads don't go stale — they haven't been contacted yet
-      cold_outreach: settings.cold_outreach_threshold,
+      outreach: settings.cold_outreach_threshold,
       responded: settings.warm_lead_threshold, // Responded is in the warming phase — reuse warm threshold
-      warm_lead: settings.warm_lead_threshold,
-      active_conversation: settings.active_conversation_threshold,
       meeting_booked: settings.active_conversation_threshold, // Booked meetings go stale as fast as active talks
+      warm_active: settings.active_conversation_threshold,
       reach_out_later: 999 // Use exact date instead
     }
 
@@ -543,7 +546,7 @@ export async function getLeadsNeedingSamples(personId = null) {
  */
 export async function getActiveConversationsGoneStale(personId = null) {
   const settings = await getCRMSettings()
-  const leads = await getLeads({ stage: 'active_conversation' }, personId)
+  const leads = await getLeads({ stage: 'warm_active' }, personId)
 
   return leads.filter(lead => {
     if (!lead.last_activity_date) return false
@@ -583,12 +586,10 @@ export async function getPipelineStats(personId = null) {
   const leads = await getLeads({}, personId)
 
   const stats = {
-    new_lead: 0,
-    cold_outreach: 0,
+    outreach: 0,
     responded: 0,
-    warm_lead: 0,
-    active_conversation: 0,
     meeting_booked: 0,
+    warm_active: 0,
     client: 0,
     reach_out_later: 0,
     passed: 0,
@@ -603,11 +604,10 @@ export async function getPipelineStats(personId = null) {
   // has no leads, and x/0 rendered as "NaN%" across the dashboard and poisoned
   // the percentage-bar widths.
   const pct = (n) => (stats.total > 0 ? (n / stats.total) * 100 : 0)
-  stats.new_pct = pct(stats.new_lead)
-  stats.cold_pct = pct(stats.cold_outreach)
+  stats.outreach_pct = pct(stats.outreach)
   stats.responded_pct = pct(stats.responded)
-  stats.warm_pct = pct(stats.warm_lead)
-  stats.active_pct = pct(stats.active_conversation)
+  stats.meeting_pct = pct(stats.meeting_booked)
+  stats.warm_pct = pct(stats.warm_active)
   stats.client_pct = pct(stats.client)
 
   return stats
@@ -720,12 +720,10 @@ export function calculateStaleness(lead, settings) {
   )
 
   const thresholds = {
-    new_lead: 999,
-    cold_outreach: settings.cold_outreach_threshold,
+    outreach: settings.cold_outreach_threshold,
     responded: settings.warm_lead_threshold,
-    warm_lead: settings.warm_lead_threshold,
-    active_conversation: settings.active_conversation_threshold,
     meeting_booked: settings.active_conversation_threshold,
+    warm_active: settings.active_conversation_threshold,
     client: 999,
     reach_out_later: 999,
     passed: 999

@@ -14,7 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const h = vi.hoisted(() => ({ ops: [], leadStage: 'new_lead' }))
+const h = vi.hoisted(() => ({ ops: [], leadStage: 'outreach' }))
 
 // Minimal PostgREST-shaped stub: records every write, serves the prior stage.
 vi.mock('@supabase/supabase-js', () => ({
@@ -63,7 +63,7 @@ const patch = (body) => ({
   body
 })
 
-beforeEach(() => { h.ops = []; h.leadStage = 'new_lead' })
+beforeEach(() => { h.ops = []; h.leadStage = 'outreach' })
 
 describe('PATCH /api/leads — stage recording', () => {
   it('records an event when the stage changes', async () => {
@@ -75,7 +75,7 @@ describe('PATCH /api/leads — stage recording', () => {
     expect(ev).toHaveLength(1)
     expect(ev[0].payload).toMatchObject({
       lead_id: 42,
-      from_stage: 'new_lead',
+      from_stage: 'outreach',
       to_stage: 'responded',
       changed_by: null   // machine caller — never attributed to a person
     })

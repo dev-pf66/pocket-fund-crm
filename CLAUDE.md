@@ -23,7 +23,12 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Project ref: `lzydgdzjrgvqglxmyfjk` (https://lzydgdzjrgvqglxmyfjk.supabase.co).
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 044). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 045). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- **Auth email redirects (Sept 2026):** password reset, signup confirmation, and magic links all depend on Supabase Auth → URL Configuration, which is invisible from the code. If `redirectTo` is not in the **Redirect URLs** allowlist, Supabase *silently discards it* and falls back to the **Site URL** — the link still works, it just lands somewhere useless. This is what broke forgot-password for everyone: Site URL was `http://localhost:3000` and the prod domain was not allowlisted, so every reset email dropped the user on a dead localhost address. `Login.jsx` was correct the whole time. Correct values: Site URL `https://pocket-fund-crm.vercel.app`, Redirect URLs `https://pocket-fund-crm.vercel.app/**` + `http://localhost:5173/**`.
+  - Probe it without sending mail (anon key only, no secrets):
+    `curl -sD- -o/dev/null "https://lzydgdzjrgvqglxmyfjk.supabase.co/auth/v1/verify?token=probe&type=recovery&redirect_to=<urlencoded-url>" -H "apikey: $VITE_SUPABASE_ANON_KEY" | grep -i ^location:`
+    If the `location` comes back as your requested URL, it is allowlisted; if it comes back as something else, it is not.
+  - Do **not** "fix" this with `supabase config push` — with no `config.toml` in this repo it pushes CLI defaults and overwrites the project's entire auth config.
 - `crm_investors` RLS is deliberately "Allow all access" (open to the team as the shared contact book) — do not "fix" it.
 
 ## CRM API (preferred access path for CRM data)
@@ -34,7 +39,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 ## Pipeline machinery (known traps)
 
-- Stage order lives in `STAGE_ORDER` in `src/lib/api/leads.js`: new_lead → cold_outreach → responded → warm_lead → active_conversation → meeting_booked → client; `passed` is terminal/outside.
+- Stage order lives in `STAGE_ORDER` in `src/lib/api/leads.js`: outreach (merged new_lead+cold_outreach) → responded → meeting_booked (agreed to meet, not yet happened) → warm_active (merged warm_lead+active_conversation, entered once the meeting happens) → client; `passed` is terminal/outside. Sept 2026 restructure (Dev's call) — see `git log` on `src/lib/api/leads.js` for the migration.
 - `src/lib/crm-api.js` is a **pure re-export barrel** over `src/lib/api/*` modules — edit the modules, not the barrel.
 - **Pagination:** `fetchAllRows()` (`src/lib/api/core.js`, mirrored for serverless in `api/_db.js`) is the ONLY sanctioned way to read a list that gets counted/aggregated. PostgREST truncates a plain select at 1000 rows with NO error, and this repo has shipped that bug three separate times. `.limit(n)` is NOT an escape hatch — PostgREST clamps it to max-rows, so `.limit(5000)` quietly returns 1000; use `fetchAllRows(f, { maxRows })`. Pass a FACTORY (a query builder is single-use), and give any ordered query a total sort (add `.order('id')`) or paging can skip/duplicate rows at a page boundary.
 - **Volume forecast:** cold calling adds ~100 rows/day to `crm_outreach_log` team-wide. The
@@ -43,7 +48,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   silently shows a slice. Filter by type, or raise the ceiling, before it bites.
 - All stage automation is **forward-only** (`advanceLeadStage`) — never regresses a lead, never touches client/passed. It deliberately skips `runStageSideEffects` to avoid double-counting.
 - Reply↔pipeline sync is bidirectional: outreach marked 'replied' advances the lead to `responded`; lead dragged to responded+ flips its latest un-replied outreach entry to 'replied'.
-- Entering `meeting_booked` auto-logs a 'meeting' activity — that's what the Dashboard Funnel counts as meetings.
+- Leaving `meeting_booked` forward (into `warm_active` or beyond) auto-logs a 'meeting' activity — that's what the Dashboard Funnel counts as meetings. It fires on the way OUT because `meeting_booked` now means "agreed to meet," not "met."
 - Per-user outreach targets: `people.daily_outreach_target` / `weekly_outreach_target` (migration 032), set in Admin → All Users → Targets; NULL falls back to 10/50. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
 - **Cold calls (Sept 2026, `src/pages/ColdCalls.jsx`)** — they dial on CallHippo, ~20 dials
   per person per day, at buyers (`crm_leads`). Calls live in `crm_outreach_log`, **one row per

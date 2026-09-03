@@ -5,7 +5,7 @@
  * target, streak, weekly digest and "My Week" count keeps working without
  * knowing calls exist (Dev's call, Sept 2026: dials count toward the goal).
  * What makes them calls is outreach_type='phone_call' plus the call_* columns
- * from migration 044. The funnel that matters — dials → pickups →
+ * from migration 045. The funnel that matters — dials → pickups →
  * conversations → meetings — is derived from call_outcome, whose vocabulary
  * and predicates live in src/lib/callOutcomes.js.
  *
@@ -532,7 +532,7 @@ export async function getCallQueue(personId = null, { limit = 50, daysBackHistor
   const enriched = leads.map(lead => {
     const calls = (byLead.get(lead.id) || [])
       .slice()
-      // called_at can be null on rows imported before migration 044 backfilled
+      // called_at can be null on rows imported before migration 045 backfilled
       // it; fall back to the date so ordering stays deterministic.
       .sort((a, b) => String(a.called_at || a.outreach_date).localeCompare(String(b.called_at || b.outreach_date)))
     const last = calls[calls.length - 1] || null

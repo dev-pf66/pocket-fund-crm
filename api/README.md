@@ -65,7 +65,7 @@ List leads with optional filters. Returns newest first.
 **Example:**
 ```bash
 curl -H "x-api-key: YOUR_KEY" \
-  "https://pocket-fund-crm.vercel.app/api/leads?stage=warm_lead&lead_type=PE%20Firm&limit=10"
+  "https://pocket-fund-crm.vercel.app/api/leads?stage=warm_active&lead_type=PE%20Firm&limit=10"
 ```
 
 **200 Response:**
@@ -83,7 +83,7 @@ curl -H "x-api-key: YOUR_KEY" \
       "linkedin_url": "",
       "lead_type": "Other",
       "deal_criteria": "",
-      "stage": "warm_lead",
+      "stage": "warm_active",
       "last_activity_date": "2026-03-11T13:52:09.477+00:00",
       "last_activity_type": "note",
       "next_follow_up_date": null,
@@ -144,7 +144,7 @@ curl -H "x-api-key: YOUR_KEY" \
     "id": 1,
     "name": "Underdogs",
     "firm_name": "",
-    "stage": "warm_lead",
+    "stage": "warm_active",
     "lead_type": null,
     "created_at": "2026-02-10T19:36:53.336404+00:00",
     ...
@@ -180,7 +180,7 @@ Content-Type: application/json
 | `linkedin_url` | string | No | |
 | `lead_type` | string | No | See [Lead Type enum](#lead-type) |
 | `lead_source` | string | No | See [Lead Source enum](#lead-source) |
-| `stage` | string | No | See [Stage enum](#stage). Defaults to `new_lead` |
+| `stage` | string | No | See [Stage enum](#stage). Defaults to `outreach` |
 | `deal_criteria` | string | No | e.g. `"B2B SaaS, $1-5M revenue"` |
 | `notes` | string | No | |
 | `initial_conversation` | string | No | |
@@ -205,7 +205,7 @@ curl -X POST \
     "firm_name": "Acme Capital",
     "lead_type": "PE Firm",
     "lead_source": "LinkedIn",
-    "stage": "warm_lead",
+    "stage": "warm_active",
     "deal_criteria": "B2B SaaS, $2-10M revenue",
     "notes": "Met at PE conference, interested in deal flow"
   }' \
@@ -223,7 +223,7 @@ curl -X POST \
     "firm_name": "Acme Capital",
     "lead_type": "PE Firm",
     "lead_source": "LinkedIn",
-    "stage": "warm_lead",
+    "stage": "warm_active",
     "deal_criteria": "B2B SaaS, $2-10M revenue",
     "notes": "Met at PE conference, interested in deal flow",
     "needs_sample_deals": false,
@@ -241,7 +241,7 @@ curl -X POST \
 
 **400 Response** (invalid enum):
 ```json
-{ "success": false, "error": "Invalid stage. Must be one of: new_lead, cold_outreach, warm_lead, active_conversation, client, passed" }
+{ "success": false, "error": "Invalid stage. Must be one of: outreach, responded, meeting_booked, warm_active, client, passed" }
 ```
 
 ---
@@ -317,7 +317,7 @@ curl -H "x-api-key: YOUR_KEY" \
       "lead": {
         "name": "Brendan",
         "firm_name": "saas.group",
-        "stage": "active_conversation"
+        "stage": "warm_active"
       }
     }
   ]
@@ -375,9 +375,9 @@ curl -H "x-api-key: YOUR_KEY" \
   "data": {
     "total_leads": 34,
     "conversion": {
-      "cold_outreach": 12,
-      "warm_lead": 10,
-      "active_conversation": 8,
+      "outreach": 12,
+      "meeting_booked": 10,
+      "warm_active": 8,
       "client": 4,
       "cold_to_warm_rate": 83,
       "warm_to_active_rate": 80,
@@ -766,12 +766,10 @@ Pipeline stages a lead progresses through:
 
 | Value | Description |
 |-------|-------------|
-| `new_lead` | Freshly added, not yet contacted |
-| `cold_outreach` | Initial contact, no response yet |
+| `outreach` | Freshly added through first contact, no response yet |
 | `responded` | Replied to outreach |
-| `warm_lead` | Responded or showed interest |
-| `active_conversation` | Ongoing discussions |
-| `meeting_booked` | Meeting scheduled |
+| `meeting_booked` | Agreed to a meeting — meeting hasn't happened yet |
+| `warm_active` | Post-meeting: warm or in active conversation |
 | `client` | Converted to paying client |
 | `reach_out_later` | Parked until a set date |
 | `passed` | Lead declined or disqualified |

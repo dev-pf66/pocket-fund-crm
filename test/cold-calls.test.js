@@ -41,10 +41,10 @@ beforeEach(() => { vi.restoreAllMocks() })
 // ---------------------------------------------------------------------------
 
 describe('the outcome vocabulary', () => {
-  it('matches the CHECK constraint in migration 044 exactly', () => {
-    const sql = readFileSync(new URL('../migrations/044_cold-calls.sql', import.meta.url), 'utf8')
+  it('matches the CHECK constraint in migration 045 exactly', () => {
+    const sql = readFileSync(new URL('../migrations/045_cold-calls.sql', import.meta.url), 'utf8')
     const check = sql.match(/call_outcome IN \(([\s\S]*?)\)\);/)
-    expect(check, 'the call_outcome CHECK constraint should still be in 044').toBeTruthy()
+    expect(check, 'the call_outcome CHECK constraint should still be in 045').toBeTruthy()
     const inSql = [...check[1].matchAll(/'([a-z_]+)'/g)].map(m => m[1])
     // Set comparison: order in the SQL is cosmetic, membership is not. A value
     // in JS but not in SQL fails every insert of it, in prod only.

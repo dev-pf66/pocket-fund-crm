@@ -3,7 +3,7 @@
  *
  * The Cold Calls page, the funnel math, the caller scorecard and the API
  * layer all read this file. If the list changes, change it here and in the
- * CHECK constraint in migrations/044_cold-calls.sql, and nowhere else.
+ * CHECK constraint in migrations/045_cold-calls.sql, and nowhere else.
  *
  * THE DISTINCTION THAT MATTERS
  * ----------------------------

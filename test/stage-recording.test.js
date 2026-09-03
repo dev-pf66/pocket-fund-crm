@@ -6,12 +6,14 @@
 // writing an event doesn't error, doesn't warn, and doesn't look wrong: the
 // number is simply low. That's the failure mode these pin.
 //
-// Both of these were shipped broken and found in review:
-//  - markLeadReachedOut is the highest-volume transition in the product
-//    (working the Outreach Queue turns new_lead into cold_outreach) and wrote
-//    crm_leads directly, so an analyst could work all morning and show zero.
-//  - the three paths in leads.js must not write an event when the stage
-//    didn't actually change, or the number inflates instead.
+// One of these was shipped broken and found in review: the three paths in
+// leads.js must not write an event when the stage didn't actually change, or
+// the number inflates instead.
+//
+// markLeadReachedOut no longer moves the stage at all — new_lead and
+// cold_outreach merged into one 'outreach' stage (Sept 2026), so working the
+// Outreach Queue is tracked by the crm_outreach_log row itself, not a stage
+// transition. It must NOT write a stage event.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fakeSupabase } from './helpers/fake-supabase.js'
@@ -43,37 +45,22 @@ function responder(lead) {
 
 beforeEach(() => { vi.restoreAllMocks() })
 
-describe('markLeadReachedOut — the Outreach Queue transition', () => {
-  it('records the new_lead -> cold_outreach move', async () => {
-    const lead = { id: 'lead-1', name: 'Probe', stage: 'new_lead', firm_name: 'Co' }
+describe('markLeadReachedOut — no longer a stage transition', () => {
+  it('logs outreach but writes no stage event — outreach queue tracks this via crm_outreach_log now', async () => {
+    const lead = { id: 'lead-1', name: 'Probe', stage: 'outreach', firm_name: 'Co' }
     h.db = fakeSupabase(responder(lead))
 
     await markLeadReachedOut(lead, 'p1', 'Pushkar')
 
-    const events = stageEvents()
-    expect(events).toHaveLength(1)
-    expect(events[0]).toMatchObject({
-      lead_id: 'lead-1',
-      from_stage: 'new_lead',
-      to_stage: 'cold_outreach',
-      changed_by: 'p1'
-    })
-  })
-
-  it('still records when the lead had no stage set', async () => {
-    const lead = { id: 'lead-2', name: 'Probe', stage: null }
-    h.db = fakeSupabase(responder(lead))
-
-    await markLeadReachedOut(lead, 'p1', 'Pushkar')
-
-    expect(stageEvents()[0]).toMatchObject({ from_stage: null, to_stage: 'cold_outreach' })
+    expect(stageEvents()).toHaveLength(0)
+    expect(h.db.opsFor('crm_outreach_log', 'insert')).toHaveLength(1)
   })
 })
 
 describe('recording does not fire on a non-move', () => {
   it('advanceLeadStage writes no event when the lead is already past the target', async () => {
     // Forward-only: it returns the lead untouched, so there is nothing to record.
-    h.db = fakeSupabase(responder({ id: 'lead-3', stage: 'warm_lead' }))
+    h.db = fakeSupabase(responder({ id: 'lead-3', stage: 'warm_active' }))
     await advanceLeadStage('lead-3', 'responded', 'p1')
     expect(stageEvents()).toHaveLength(0)
   })

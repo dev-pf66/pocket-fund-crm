@@ -19,20 +19,18 @@ import { getCRMSettings } from './misc'
 // user); admins pass null where noted to see everything. Staleness
 // thresholds come from crm_settings with 3/7/14 fallbacks.
 
-// Ranking weights: warm/responded leads outrank active conversations going
-// quiet, then cold-outreach continuations, then new leads. Stages absent
-// here (client, passed, reach_out_later) never enter the queue.
+// Ranking weights: warm/responded leads outrank a booked meeting waiting on
+// its date, then outreach in progress. Stages absent here (client, passed,
+// reach_out_later) never enter the queue.
 export const TODAY_STAGE_WEIGHTS = {
-  warm_lead: 5,
   responded: 5,
-  active_conversation: 4,
+  warm_active: 5,
   meeting_booked: 3,
-  cold_outreach: 2,
-  new_lead: 1
+  outreach: 2
 }
 
 const TODAY_QUEUE_STAGES = Object.keys(TODAY_STAGE_WEIGHTS)
-const TODAY_ENGAGED_STAGES = ['responded', 'warm_lead', 'active_conversation', 'meeting_booked']
+const TODAY_ENGAGED_STAGES = ['responded', 'meeting_booked', 'warm_active']
 
 // Today only surfaces what's live: activity in the last 2 weeks, or
 // follow-ups due in the next 2 weeks. Older neglected leads stop flooding
@@ -219,7 +217,7 @@ export async function getEscalations(personId = null, { limit = 10 } = {}) {
 
   const escalations = data.filter(lead => {
     const days = daysStaleFor(lead)
-    if (lead.stage === 'active_conversation' && days > t.active) return true
+    if (lead.stage === 'warm_active' && days > t.active) return true
     const dealSignals = lead.budget_discussed || lead.expected_close_date
     if (dealSignals && days > t.warm && TODAY_ENGAGED_STAGES.includes(lead.stage)) return true
     return false
@@ -331,11 +329,6 @@ export async function getTodayCounters(personId) {
 
   let overdueSLA = 0
   for (const lead of leadsRes.data || []) {
-    if (lead.stage === 'new_lead') {
-      // First-touch SLA runs from creation, not last activity.
-      if (getDaysBetween(new Date(lead.created_at), new Date()) > t.cold) overdueSLA += 1
-      continue
-    }
     if (calculateStaleness(lead, t.raw).status === 'stale') overdueSLA += 1
   }
 

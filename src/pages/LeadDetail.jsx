@@ -122,12 +122,10 @@ function InlineField({ value, onSave, type = 'text', options = null, placeholder
 }
 
 const STAGE_OPTIONS = [
-  { value: 'new_lead', label: 'New Lead' },
-  { value: 'cold_outreach', label: 'Cold Outreach' },
+  { value: 'outreach', label: 'New Lead / Outreach' },
   { value: 'responded', label: 'Responded' },
-  { value: 'warm_lead', label: 'Warm Lead' },
-  { value: 'active_conversation', label: 'Active Conversation' },
-  { value: 'meeting_booked', label: 'Meeting' },
+  { value: 'meeting_booked', label: 'Meeting Booked' },
+  { value: 'warm_active', label: 'Warm / Active' },
   { value: 'client', label: 'Client' },
   { value: 'passed', label: 'Passed' }
 ]
@@ -558,11 +556,10 @@ function LeadDetail() {
                   value={editedLead.stage}
                   onChange={(e) => setEditedLead({ ...editedLead, stage: e.target.value })}
                 >
-                  <option value="cold_outreach">Cold Outreach</option>
+                  <option value="outreach">New Lead / Outreach</option>
                   <option value="responded">Responded</option>
-                  <option value="warm_lead">Warm Lead</option>
-                  <option value="active_conversation">Active Conversation</option>
-                  <option value="meeting_booked">Meeting</option>
+                  <option value="meeting_booked">Meeting Booked</option>
+                  <option value="warm_active">Warm / Active</option>
                   <option value="client">Client</option>
                   <option value="passed">Passed</option>
                 </select>

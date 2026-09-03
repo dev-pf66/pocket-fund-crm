@@ -72,13 +72,11 @@ export const weeklyTargetOf = (person) => person?.weekly_outreach_target ?? DEFA
 export const hasTarget = (t) => Number(t) > 0
 
 const PIPELINE_SEGMENTS = [
-  { key: 'new_lead',             label: 'New',       color: '#a78bfa' },
-  { key: 'cold_outreach',        label: 'Cold',      color: '#60a5fa' },
-  { key: 'responded',            label: 'Responded', color: '#06b6d4' },
-  { key: 'warm_lead',            label: 'Warm',      color: '#fbbf24' },
-  { key: 'active_conversation',  label: 'Active',    color: '#f97316' },
-  { key: 'meeting_booked',       label: 'Meeting',   color: '#ec4899' },
-  { key: 'client',               label: 'Clients',   color: '#22c55e' },
+  { key: 'outreach',       label: 'Outreach', color: '#60a5fa' },
+  { key: 'responded',      label: 'Responded', color: '#06b6d4' },
+  { key: 'meeting_booked', label: 'Meeting',   color: '#ec4899' },
+  { key: 'warm_active',    label: 'Warm',      color: '#fbbf24' },
+  { key: 'client',         label: 'Clients',   color: '#22c55e' },
 ]
 
 function daysSince(dateStr) {
