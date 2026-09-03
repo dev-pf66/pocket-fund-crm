@@ -6,6 +6,7 @@ import { useApp } from '../App'
 import { Upload, X, Check, AlertCircle } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { parseCSVText } from '../lib/csv'
+import { normalizePhone, DIAL_CODES } from '../lib/phone'
 
 // Mirrors VARCHAR limits in supabase-crm-schema.sql so we fail soft on long
 // inputs instead of letting Postgres reject the row with a cryptic error.
@@ -26,6 +27,11 @@ function ImportLeads() {
   const [mapping, setMapping] = useState({})
   const [step, setStep] = useState(1) // 1=upload, 2=map, 3=preview, 4=importing, 5=complete
   const [results, setResults] = useState({ success: 0, duplicates: 0, failed: 0, errors: [] })
+  // Dial code applied to a number that arrives without one. Never guessed —
+  // a 10-digit number is a valid local number in a dozen countries, and
+  // silently picking the wrong one produces a number that looks fine and
+  // fails at dial time. '' = leave every number exactly as typed.
+  const [phoneCountry, setPhoneCountry] = useState('1')
 
   const fieldOptions = [
     { value: '', label: '-- Skip --' },
@@ -119,6 +125,15 @@ function ImportLeads() {
         lead[fieldName] = limit ? String(raw).slice(0, limit) : raw
       })
 
+      // Store phones as E.164 so the Cold Calls dial button can hand them
+      // straight to the dialer. `_phone` carries the before/after for the
+      // preview and is stripped before insert.
+      if (lead.phone) {
+        const norm = normalizePhone(lead.phone, phoneCountry || null)
+        lead._phone = { original: lead.phone, ...norm }
+        lead.phone = norm.value  // E.164 when resolved, untouched original when not
+      }
+
       return lead
     }).filter(lead => lead.name) // Only include rows with a name
   }
@@ -176,7 +191,10 @@ function ImportLeads() {
       }
 
       try {
-        await createLead(lead, currentPerson?.id)
+        // _phone is preview metadata, not a column — it would break the insert.
+        const { _phone, ...leadRow } = lead
+        void _phone
+        await createLead(leadRow, currentPerson?.id)
         results.success++
         // Register keys so duplicates within the same CSV are caught too.
         if (emailKey) existingEmails.add(emailKey)
@@ -193,6 +211,14 @@ function ImportLeads() {
   }
 
   const mappedLeads = step >= 3 ? getMappedLeads() : []
+  const phoneSummary = mappedLeads.reduce((acc, l) => {
+    if (!l._phone) return acc
+    acc.withPhone += 1
+    if (!l._phone.ok) acc.unresolved += 1
+    else if (l._phone.changed) acc.reformatted += 1
+    else acc.alreadyValid += 1
+    return acc
+  }, { withPhone: 0, reformatted: 0, alreadyValid: 0, unresolved: 0 })
 
   return (
     <div>
@@ -261,6 +287,30 @@ function ImportLeads() {
             ))}
           </div>
 
+          {Object.values(mapping).includes('phone') && (
+            <div style={{ marginTop: '20px', padding: '14px', background: 'var(--gray-50, #f9fafb)', borderRadius: '8px' }}>
+              <label className="form-label" style={{ display: 'block', marginBottom: '6px' }}>
+                Country for numbers with no country code
+              </label>
+              <select
+                className="form-select"
+                style={{ maxWidth: '280px' }}
+                value={phoneCountry}
+                onChange={(e) => setPhoneCountry(e.target.value)}
+              >
+                {DIAL_CODES.map(c => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+                <option value="">Don&apos;t guess — leave as typed</option>
+              </select>
+              <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--gray-600, #6b7280)' }}>
+                Phones are stored as +1XXXXXXXXXX so the Cold Calls dial button works.
+                A number that already starts with + or 00 is kept as-is; anything that
+                can&apos;t be resolved is imported unchanged and flagged in the preview.
+              </p>
+            </div>
+          )}
+
           <div style={{ marginTop: '24px', display: 'flex', gap: '8px' }}>
             <button className="btn btn-primary" onClick={() => setStep(3)}>
               Preview ({csvData.length} rows)
@@ -280,6 +330,26 @@ function ImportLeads() {
             {mappedLeads.length} leads will be imported
           </p>
 
+          {phoneSummary.withPhone > 0 && (
+            <div
+              className="card"
+              style={{
+                marginBottom: '16px', padding: '12px 14px',
+                borderLeft: `4px solid ${phoneSummary.unresolved > 0 ? '#f59e0b' : '#16a34a'}`
+              }}
+            >
+              <strong>Phone numbers:</strong>{' '}
+              {phoneSummary.reformatted} reformatted to E.164,{' '}
+              {phoneSummary.alreadyValid} already valid
+              {phoneSummary.unresolved > 0 && (
+                <span style={{ color: '#b45309' }}>
+                  , <strong>{phoneSummary.unresolved} couldn&apos;t be resolved</strong> — imported
+                  as typed and marked below. Those won&apos;t dial reliably.
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="preview-table-container">
             <table className="preview-table">
               <thead>
@@ -297,7 +367,19 @@ function ImportLeads() {
                     <td>{lead.name}</td>
                     <td>{lead.firm_name || '-'}</td>
                     <td>{lead.email || '-'}</td>
-                    <td>{lead.phone || '-'}</td>
+                    <td>
+                      {lead.phone || '-'}
+                      {lead._phone?.changed && (
+                        <div style={{ fontSize: '11px', color: 'var(--gray-500, #9ca3af)' }}>
+                          was {lead._phone.original}
+                        </div>
+                      )}
+                      {lead._phone && !lead._phone.ok && (
+                        <div style={{ fontSize: '11px', color: '#b45309' }}>
+                          ⚠ {lead._phone.reason}
+                        </div>
+                      )}
+                    </td>
                     <td>{lead.lead_type || '-'}</td>
                   </tr>
                 ))}
