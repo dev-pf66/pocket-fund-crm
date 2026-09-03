@@ -39,12 +39,12 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 ## Pipeline machinery (known traps)
 
-- Stage order lives in `STAGE_ORDER` in `src/lib/api/leads.js`: new_lead → cold_outreach → responded → warm_lead → active_conversation → meeting_booked → client; `passed` is terminal/outside.
+- Stage order lives in `STAGE_ORDER` in `src/lib/api/leads.js`: outreach (merged new_lead+cold_outreach) → responded → meeting_booked (agreed to meet, not yet happened) → warm_active (merged warm_lead+active_conversation, entered once the meeting happens) → client; `passed` is terminal/outside. Sept 2026 restructure (Dev's call) — see `git log` on `src/lib/api/leads.js` for the migration.
 - `src/lib/crm-api.js` is a **pure re-export barrel** over `src/lib/api/*` modules — edit the modules, not the barrel.
 - **Pagination:** `fetchAllRows()` (`src/lib/api/core.js`, mirrored for serverless in `api/_db.js`) is the ONLY sanctioned way to read a list that gets counted/aggregated. PostgREST truncates a plain select at 1000 rows with NO error, and this repo has shipped that bug three separate times. `.limit(n)` is NOT an escape hatch — PostgREST clamps it to max-rows, so `.limit(5000)` quietly returns 1000; use `fetchAllRows(f, { maxRows })`. Pass a FACTORY (a query builder is single-use), and give any ordered query a total sort (add `.order('id')`) or paging can skip/duplicate rows at a page boundary.
 - All stage automation is **forward-only** (`advanceLeadStage`) — never regresses a lead, never touches client/passed. It deliberately skips `runStageSideEffects` to avoid double-counting.
 - Reply↔pipeline sync is bidirectional: outreach marked 'replied' advances the lead to `responded`; lead dragged to responded+ flips its latest un-replied outreach entry to 'replied'.
-- Entering `meeting_booked` auto-logs a 'meeting' activity — that's what the Dashboard Funnel counts as meetings.
+- Leaving `meeting_booked` forward (into `warm_active` or beyond) auto-logs a 'meeting' activity — that's what the Dashboard Funnel counts as meetings. It fires on the way OUT because `meeting_booked` now means "agreed to meet," not "met."
 - Per-user outreach targets: `people.daily_outreach_target` / `weekly_outreach_target` (migration 032), set in Admin → All Users → Targets; NULL falls back to 10/50. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
 - Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view. Shipped July 2026 (`feature/today-tab` PR merged).
 - Dev's standing product decisions (July 2026): Tracker/Queue/Log stay three separate pages; all five contact tables stay (leads, sellers, investors, partners, demos).

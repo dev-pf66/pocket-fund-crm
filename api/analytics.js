@@ -39,20 +39,20 @@ export default async function handler(req, res) {
 
     // Calculate analytics
     const stages = {
-      cold_outreach: leads.filter(l => l.stage === 'cold_outreach').length,
+      outreach: leads.filter(l => l.stage === 'outreach').length,
       responded: leads.filter(l => l.stage === 'responded').length,
-      warm_lead: leads.filter(l => l.stage === 'warm_lead').length,
-      active_conversation: leads.filter(l => l.stage === 'active_conversation').length,
+      meeting_booked: leads.filter(l => l.stage === 'meeting_booked').length,
+      warm_active: leads.filter(l => l.stage === 'warm_active').length,
       client: leads.filter(l => l.stage === 'client').length
     }
 
     const conversion = {
       ...stages,
-      cold_to_responded_rate: stages.cold_outreach > 0 ? Math.round((stages.responded / stages.cold_outreach) * 100) : 0,
-      responded_to_warm_rate: stages.responded > 0 ? Math.round((stages.warm_lead / stages.responded) * 100) : 0,
-      warm_to_active_rate: stages.warm_lead > 0 ? Math.round((stages.active_conversation / stages.warm_lead) * 100) : 0,
-      active_to_client_rate: stages.active_conversation > 0 ? Math.round((stages.client / stages.active_conversation) * 100) : 0,
-      overall_rate: stages.cold_outreach > 0 ? Math.round((stages.client / stages.cold_outreach) * 100) : 0
+      outreach_to_responded_rate: stages.outreach > 0 ? Math.round((stages.responded / stages.outreach) * 100) : 0,
+      responded_to_meeting_rate: stages.responded > 0 ? Math.round((stages.meeting_booked / stages.responded) * 100) : 0,
+      meeting_to_warm_rate: stages.meeting_booked > 0 ? Math.round((stages.warm_active / stages.meeting_booked) * 100) : 0,
+      warm_to_client_rate: stages.warm_active > 0 ? Math.round((stages.client / stages.warm_active) * 100) : 0,
+      overall_rate: stages.outreach > 0 ? Math.round((stages.client / stages.outreach) * 100) : 0
     }
 
     // Lead sources

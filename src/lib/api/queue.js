@@ -6,7 +6,6 @@
 import { supabase } from '../supabase'
 import { normalizeLinkedInUrl, nameFromLinkedInUrl } from '../linkedin'
 import { cacheClear, fetchAllRows } from './core'
-import { recordStageChange } from './leads'
 import { logOutreach } from './outreach'
 
 // ============================================================================
@@ -63,7 +62,7 @@ export async function bulkCreateLeads(urls, batchLabel, currentPersonId, assigne
   const rows = toInsert.map((url, i) => ({
     name: nameFromLinkedInUrl(url) || 'Unknown',
     linkedin_url: url,
-    stage: 'new_lead',
+    stage: 'outreach',
     lead_source: 'Bulk Import',
     created_by: currentPersonId,
     assigned_to: pool[i % pool.length],
@@ -85,38 +84,57 @@ export async function bulkCreateLeads(urls, batchLabel, currentPersonId, assigne
   return { added: data.length, skipped, batchId, batchLabel: label, leads: data }
 }
 
+// new_lead and cold_outreach merged into a single 'outreach' stage, so stage
+// alone can no longer tell "never contacted" from "contacted, no reply yet" —
+// that's now whether the lead has any crm_outreach_log row at all.
+async function getTouchedLeadIds(leadIds) {
+  if (!leadIds.length) return new Set()
+  const rows = await fetchAllRows(() => supabase
+    .from('crm_outreach_log')
+    .select('lead_id')
+    .in('lead_id', leadIds))
+  return new Set(rows.map(r => r.lead_id))
+}
+
 export async function getOutreachQueue(currentPersonId) {
   if (!currentPersonId) return { leads: [], batchStats: {} }
   const { data: queue, error } = await supabase
     .from('crm_leads')
     .select('*')
     .eq('assigned_to', currentPersonId)
-    .eq('stage', 'new_lead')
+    .eq('stage', 'outreach')
     .order('created_at', { ascending: false })
   if (error) throw error
 
-  const batchIds = [...new Set((queue || []).map(l => l.import_batch_id).filter(Boolean))]
+  const candidates = queue || []
+  const touchedIds = await getTouchedLeadIds(candidates.map(l => l.id))
+  const untouched = candidates.filter(l => !touchedIds.has(l.id))
+
+  const batchIds = [...new Set(untouched.map(l => l.import_batch_id).filter(Boolean))]
   const batchStats = {}
   if (batchIds.length > 0) {
     // Paged: import batches are bulk by definition, so a >1000-lead import
     // would report wrong "x of y contacted" progress.
     const batchLeads = await fetchAllRows(() => supabase
       .from('crm_leads')
-      .select('import_batch_id, stage')
+      .select('id, import_batch_id')
       .eq('assigned_to', currentPersonId)
       .in('import_batch_id', batchIds))
+    const batchTouched = await getTouchedLeadIds(batchLeads.map(l => l.id))
     for (const row of batchLeads) {
       const id = row.import_batch_id
       if (!batchStats[id]) batchStats[id] = { total: 0, contacted: 0 }
       batchStats[id].total += 1
-      if (row.stage !== 'new_lead') batchStats[id].contacted += 1
+      if (batchTouched.has(row.id)) batchStats[id].contacted += 1
     }
   }
-  return { leads: queue || [], batchStats }
+  return { leads: untouched, batchStats }
 }
 
-// Mark a queued lead as reached out: logs a LinkedIn outreach entry and
-// transitions the lead to 'cold_outreach' so it drops out of the queue.
+// Mark a queued lead as reached out: logs a LinkedIn outreach entry. Stage
+// stays 'outreach' — new_lead and cold_outreach are one stage now, so the
+// outreach log entry itself (not a stage move) is what drops this lead out
+// of the queue.
 export async function markLeadReachedOut(lead, currentPersonId, currentPersonName) {
   await logOutreach({
     lead_id: lead.id,
@@ -127,12 +145,9 @@ export async function markLeadReachedOut(lead, currentPersonId, currentPersonNam
     platform_details: lead.linkedin_url || ''
   }, currentPersonId, currentPersonName)
 
-  const priorStage = lead.stage ?? null
-
   const { data, error } = await supabase
     .from('crm_leads')
     .update({
-      stage: 'cold_outreach',
       last_activity_date: new Date().toISOString(),
       last_activity_type: 'outreach'
     })
@@ -140,12 +155,6 @@ export async function markLeadReachedOut(lead, currentPersonId, currentPersonNam
     .select()
     .single()
   if (error) throw error
-
-  // This is the highest-volume stage transition in the product — working the
-  // queue is how new_lead becomes cold_outreach. It writes crm_leads directly
-  // rather than going through updateLead/moveLead, so without this the
-  // "leads moved forward" metric misses an analyst's entire morning.
-  await recordStageChange(lead.id, priorStage, 'cold_outreach', currentPersonId)
 
   cacheClear('leads')
   cacheClear('dashboard')

@@ -32,3 +32,4 @@ dist-ssr
 .claude/
 .context/
 .mcp.json
+.env*

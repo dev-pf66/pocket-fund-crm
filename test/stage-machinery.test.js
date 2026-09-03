@@ -33,7 +33,7 @@ function withLead(lead) {
   }
 }
 
-const LEAD = { id: 'lead-1', stage: 'cold_outreach', assigned_to: 'p1' }
+const LEAD = { id: 'lead-1', stage: 'outreach', assigned_to: 'p1' }
 
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -72,7 +72,7 @@ describe('advanceLeadStage — forward-only', () => {
 
   it('never touches a passed lead — passed is terminal and outside STAGE_ORDER', async () => {
     h.db = fakeSupabase(withLead({ ...LEAD, stage: 'passed' }))
-    const result = await advanceLeadStage('lead-1', 'warm_lead', 'p1')
+    const result = await advanceLeadStage('lead-1', 'warm_active', 'p1')
     expect(h.db.opsFor('crm_leads', 'update')).toHaveLength(0)
     expect(result.stage).toBe('passed')
   })

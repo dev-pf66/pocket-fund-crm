@@ -33,7 +33,7 @@ function ChatTerminal() {
       lead_type: '',
       deal_criteria: '',
       notes: '',
-      stage: 'new_lead'
+      stage: 'outreach'
     }
 
     // Extract name (first thing after "add")
@@ -82,10 +82,10 @@ function ChatTerminal() {
     }
 
     // Extract stage
-    if (/warm/i.test(text)) {
-      lead.stage = 'warm_lead'
-    } else if (/active|conversation/i.test(text)) {
-      lead.stage = 'active_conversation'
+    if (/meeting/i.test(text)) {
+      lead.stage = 'meeting_booked'
+    } else if (/warm|active|conversation/i.test(text)) {
+      lead.stage = 'warm_active'
     } else if (/client/i.test(text)) {
       lead.stage = 'client'
     }
