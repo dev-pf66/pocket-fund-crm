@@ -13,12 +13,10 @@ import { isAdminUser } from '../lib/admin'
 import { runBulk } from '../lib/bulkActions'
 
 const STAGES = [
-  { key: 'new_lead', label: 'New Leads', color: '#a78bfa' },
-  { key: 'cold_outreach', label: 'Cold Outreach', color: '#60a5fa' },
+  { key: 'outreach', label: 'New Leads (Outreach)', color: '#60a5fa' },
   { key: 'responded', label: 'Responded', color: '#06b6d4' },
-  { key: 'warm_lead', label: 'Warm Leads', color: '#fbbf24' },
-  { key: 'active_conversation', label: 'Active', color: '#f97316' },
-  { key: 'meeting_booked', label: 'Meeting', color: '#ec4899' },
+  { key: 'meeting_booked', label: 'Meeting Booked', color: '#ec4899' },
+  { key: 'warm_active', label: 'Warm Leads (Active)', color: '#fbbf24' },
   { key: 'client', label: 'Clients', color: '#22c55e' }
 ]
 

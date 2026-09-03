@@ -982,7 +982,7 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
         lead = await createLead({
           name: guessedName,
           linkedin_url: url,
-          stage: 'cold_outreach',
+          stage: 'outreach',
           lead_source: 'LinkedIn'
         }, currentPersonId)
         toast.success(`Created lead "${lead.name}"`)

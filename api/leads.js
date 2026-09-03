@@ -6,7 +6,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Valid enum values
-const VALID_STAGES = ['new_lead', 'cold_outreach', 'responded', 'warm_lead', 'active_conversation', 'meeting_booked', 'client', 'reach_out_later', 'passed']
+const VALID_STAGES = ['outreach', 'responded', 'meeting_booked', 'warm_active', 'client', 'reach_out_later', 'passed']
 const VALID_LEAD_TYPES = ['Independent Sponsor', 'PE Firm', 'Family Office', 'Other']
 const VALID_LEAD_SOURCES = ['LinkedIn', 'Referral', 'Cold Email', 'Event', 'Website']
 

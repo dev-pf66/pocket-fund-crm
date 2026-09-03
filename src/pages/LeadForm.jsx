@@ -24,7 +24,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
     lead_type: lead?.lead_type || '',
     outreach_stage: lead?.outreach_stage || '',
     deal_criteria: lead?.deal_criteria || '',
-    stage: lead?.stage || 'new_lead',
+    stage: lead?.stage || 'outreach',
     lead_source: lead?.lead_source || '',
     notes: lead?.notes || ''
   }
@@ -237,12 +237,10 @@ function LeadForm({ onClose, onSave, lead = null }) {
             <div className="form-group">
               <label>Stage</label>
               <select name="stage" value={formData.stage} onChange={handleChange}>
-                <option value="new_lead">New Lead</option>
-                <option value="cold_outreach">Cold Outreach</option>
+                <option value="outreach">New Lead / Outreach</option>
                 <option value="responded">Responded</option>
-                <option value="warm_lead">Warm Lead</option>
-                <option value="active_conversation">Active Conversation</option>
-                <option value="meeting_booked">Meeting</option>
+                <option value="meeting_booked">Meeting Booked</option>
+                <option value="warm_active">Warm / Active</option>
                 <option value="client">Client</option>
               </select>
             </div>

@@ -23,7 +23,7 @@ import { istToday, istAddDays, istWeekStart, IST_OFFSET_MS } from '../dateUtils'
 import { fetchAllRows } from './core'
 import { isForwardMove } from './leads'
 
-const LIVE_STAGES = ['active_conversation', 'meeting_booked']
+const LIVE_STAGES = ['meeting_booked', 'warm_active']
 
 /** IST calendar day (YYYY-MM-DD) of a timestamptz string, or null. */
 function istDayOf(ts) {

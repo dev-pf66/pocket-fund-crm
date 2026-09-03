@@ -99,7 +99,7 @@ function OutreachTracker() {
     try {
       const [dashStats, leadsData, templateData] = await Promise.all([
         getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30, dailyGoal: dailyTargetOf(currentPerson) }),
-        getLeads({ stage: 'cold_outreach' }, currentPerson.id),
+        getLeads({ stage: 'outreach' }, currentPerson.id),
         getEmailTemplates().catch(() => [])
       ])
 
@@ -158,7 +158,7 @@ function OutreachTracker() {
         lead = await createLead({
           name: guessedName,
           linkedin_url: url,
-          stage: 'cold_outreach',
+          stage: 'outreach',
           lead_source: 'LinkedIn'
         }, currentPerson?.id)
         leadCreated = true

@@ -244,7 +244,7 @@ async function syncReplyToPipeline(outreachRow, currentPersonId = null) {
  * real CRM lead so it can be viewed and edited in LeadDetail. Backfills the
  * outreach row's lead_id so future renders link straight through.
  */
-export async function promoteOutreachToLead(outreach, currentPersonId, { stage = 'new_lead' } = {}) {
+export async function promoteOutreachToLead(outreach, currentPersonId, { stage = 'outreach' } = {}) {
   if (!outreach?.lead_name) throw new Error('Outreach entry has no lead_name to promote')
 
   const name = String(outreach.lead_name).trim()
@@ -283,7 +283,7 @@ export async function promoteOutreachToLead(outreach, currentPersonId, { stage =
   }
   if (!lead) {
     lead = await createLead(leadData, currentPersonId)
-  } else if (stage !== 'new_lead') {
+  } else if (stage !== 'outreach') {
     // Reply-driven promotion that matched an existing lead: pull that lead
     // forward to the requested stage (forward-only; never regresses).
     try {

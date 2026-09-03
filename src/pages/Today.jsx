@@ -855,7 +855,7 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
 
 function EscalationRow({ lead, settings, busy, pinged, ownerName, onPing }) {
   const days = daysStaleFor(lead)
-  const reason = lead.stage === 'active_conversation'
+  const reason = lead.stage === 'warm_active'
     ? `active conversation silent ${days}d`
     : `${lead.budget_discussed ? 'budget discussed' : 'close date set'}, stalling ${days}d`
 
