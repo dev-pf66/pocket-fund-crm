@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   getCallQueue, getCallFunnel, getCallerScorecard, getCallbacksDue,
   logCall, getTodayCallCount, setDoNotCall, getCallLog, MAX_CALL_ATTEMPTS,
-  logCallTranscript, getCallTranscriptIds
+  logCallTranscript, getCallTranscriptIds, bulkCreateCallLeads
 } from '../lib/crm-api'
 import {
   CALL_OUTCOMES, outcomeLabel, outcomeColor, fmtRate, fmtDuration, rate
@@ -10,12 +10,14 @@ import {
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { isAdminUser } from '../lib/admin'
+import { parseCallListText } from '../lib/callList'
 import { dailyTargetOf, hasTarget } from './Dashboard'
 import { fmtDate, istToday } from '../lib/dateUtils'
 import { useSessionState } from '../hooks/useSessionState'
 import {
   Phone, PhoneCall, PhoneOff, SkipForward, Clock, Copy, Mic,
-  TrendingUp, Users, Ban, ExternalLink, RefreshCw, FileText, Check
+  TrendingUp, Users, Ban, ExternalLink, RefreshCw, FileText, Check,
+  Inbox, Plus, ChevronDown, ChevronRight, X, Upload, AlertTriangle
 } from 'lucide-react'
 
 // Keyboard shortcuts for Call Mode. At 20 dials a day the difference between
@@ -51,7 +53,7 @@ function localToIso(value) {
 }
 
 function ColdCalls() {
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const { toast } = useToast()
   const isAdmin = isAdminUser(currentPerson)
 
@@ -72,7 +74,7 @@ function ColdCalls() {
             Dials count toward the daily goal. Pickups and conversations are what we manage on.
           </p>
         </div>
-        {tab !== 'call' && (
+        {tab !== 'call' && tab !== 'queue' && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <select className="form-select" style={{ width: 'auto' }} value={daysBack} onChange={e => setDaysBack(Number(e.target.value))}>
               {WINDOWS.map(w => <option key={w.value} value={w.value}>Last {w.label}</option>)}
@@ -94,6 +96,9 @@ function ColdCalls() {
         <button className={`tab ${tab === 'funnel' ? 'active' : ''}`} onClick={() => setTab('funnel')}>
           <TrendingUp size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />Funnel
         </button>
+        <button className={`tab ${tab === 'queue' ? 'active' : ''}`} onClick={() => setTab('queue')}>
+          <Inbox size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />Queue
+        </button>
         <button className={`tab ${tab === 'callers' ? 'active' : ''}`} onClick={() => setTab('callers')}>
           <Users size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />Callers
         </button>
@@ -101,6 +106,7 @@ function ColdCalls() {
 
       {tab === 'call' && <CallMode person={currentPerson} toast={toast} />}
       {tab === 'funnel' && <FunnelView daysBack={daysBack} personId={scopeId} teamScope={isAdmin && teamScope} />}
+      {tab === 'queue' && <CallQueueView person={currentPerson} isAdmin={isAdmin} people={people} toast={toast} />}
       {tab === 'callers' && <CallersView daysBack={daysBack} />}
     </div>
   )
@@ -874,6 +880,340 @@ function CallersView({ daysBack }) {
         cold call on a Sunday. &ldquo;Cost&rdquo; is dials per meeting booked: high dials with a high cost is a
         script problem, low dials with a low cost is a volume problem.
       </p>
+    </div>
+  )
+}
+
+// ============================================================================
+// QUEUE — who is left to call, and how they get here
+// ============================================================================
+
+/**
+ * The call-queue twin of the general Outreach Queue page. Same shape on
+ * purpose: grouped by the batch they were imported in, collapsible, with an
+ * "add a list" button that is the only way leads get into this queue at all.
+ *
+ * Until this existed there was no way to add someone to call from the Cold
+ * Calls page — a lead only appeared if it happened to already carry a phone
+ * number, which 5% of the table did.
+ */
+const UNBATCHED = '__unbatched__'
+
+function CallQueueView({ person, isAdmin, people, toast }) {
+  const [loading, setLoading] = useState(true)
+  const [queue, setQueue] = useState([])
+  const [exhausted, setExhausted] = useState([])
+  const [collapsed, setCollapsed] = useState({})
+  const [showAdd, setShowAdd] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!person?.id) return
+    setLoading(true)
+    try {
+      const q = await getCallQueue(person.id, { limit: 500 })
+      setQueue(q.queue)
+      setExhausted(q.exhausted)
+    } catch (e) {
+      console.error(e)
+      toast?.(`Could not load the queue: ${e.message}`, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [person?.id, toast])
+
+  useEffect(() => { load() }, [load])
+
+  // Grouped by import batch, newest batch first, so a list pasted this morning
+  // is at the top rather than buried under everything ever imported.
+  const groups = useMemo(() => {
+    const by = new Map()
+    for (const lead of queue) {
+      const key = lead.import_batch_id || UNBATCHED
+      if (!by.has(key)) {
+        by.set(key, { key, label: lead.import_batch_label, leads: [] })
+      }
+      by.get(key).leads.push(lead)
+    }
+    const out = [...by.values()]
+    out.sort((a, b) => {
+      if (a.key === UNBATCHED) return 1
+      if (b.key === UNBATCHED) return -1
+      return (b.leads[0]?.id || 0) - (a.leads[0]?.id || 0)
+    })
+    return out
+  }, [queue])
+
+  async function handleAdded(result) {
+    const { added, skipped } = result
+    if (added === 0) {
+      toast?.(skipped > 0 ? `All ${skipped} already in the CRM` : 'Nothing to add', 'info')
+    } else {
+      toast?.(
+        `Added ${added} to the call queue${skipped > 0 ? ` · ${skipped} already on file` : ''}`,
+        'success'
+      )
+    }
+    setShowAdd(false)
+    await load()
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ color: '#6b7280', fontSize: '14px' }}>
+          {loading ? 'Loading…' : `${queue.length} to call${exhausted.length ? ` · ${exhausted.length} maxed out on attempts` : ''}`}
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
+          <Plus size={16} /> Add call list
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+          Loading queue…
+        </div>
+      ) : groups.length === 0 ? (
+        <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <Inbox size={40} style={{ color: '#9ca3af', marginBottom: '12px' }} />
+          <h3 style={{ margin: '0 0 6px', color: '#111827' }}>Nobody to call</h3>
+          <p style={{ color: '#6b7280', margin: '0 0 16px' }}>
+            Paste a list of numbers to fill the queue. A lead needs a phone number
+            to be callable — that is what puts it here.
+          </p>
+          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
+            <Plus size={16} /> Add call list
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {groups.map(g => {
+            const isCollapsed = !!collapsed[g.key]
+            const title = g.key === UNBATCHED
+              ? 'Already in the CRM'
+              : (g.label || 'Imported list')
+            return (
+              <div key={g.key} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <button
+                  onClick={() => setCollapsed(c => ({ ...c, [g.key]: !c[g.key] }))}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '13px 16px', background: '#f9fafb', border: 'none',
+                    borderBottom: isCollapsed ? 'none' : '1px solid #e5e7eb',
+                    cursor: 'pointer', textAlign: 'left'
+                  }}
+                >
+                  {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                  <span style={{ fontWeight: 600, flex: 1 }}>{title}</span>
+                  <span style={{ fontSize: '12px', color: '#6b7280' }}>{g.leads.length} to call</span>
+                </button>
+                {!isCollapsed && (
+                  <div style={{ padding: '6px 10px' }}>
+                    {g.leads.map(l => (
+                      <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '9px 6px', borderBottom: '1px solid #f3f4f6', fontSize: '14px' }}>
+                        <span style={{ fontWeight: 500, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {l.name}
+                        </span>
+                        <span style={{ color: '#6b7280', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {l.firm_name || ''}
+                        </span>
+                        <span style={{ color: '#374151', fontVariantNumeric: 'tabular-nums' }}>{l.phone}</span>
+                        <span style={{ color: '#6b7280', fontSize: '12px', minWidth: '92px', textAlign: 'right' }}>
+                          {l.attempts > 0
+                            ? `${l.attempts} attempt${l.attempts === 1 ? '' : 's'}`
+                            : 'not called'}
+                        </span>
+                        <a className="btn btn-secondary btn-sm" href={`/leads/${l.id}`} target="_blank" rel="noreferrer">
+                          <ExternalLink size={13} />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {showAdd && (
+        <AddCallListModal
+          personId={person?.id}
+          isAdmin={isAdmin}
+          people={people}
+          onClose={() => setShowAdd(false)}
+          onDone={handleAdded}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Paste or upload a call list.
+ *
+ * Shows a parsed preview BEFORE anything is written, because a call list is
+ * ambiguous in a way a list of LinkedIn URLs is not — the number has to be
+ * picked out by shape, and a number that will not resolve is stored verbatim
+ * rather than guessed at. You should see which rows those are first.
+ */
+function AddCallListModal({ personId, isAdmin, people, onClose, onDone }) {
+  const [text, setText] = useState('')
+  const [label, setLabel] = useState('')
+  const [defaultCode, setDefaultCode] = useState('')
+  const [assignees, setAssignees] = useState([])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  const parsed = useMemo(
+    () => parseCallListText(text, defaultCode.trim() || null),
+    [text, defaultCode]
+  )
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setText(await file.text())
+    e.target.value = ''
+  }
+
+  async function handleSubmit() {
+    if (parsed.rows.length === 0 || submitting) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const result = await bulkCreateCallLeads(
+        parsed.rows, label, personId, assignees.length ? assignees : null
+      )
+      onDone(result)
+    } catch (e) {
+      console.error(e)
+      setError(e.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-large" onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ margin: 0 }}>Add call list</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="form-group" style={{ marginTop: '16px' }}>
+          <label className="form-label">Label for this batch</label>
+          <input
+            className="form-input"
+            value={label}
+            onChange={e => setLabel(e.target.value)}
+            placeholder="e.g. Sept 4 — HVAC owners, Texas"
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Numbers</label>
+          <textarea
+            className="form-input"
+            rows={8}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder={'One per line. The number is found wherever it sits:\n\n+1 415 555 0142\nJohn Smith, +1 415 555 0143\nJane Doe, Acme Capital, +1 415 555 0144'}
+            style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '13px', resize: 'vertical' }}
+          />
+          <label className="btn btn-secondary btn-sm" style={{ marginTop: '8px', display: 'inline-flex', cursor: 'pointer' }}>
+            <Upload size={14} /> Upload CSV or TXT
+            <input type="file" accept=".csv,.txt" onChange={handleFile} style={{ display: 'none' }} />
+          </label>
+        </div>
+
+        <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '12px' }}>
+          <div className="form-group">
+            <label className="form-label">Default dial code</label>
+            <input
+              className="form-input"
+              value={defaultCode}
+              onChange={e => setDefaultCode(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="e.g. 1"
+            />
+            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+              Applied only to local numbers. Leave blank to never guess a country.
+            </div>
+          </div>
+          {isAdmin && (
+            <div className="form-group">
+              <label className="form-label">Assign to (round-robin)</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {(people || []).map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`btn btn-sm ${assignees.includes(p.id) ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setAssignees(a => a.includes(p.id) ? a.filter(x => x !== p.id) : [...a, p.id])}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                None selected = all assigned to you.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {text.trim() && (
+          <div className="card" style={{ background: '#f9fafb', padding: '12px', marginTop: '4px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+              {parsed.rows.length} number{parsed.rows.length === 1 ? '' : 's'} ready
+            </div>
+            {parsed.unresolved > 0 && (
+              <div style={{ fontSize: '12px', color: '#b45309', display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                <AlertTriangle size={13} style={{ marginTop: '1px', flexShrink: 0 }} />
+                <span>
+                  {parsed.unresolved} could not be resolved to a full international number.
+                  They will be saved exactly as typed — set a default dial code above if they
+                  are all local.
+                </span>
+              </div>
+            )}
+            {parsed.invalid.length > 0 && (
+              <div style={{ fontSize: '12px', color: '#b91c1c', marginTop: '6px' }}>
+                {parsed.invalid.length} line{parsed.invalid.length === 1 ? '' : 's'} had no phone
+                number and will be skipped: {parsed.invalid.slice(0, 3).map(i => `"${i.line}"`).join(', ')}
+                {parsed.invalid.length > 3 ? '…' : ''}
+              </div>
+            )}
+            <div style={{ marginTop: '8px', maxHeight: '120px', overflowY: 'auto', fontSize: '12px', color: '#374151' }}>
+              {parsed.rows.slice(0, 8).map((r, i) => (
+                <div key={i} style={{ display: 'flex', gap: '10px', padding: '2px 0' }}>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                  <span style={{ color: '#6b7280', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.firm_name}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', color: r.resolved ? '#374151' : '#b45309' }}>{r.phone}</span>
+                </div>
+              ))}
+              {parsed.rows.length > 8 && <div style={{ color: '#6b7280' }}>…and {parsed.rows.length - 8} more</div>}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div style={{ color: '#b91c1c', fontSize: '13px', marginTop: '10px' }}>{error}</div>
+        )}
+
+        <div className="form-actions" style={{ marginTop: '16px' }}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button
+            className="btn btn-primary"
+            onClick={handleSubmit}
+            disabled={parsed.rows.length === 0 || submitting}
+          >
+            {submitting ? 'Adding…' : `Add ${parsed.rows.length || ''} to queue`.trim()}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
