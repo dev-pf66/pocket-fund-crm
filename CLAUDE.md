@@ -23,7 +23,20 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Project ref: `lzydgdzjrgvqglxmyfjk` (https://lzydgdzjrgvqglxmyfjk.supabase.co).
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 039). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 045). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- **Applying a migration (Sept 2026) — the Supabase CLI can do it, no dashboard paste needed.**
+  The CLI is linked to `lzydgdzjrgvqglxmyfjk` ("pf sales CRM") and the DB credential is
+  cached in the macOS keychain, so `supabase db push` connects on its own. There is no
+  `SUPABASE_ACCESS_TOKEN`, no `.supabase/access-token`, and no Postgres URL in any env
+  file — earlier sessions concluded from that that migrations were blocked. They are not.
+  - `supabase db push` reads `supabase/migrations/<timestamp>_name.sql`, NOT the repo's
+    `migrations/NNN_*.sql`. Copy the numbered file across, `--dry-run` first to confirm it
+    lists only your migration, then push. `supabase/` is gitignored — the numbered file in
+    `migrations/` stays the committed source of truth.
+  - `supabase db dump` / `db diff` need Docker Desktop and will fail without it. `db push`
+    does not — it connects directly.
+  - Verify with real queries afterwards (select the new column; prove a CHECK rejects what
+    it should). Never trust the CLI's success line alone.
 - **Auth email redirects (Sept 2026):** password reset, signup confirmation, and magic links all depend on Supabase Auth → URL Configuration, which is invisible from the code. If `redirectTo` is not in the **Redirect URLs** allowlist, Supabase *silently discards it* and falls back to the **Site URL** — the link still works, it just lands somewhere useless. This is what broke forgot-password for everyone: Site URL was `http://localhost:3000` and the prod domain was not allowlisted, so every reset email dropped the user on a dead localhost address. `Login.jsx` was correct the whole time. Correct values: Site URL `https://pocket-fund-crm.vercel.app`, Redirect URLs `https://pocket-fund-crm.vercel.app/**` + `http://localhost:5173/**`.
   - Probe it without sending mail (anon key only, no secrets):
     `curl -sD- -o/dev/null "https://lzydgdzjrgvqglxmyfjk.supabase.co/auth/v1/verify?token=probe&type=recovery&redirect_to=<urlencoded-url>" -H "apikey: $VITE_SUPABASE_ANON_KEY" | grep -i ^location:`
@@ -42,10 +55,33 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Stage order lives in `STAGE_ORDER` in `src/lib/api/leads.js`: outreach (merged new_lead+cold_outreach) → responded → meeting_booked (agreed to meet, not yet happened) → warm_active (merged warm_lead+active_conversation, entered once the meeting happens) → client; `passed` is terminal/outside. Sept 2026 restructure (Dev's call) — see `git log` on `src/lib/api/leads.js` for the migration.
 - `src/lib/crm-api.js` is a **pure re-export barrel** over `src/lib/api/*` modules — edit the modules, not the barrel.
 - **Pagination:** `fetchAllRows()` (`src/lib/api/core.js`, mirrored for serverless in `api/_db.js`) is the ONLY sanctioned way to read a list that gets counted/aggregated. PostgREST truncates a plain select at 1000 rows with NO error, and this repo has shipped that bug three separate times. `.limit(n)` is NOT an escape hatch — PostgREST clamps it to max-rows, so `.limit(5000)` quietly returns 1000; use `fetchAllRows(f, { maxRows })`. Pass a FACTORY (a query builder is single-use), and give any ordered query a total sort (add `.order('id')`) or paging can skip/duplicate rows at a page boundary.
+- **Volume forecast:** cold calling adds ~100 rows/day to `crm_outreach_log` team-wide. The
+  `MAX_LOG_ROWS = 5000` ceiling in `src/lib/api/outreach.js` bounds the Tracker/Log table reads;
+  at this rate the 30-day "All" view gets there in roughly two months, and past it the table
+  silently shows a slice. Filter by type, or raise the ceiling, before it bites.
 - All stage automation is **forward-only** (`advanceLeadStage`) — never regresses a lead, never touches client/passed. It deliberately skips `runStageSideEffects` to avoid double-counting.
 - Reply↔pipeline sync is bidirectional: outreach marked 'replied' advances the lead to `responded`; lead dragged to responded+ flips its latest un-replied outreach entry to 'replied'.
 - Leaving `meeting_booked` forward (into `warm_active` or beyond) auto-logs a 'meeting' activity — that's what the Dashboard Funnel counts as meetings. It fires on the way OUT because `meeting_booked` now means "agreed to meet," not "met."
 - Per-user outreach targets: `people.daily_outreach_target` / `weekly_outreach_target` (migration 032), set in Admin → All Users → Targets; NULL falls back to 10/50. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
+- **Cold calls (Sept 2026, `src/pages/ColdCalls.jsx`)** — they dial on CallHippo, ~20 dials
+  per person per day, at buyers (`crm_leads`). Calls live in `crm_outreach_log`, **one row per
+  DIAL**, `outreach_type='phone_call'` — so dials count toward the daily target, the streak and
+  the digest for free (Dev's call: dials count, but pickups/conversations are what we manage on).
+  - The outcome vocabulary and its predicates live in **`src/lib/callOutcomes.js`** and are
+    mirrored by a CHECK constraint in migration 044. A test fails if the two drift apart.
+  - **A gatekeeper is a pickup, NOT a conversation.** Same for a wrong number. Folding them
+    together flatters the funnel by exactly the amount that matters. `isPickup` vs
+    `isConversation` is the whole distinction the page exists to make.
+  - Every call row still carries the legacy `status`, derived from the outcome via
+    `statusForOutcome()`, so reply rate / the weekly digest / the pipeline response filter keep
+    reading one column and never learn what a gatekeeper is. Never write `status` on a call row
+    by hand — `logCall`/`updateCall` derive it.
+  - `not_interested` maps to `replied` on purpose: they responded. It advances the lead to
+    `responded`, and the caller moves it to `passed` from there.
+  - `do_not_call` is a real column on `crm_leads`, filtered in SQL — the call queue must never
+    load someone who asked not to be called.
+  - Recordings are a pasted CallHippo URL on the call row (`recording_url`). A CallHippo webhook
+    that auto-logs dials is the obvious next step and is why `provider_call_id` (unique) exists.
 - Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view. Shipped July 2026 (`feature/today-tab` PR merged).
 - Dev's standing product decisions (July 2026): Tracker/Queue/Log stay three separate pages; all five contact tables stay (leads, sellers, investors, partners, demos).
 

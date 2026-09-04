@@ -5,7 +5,7 @@ import { useApp } from '../App'
 import { isAdminUser } from '../lib/admin'
 import CommandPalette from './CommandPalette'
 import { useFollowUpCount } from '../hooks/useFollowUpCount'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun, Search, Bell } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun, Search, Bell, PhoneCall } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
@@ -27,6 +27,7 @@ function Layout() {
         { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
         { to: '/outreach', label: 'Tracker', icon: <Target size={18} /> },
         { to: '/outreach-queue', label: 'Queue', icon: <Inbox size={18} /> },
+        { to: '/cold-calls', label: 'Cold Calls', icon: <PhoneCall size={18} /> },
         { to: '/outreach-admin', label: 'Log', icon: <ClipboardList size={18} /> },
       ],
     },

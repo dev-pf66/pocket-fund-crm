@@ -49,6 +49,7 @@ const Analytics = lazyWithRetry(() => import('./pages/Analytics'))
 const OutreachTracker = lazyWithRetry(() => import('./pages/OutreachTracker'))
 const OutreachAdmin = lazyWithRetry(() => import('./pages/OutreachAdmin'))
 const OutreachQueue = lazyWithRetry(() => import('./pages/OutreachQueue'))
+const ColdCalls = lazyWithRetry(() => import('./pages/ColdCalls'))
 const Admin = lazyWithRetry(() => import('./pages/Admin'))
 const Help = lazyWithRetry(() => import('./pages/Help'))
 const HelpAdmin = lazyWithRetry(() => import('./pages/HelpAdmin'))
@@ -175,6 +176,7 @@ function AppContent() {
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="outreach" element={<OutreachTracker />} />
               <Route path="outreach-queue" element={<OutreachQueue />} />
+              <Route path="cold-calls" element={<ColdCalls />} />
               <Route path="outreach-admin" element={<OutreachAdmin />} />
               <Route path="pe-os" element={<PEOSBoard />} />
               <Route path="sellers" element={<SellersBoard />} />
