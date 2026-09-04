@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   getCallQueue, getCallFunnel, getCallerScorecard, getCallbacksDue,
-  logCall, getTodayCallCount, setDoNotCall, getCallLog, MAX_CALL_ATTEMPTS
+  logCall, getTodayCallCount, setDoNotCall, getCallLog, MAX_CALL_ATTEMPTS,
+  logCallTranscript, getCallTranscriptIds
 } from '../lib/crm-api'
 import {
   CALL_OUTCOMES, outcomeLabel, outcomeColor, fmtRate, fmtDuration, rate
@@ -14,7 +15,7 @@ import { fmtDate, istToday } from '../lib/dateUtils'
 import { useSessionState } from '../hooks/useSessionState'
 import {
   Phone, PhoneCall, PhoneOff, SkipForward, Clock, Copy, Mic,
-  TrendingUp, Users, Ban, ExternalLink, RefreshCw
+  TrendingUp, Users, Ban, ExternalLink, RefreshCw, FileText, Check
 } from 'lucide-react'
 
 // Keyboard shortcuts for Call Mode. At 20 dials a day the difference between
@@ -127,6 +128,15 @@ function CallMode({ person, toast }) {
   const [duration, setDuration] = useState('')
   const [recordingUrl, setRecordingUrl] = useState('')
   const [callbackAt, setCallbackAt] = useState('')
+  // Transcript for the dial in progress. Usually pasted after the fact, so
+  // the logged-today list carries its own entry point below.
+  const [transcript, setTranscript] = useState('')
+  const [showTranscript, setShowTranscript] = useState(false)
+  // outreach_log_id -> has a transcript. Drives the marker on logged rows.
+  const [transcriptIds, setTranscriptIds] = useState(() => new Set())
+  const [transcriptFor, setTranscriptFor] = useState(null)
+  const [rowTranscript, setRowTranscript] = useState('')
+  const [savingTranscript, setSavingTranscript] = useState(false)
 
   const target = dailyTargetOf(person)
 
@@ -144,8 +154,15 @@ function CallMode({ person, toast }) {
       setExhausted(q.exhausted)
       setCallbacks(cbs)
       setTodayCount(count)
-      setTodayRows(log.filter(r => r.outreach_date === istToday()))
+      const todays = log.filter(r => r.outreach_date === istToday())
+      setTodayRows(todays)
       setCursor(0)
+      // Non-fatal: the marker is a convenience, not the queue.
+      try {
+        setTranscriptIds(await getCallTranscriptIds(todays.map(r => r.id)))
+      } catch (e) {
+        console.error('Could not load transcript markers:', e)
+      }
     } catch (e) {
       console.error(e)
       toast?.(`Could not load the call queue: ${e.message}`, 'error')
@@ -182,12 +199,38 @@ function CallMode({ person, toast }) {
     setDuration('')
     setRecordingUrl('')
     setCallbackAt('')
+    setTranscript('')
+    setShowTranscript(false)
   }, [])
 
   const advance = useCallback(() => {
     resetPanel()
     setCursor(c => c + 1)
   }, [resetPanel])
+
+  const saveRowTranscript = useCallback(async (row) => {
+    if (!rowTranscript.trim() || savingTranscript) return
+    setSavingTranscript(true)
+    try {
+      await logCallTranscript({
+        leadId: row.lead_id,
+        outreachLogId: row.id,
+        transcript: rowTranscript,
+        title: `Cold call — ${row.lead_name || row.phone_number || 'unknown contact'}`,
+        calledAt: row.called_at,
+        currentPersonId: person?.id,
+      })
+      setTranscriptIds(prev => new Set(prev).add(row.id))
+      setTranscriptFor(null)
+      setRowTranscript('')
+      toast?.('Transcript saved', 'success')
+    } catch (e) {
+      console.error(e)
+      toast?.(`Could not save the transcript: ${e.message}`, 'error')
+    } finally {
+      setSavingTranscript(false)
+    }
+  }, [rowTranscript, savingTranscript, person?.id, toast])
 
   const submit = useCallback(async (outcome, extra = {}) => {
     if (!current || !person?.id || saving) return
@@ -208,6 +251,26 @@ function CallMode({ person, toast }) {
 
       setTodayCount(c => c + 1)
       setTodayRows(rows => [{ ...saved, lead_name: current.name, firm_name: current.firm_name }, ...rows])
+
+      // The dial is already counted. A transcript that fails to save must not
+      // take the dial down with it — say so and leave the call logged.
+      if (transcript.trim()) {
+        try {
+          await logCallTranscript({
+            leadId: current.id,
+            outreachLogId: saved?.id ?? null,
+            transcript,
+            title: `Cold call — ${current.name}`,
+            calledAt: saved?.called_at,
+            currentPersonId: person.id,
+          })
+          if (saved?.id) setTranscriptIds(prev => new Set(prev).add(saved.id))
+        } catch (e) {
+          console.error(e)
+          toast?.(`Call logged, but the transcript did not save: ${e.message}`, 'error')
+        }
+      }
+
       toast?.(`${current.name} — ${outcomeLabel(outcome)}`, outcome === 'meeting_booked' ? 'success' : 'info')
       advance()
     } catch (e) {
@@ -216,7 +279,7 @@ function CallMode({ person, toast }) {
     } finally {
       setSaving(false)
     }
-  }, [current, person, saving, duration, notes, recordingUrl, toast, advance])
+  }, [current, person, saving, duration, notes, recordingUrl, transcript, toast, advance])
 
   const pickOutcome = useCallback((outcome) => {
     // A callback without a time is just a note nobody will read. Everything
@@ -428,6 +491,37 @@ function CallMode({ person, toast }) {
             </div>
           </div>
 
+          {/* Transcript. Collapsed by default — Call Mode's whole point is one
+              tap per dial, and a textarea in the default path would slow every
+              call to capture something you only have for a few of them. */}
+          {!showTranscript ? (
+            <button
+              className="btn btn-secondary btn-sm"
+              style={{ marginTop: '10px' }}
+              onClick={() => setShowTranscript(true)}
+            >
+              <FileText size={14} /> Add transcript
+            </button>
+          ) : (
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label className="form-label" style={{ fontSize: '12px' }}>
+                <FileText size={11} style={{ verticalAlign: '-1px' }} /> Transcript
+              </label>
+              <textarea
+                className="form-input"
+                rows={6}
+                value={transcript}
+                onChange={e => setTranscript(e.target.value)}
+                placeholder="Paste the call transcript — it saves with the outcome you tap next"
+                style={{ fontFamily: 'inherit', resize: 'vertical' }}
+              />
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Saved against this specific dial, not just the lead. You can also add one
+                afterwards from the list below.
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
             <button className="btn btn-secondary" onClick={advance} disabled={saving}>
               <SkipForward size={14} /> Skip for now
@@ -442,15 +536,56 @@ function CallMode({ person, toast }) {
           <div className="card-header"><h3 style={{ margin: 0 }}>Logged today</h3></div>
           <div style={{ maxHeight: '260px', overflowY: 'auto' }}>
             {todayRows.map(r => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 0', borderBottom: '1px solid #f3f4f6', fontSize: '14px' }}>
-                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: outcomeColor(r.call_outcome), flexShrink: 0 }} />
-                <span style={{ fontWeight: 500 }}>{r.lead_name || r.phone_number || 'Unknown'}</span>
-                <span style={{ color: '#6b7280' }}>{r.firm_name}</span>
-                <span style={{ marginLeft: 'auto', color: outcomeColor(r.call_outcome), fontWeight: 500 }}>
-                  {outcomeLabel(r.call_outcome)}
-                </span>
-                {r.call_duration_seconds > 0 && (
-                  <span style={{ color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{fmtDuration(r.call_duration_seconds)}</span>
+              <div key={r.id} style={{ borderBottom: '1px solid #f3f4f6', padding: '7px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+                  <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: outcomeColor(r.call_outcome), flexShrink: 0 }} />
+                  <span style={{ fontWeight: 500 }}>{r.lead_name || r.phone_number || 'Unknown'}</span>
+                  <span style={{ color: '#6b7280' }}>{r.firm_name}</span>
+                  <span style={{ marginLeft: 'auto', color: outcomeColor(r.call_outcome), fontWeight: 500 }}>
+                    {outcomeLabel(r.call_outcome)}
+                  </span>
+                  {r.call_duration_seconds > 0 && (
+                    <span style={{ color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{fmtDuration(r.call_duration_seconds)}</span>
+                  )}
+                  {transcriptIds.has(r.id) ? (
+                    <span style={{ color: '#16a34a', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <Check size={13} /> transcript
+                    </span>
+                  ) : r.lead_id ? (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => { setTranscriptFor(r.id); setRowTranscript('') }}
+                      title="Paste the transcript for this call"
+                    >
+                      <FileText size={13} /> Transcript
+                    </button>
+                  ) : null}
+                </div>
+
+                {transcriptFor === r.id && (
+                  <div style={{ marginTop: '8px' }}>
+                    <textarea
+                      className="form-input"
+                      rows={6}
+                      value={rowTranscript}
+                      onChange={e => setRowTranscript(e.target.value)}
+                      placeholder={`Paste the transcript of the call with ${r.lead_name || 'this contact'}`}
+                      style={{ fontFamily: 'inherit', resize: 'vertical' }}
+                      autoFocus
+                    />
+                    <div className="form-actions" style={{ marginTop: '6px' }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => setTranscriptFor(null)}>
+                        Cancel
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={!rowTranscript.trim() || savingTranscript}
+                        onClick={() => saveRowTranscript(r)}
+                      >
+                        {savingTranscript ? 'Saving…' : 'Save transcript'}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             ))}

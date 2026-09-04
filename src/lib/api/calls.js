@@ -25,6 +25,57 @@ import { logActivityManual } from './misc'
 import { statusForOutcome, isPickup, isConversation, summarizeCalls, rate } from '../callOutcomes'
 
 /**
+ * Attach a transcript to a dial that has already been logged.
+ *
+ * Linked to BOTH the lead and the specific crm_outreach_log row (migration
+ * 047). A cold lead gets dialled up to MAX_CALL_ATTEMPTS times; a transcript
+ * that only knows the lead cannot say which of those calls it is a record of.
+ *
+ * Callers must treat a throw here as non-fatal — the dial is already in the
+ * log by the time this runs, and losing a counted dial to a failed paste
+ * would be worse than losing the paste.
+ */
+export async function logCallTranscript({
+  leadId, outreachLogId = null, transcript, title = null,
+  calledAt = null, currentPersonId = null
+}) {
+  const text = (transcript || '').trim()
+  if (!leadId || !text) return null
+
+  const { data, error } = await supabase
+    .from('crm_transcripts')
+    .insert([{
+      lead_id: leadId,
+      outreach_log_id: outreachLogId,
+      title: title || `Cold call — ${istDateStr()}`,
+      transcript: text,
+      call_date: calledAt || new Date().toISOString(),
+      created_by: currentPersonId
+    }])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Which of these dials already carry a transcript, as a Set of
+ * outreach_log_id. Drives the marker on the logged-today list so a caller
+ * can see at a glance what still needs pasting in.
+ */
+export async function getCallTranscriptIds(outreachLogIds = []) {
+  const ids = outreachLogIds.filter(Boolean)
+  if (ids.length === 0) return new Set()
+
+  const { data, error } = await supabase
+    .from('crm_transcripts')
+    .select('outreach_log_id')
+    .in('outreach_log_id', ids)
+  if (error) throw error
+  return new Set((data || []).map(r => r.outreach_log_id))
+}
+
+/**
  * How many dials at one contact before the queue stops offering them. Not a
  * hard block — exhausted leads are still reachable in their own section — but
  * past this the marginal dial is worth less than a fresh name.
