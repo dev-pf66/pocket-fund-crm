@@ -38,7 +38,7 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `POST` | [`/api/activities`](#post-apiactivities) | API key | Log an activity on a lead |
 | `GET` | [`/api/analytics`](#get-apianalytics) | API key | Pipeline analytics & conversion rates |
 | `POST` | [`/api/analyze-transcript`](#post-apianalyze-transcript) | API key | AI analysis of a sales call transcript |
-| `POST` | [`/api/enrich-linkedin`](#post-apienrich-linkedin) | API key | AI-powered LinkedIn profile enrichment |
+| `POST` | [`/api/enrich-linkedin`](#post-apienrich-linkedin) | API key | Summarise the CRM context on a lead (does not read LinkedIn) |
 | `GET` | [`/api/investors`](#get-apiinvestors) | API key | List investors (filterable + searchable) |
 | `GET` | [`/api/investors?id=`](#get-apiinvestorsid123) | API key | Get single investor by ID |
 | `POST` | [`/api/investors`](#post-apiinvestors) | API key | Create a new investor |
@@ -484,11 +484,13 @@ curl -X POST \
 
 ---
 
-## LinkedIn Enrichment
+## CRM Context Summary
 
 ### POST /api/enrich-linkedin
 
-Enrich a lead's profile using AI-powered LinkedIn analysis. Uses Claude Haiku to generate structured professional data (headline, position, experience, education) based on the lead's existing info and LinkedIn URL. Updates the lead record and logs an activity note.
+Summarises the CRM fields already on a lead. **It does not read LinkedIn** — the URL is an identifier, not a source, and nothing in this codebase fetches a profile.
+
+> Until September 2026 this endpoint asked Claude to "generate realistic and plausible professional enrichment data" from the profile URL slug and wrote the result to `linkedin_headline`, `current_position`, `past_experience` and `education` as though it were fact. All three leads it ever ran on had a blank firm name, so it invented an employer and a degree for each. Those four columns are no longer written by anything; migration `046` relabels the affected rows `unverified_ai` so the UI can mark them. Do not reintroduce them.
 
 **Headers:**
 ```
@@ -500,8 +502,9 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `leadId` | integer | **Yes** | ID of the lead to enrich |
-| `linkedinUrl` | string | **Yes** | Full LinkedIn profile URL (must be a valid `linkedin.com` domain) |
+| `leadId` | integer | No | ID of the lead to summarise. Omit for preview mode (nothing is saved). |
+| `linkedinUrl` | string | **Yes** | Full LinkedIn personal profile URL (`linkedin.com/in/...`) |
+| `context` | object | No | Preview mode only: `{ name, firm_name, lead_type }` to summarise before the lead exists |
 
 **Example:**
 ```bash
@@ -521,42 +524,44 @@ curl -X POST \
   "success": true,
   "enrichment": {
     "linkedin_url": "https://www.linkedin.com/in/janesmith",
-    "linkedin_headline": "Managing Partner at Acme Capital | Private Equity | B2B SaaS Acquisitions",
-    "current_position": "Managing Partner at Acme Capital",
-    "past_experience": "• VP of Strategy at Summit Partners (2018-2022)\n• Associate at Goldman Sachs (2015-2018)",
-    "education": "MBA, Wharton School of Business; BS Finance, NYU",
-    "enrichment_status": "enriched",
-    "enriched_at": "2026-03-16T14:30:00.000Z",
-    "enrichment_notes": "Experienced PE professional with B2B SaaS focus. Approach with relevant deal flow in the $2-10M range."
+    "suggested_name": "Jane Smith",
+    "suggested_lead_type": "PE Firm",
+    "enrichment_notes": "Fund on file with B2B SaaS deal criteria in the $2-10M range; approach with matching deal flow.",
+    "insufficient_context": false
   }
 }
 ```
 
-**Enrichment fields saved to the lead:**
+| Field | Description |
+|-------|-------------|
+| `suggested_name` | Derived from the URL slug **deterministically**, never inferred. `""` when the slug won't split (`/in/liroyhaddad`) — the caller must ask the user rather than file someone as "Liroyhaddad". |
+| `suggested_lead_type` | One of `PE Firm`, `Family Office`, `Independent Sponsor`, `Other`, or `""`. Anything else the model returns is discarded. |
+| `enrichment_notes` | Summary drawn strictly from the facts on file. `""` when there is nothing to say. |
+| `insufficient_context` | `true` when the lead had no firm, type, notes or deal criteria on file. No model call is made in that case. |
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `linkedin_url` | string | The LinkedIn URL provided |
-| `linkedin_headline` | string | Generated headline (max 300 chars) |
-| `current_position` | string | Current role and title (max 200 chars) |
-| `past_experience` | string | Bullet-pointed past roles |
-| `education` | string | Educational background |
-| `enrichment_status` | string | Set to `enriched` on success, `failed` on error |
-| `enriched_at` | timestamp | When enrichment completed |
+**Fields written to the lead** (`leadId` supplied):
+
+| Field | Description |
+|-------|-------------|
+| `linkedin_url` | The LinkedIn URL provided |
+| `enrichment_status` | `summarized` on success · `no_context` when nothing was on file · `failed` on error. `enriching` while in flight. |
+| `enriched_at` | When the summary completed |
+
+`enrichment_status` values `enriched` and `unverified_ai` are legacy: `enriched` is never written again, and `unverified_ai` marks the rows carrying fabricated biography data.
 
 **Side effects:**
 - Sets `enrichment_status` to `enriching` during processing
-- Logs a `note` activity on the lead with enrichment summary
+- Logs a `note` activity carrying the summary, prefixed to state no LinkedIn data was fetched
 - On failure, sets `enrichment_status` to `failed`
 
 **400 Response:**
 ```json
-{ "error": "leadId and linkedinUrl are required" }
+{ "error": "linkedinUrl is required" }
 ```
 
-**400 Response** (invalid URL):
+**400 Response** (invalid or non-profile URL):
 ```json
-{ "error": "Invalid LinkedIn URL" }
+{ "error": "Not a LinkedIn personal profile URL (expected /in/...)" }
 ```
 
 **404 Response:**

@@ -18,7 +18,7 @@
 // Every builder method the app chains, all of which return the builder.
 const CHAINABLE = [
   'select', 'insert', 'update', 'upsert', 'delete',
-  'eq', 'neq', 'in', 'is', 'not', 'gt', 'gte', 'lt', 'lte', 'or', 'contains',
+  'eq', 'neq', 'in', 'is', 'not', 'gt', 'gte', 'lt', 'lte', 'or', 'contains', 'ilike',
   'order', 'range', 'limit', 'single', 'maybeSingle'
 ]
 

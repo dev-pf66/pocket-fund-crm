@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead, getEmailTemplates } from '../lib/crm-api'
-import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
+import { isLinkedInUrl, nameFromLinkedInUrl, placeholderNameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
 import { useFieldOptions } from '../hooks/useFieldOptions'
@@ -154,7 +154,10 @@ function OutreachTracker() {
       let lead = await findLeadByLinkedInUrl(url)
       let leadCreated = false
       if (!lead) {
-        const guessedName = nameFromLinkedInUrl(url) || 'Unknown'
+        // nameFromLinkedInUrl returns '' for a run-together slug it can't
+        // split. Fall back to the handle rather than a fake-looking name:
+        // this path is the one that filed 126 leads as "Liroyhaddad".
+        const guessedName = nameFromLinkedInUrl(url) || placeholderNameFromLinkedInUrl(url) || 'Unknown'
         lead = await createLead({
           name: guessedName,
           linkedin_url: url,

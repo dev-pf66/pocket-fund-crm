@@ -260,9 +260,13 @@ export async function calculateLeadScore(leadId) {
 // ============================================================================
 
 /**
- * Enrich lead from LinkedIn URL using AI-powered enrichment.
- * Calls the /api/enrich-linkedin serverless function which uses Claude
- * to generate structured enrichment data based on the lead's info.
+ * Summarise the CRM context we hold for a lead, keyed by their LinkedIn URL.
+ *
+ * NOT a profile fetch — nothing reads LinkedIn. The endpoint summarises the
+ * lead's own CRM fields and returns an empty summary when there is nothing on
+ * file. It used to invent employers, titles and degrees and write them to
+ * linkedin_headline / current_position / past_experience / education; it no
+ * longer writes those columns at all.
  */
 export async function enrichLeadFromLinkedIn(leadId, linkedinUrl) {
   // Immediately mark as enriching in local state
@@ -306,9 +310,12 @@ export async function enrichLeadFromLinkedIn(leadId, linkedinUrl) {
 }
 
 /**
- * Preview-enrich from a LinkedIn URL WITHOUT saving a lead.
- * Used by the Add Lead form to pre-fill fields before the lead exists.
- * Returns { suggested_name, suggested_lead_type, linkedin_headline, current_position, past_experience, education, enrichment_notes }.
+ * Preview version of the above, for the Add Lead form — nothing is saved.
+ *
+ * Returns { linkedin_url, suggested_name, suggested_lead_type,
+ * enrichment_notes, insufficient_context }. suggested_name is derived from
+ * the URL slug deterministically and is '' when the slug won't split;
+ * insufficient_context is true when the CRM had nothing to summarise.
  */
 export async function previewLinkedInEnrichment(linkedinUrl, context = {}) {
   const { data: { session } } = await supabase.auth.getSession()

@@ -1,11 +1,18 @@
 import { useState } from 'react'
-import { createLead, updateLead, previewLinkedInEnrichment } from '../lib/crm-api'
+import { createLead, updateLead, previewLinkedInEnrichment, findDuplicateLead } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
+import { Link } from 'react-router-dom'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, AlertTriangle } from 'lucide-react'
+
+const DUPLICATE_MATCH_LABELS = {
+  linkedin_url: 'the same LinkedIn profile',
+  email: 'the same email address',
+  name_firm: 'the same name and firm'
+}
 
 function LeadForm({ onClose, onSave, lead = null }) {
   const { currentPerson } = useApp()
@@ -13,6 +20,9 @@ function LeadForm({ onClose, onSave, lead = null }) {
   const leadTypes = useLeadTypes()
   const [loading, setLoading] = useState(false)
   const [autoFilling, setAutoFilling] = useState(false)
+  // A lead already on file matching what's being typed. A warning, not a block —
+  // the form is the deliberate path, so it tells you and lets you decide.
+  const [duplicate, setDuplicate] = useState(null)
   // Only persist the new-lead draft across navigation; edit mode is seeded
   // from the `lead` prop so persistence would desync if the lead changed.
   const initialForm = {
@@ -38,13 +48,28 @@ function LeadForm({ onClose, onSave, lead = null }) {
     setFormData(prev => {
       const next = { ...prev, [name]: value }
       // When pasting a LinkedIn URL and name is empty, pre-populate the name
-      // from the slug so the user doesn't have to retype it.
+      // from the slug so the user doesn't have to retype it. Returns '' for a
+      // run-together slug it can't split, in which case we leave the field
+      // blank for the user rather than filing them as "Liroyhaddad".
       if (name === 'linkedin_url' && !prev.name.trim() && isLinkedInUrl(value)) {
         const guessed = nameFromLinkedInUrl(value)
         if (guessed) next.name = guessed
       }
       return next
     })
+  }
+
+  // Runs on blur of the fields that identify a person. Edit mode skips it:
+  // a lead always matches itself.
+  async function checkForDuplicate() {
+    if (lead?.id) return
+    const { linkedin_url, email, name, firm_name } = formData
+    if (!linkedin_url.trim() && !email.trim() && !name.trim()) {
+      setDuplicate(null)
+      return
+    }
+    const match = await findDuplicateLead({ linkedin_url, email, name, firm_name })
+    setDuplicate(match)
   }
 
   async function handleAutoFill() {
@@ -71,7 +96,13 @@ function LeadForm({ onClose, onSave, lead = null }) {
         lead_type: prev.lead_type || enrichment.suggested_lead_type || prev.lead_type,
         notes: prev.notes.trim() ? prev.notes : (enrichment.enrichment_notes || prev.notes)
       }))
-      toast.success('Auto-filled from LinkedIn')
+      // Nothing on file is a real answer, not a success. Saying "auto-filled"
+      // when nothing was filled is how people stopped trusting this button.
+      if (enrichment.insufficient_context) {
+        toast.warn('Nothing on file for this lead yet — add a firm or notes and try again')
+      } else {
+        toast.success('Summarised from what the CRM already knows')
+      }
     } catch (error) {
       console.error('Auto-fill failed:', error)
       toast.error('Auto-fill failed: ' + error.message)
@@ -122,6 +153,21 @@ function LeadForm({ onClose, onSave, lead = null }) {
       <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
         <h2>{lead ? 'Edit Lead' : 'Add New Lead'}</h2>
 
+        {duplicate && (
+          <div className="form-duplicate-warning">
+            <AlertTriangle size={16} />
+            <div>
+              <strong>
+                <Link to={`/leads/${duplicate.lead.id}`}>{duplicate.lead.name}</Link>
+                {duplicate.lead.firm_name ? ` — ${duplicate.lead.firm_name}` : ''}
+              </strong>{' '}
+              is already in the pipeline ({duplicate.lead.stage}), matched on{' '}
+              {DUPLICATE_MATCH_LABELS[duplicate.matchedOn] || duplicate.matchedOn}.
+              Saving will create a second record for them.
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <div className="form-group">
@@ -131,6 +177,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
+                onBlur={checkForDuplicate}
                 placeholder="Full Name"
                 required
                 autoFocus
@@ -144,6 +191,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
                 name="firm_name"
                 value={formData.firm_name}
                 onChange={handleChange}
+                onBlur={checkForDuplicate}
                 placeholder="Company/Fund Name"
               />
             </div>
@@ -157,6 +205,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
+                onBlur={checkForDuplicate}
                 placeholder="email@example.com"
               />
             </div>
@@ -181,6 +230,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
                 name="linkedin_url"
                 value={formData.linkedin_url}
                 onChange={handleChange}
+                onBlur={checkForDuplicate}
                 placeholder="https://linkedin.com/in/..."
                 style={{ flex: 1 }}
               />
@@ -189,11 +239,11 @@ function LeadForm({ onClose, onSave, lead = null }) {
                 className="btn btn-secondary"
                 onClick={handleAutoFill}
                 disabled={autoFilling || !formData.linkedin_url.trim()}
-                title="Fill name, lead type, and notes from the LinkedIn URL"
+                title="Summarise what the CRM already knows about this lead. Does not read LinkedIn."
                 style={{ whiteSpace: 'nowrap' }}
               >
                 <Sparkles size={16} />
-                {autoFilling ? 'Filling...' : 'Auto-fill'}
+                {autoFilling ? 'Summarising...' : 'Summarise'}
               </button>
             </div>
           </div>

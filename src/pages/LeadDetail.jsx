@@ -615,7 +615,7 @@ function LeadDetail() {
               <div className="form-group full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '8px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Sparkles size={16} />
-                  LinkedIn Auto-Enrichment
+                  CRM Context Summary
                   {editedLead.enrichment_status && (
                     <span className={`enrichment-badge enrichment-badge-${editedLead.enrichment_status}`}>
                       {editedLead.enrichment_status}
@@ -637,13 +637,23 @@ function LeadDetail() {
                     disabled={!editedLead.linkedin_url || enriching}
                   >
                     {enriching && <span className="enrichment-spinner" />}
-                    {enriching ? 'Enriching...' : editedLead.enrichment_status === 'enriched' ? 'Re-enrich' : 'Auto-Fill'}
+                    {enriching ? 'Summarising...' : 'Summarise'}
                   </button>
                 </div>
+                <div className="enrichment-disclaimer">
+                  Summarises the fields already on this lead. It does not read LinkedIn — the URL is just the identifier.
+                </div>
 
-                {/* Enrichment results */}
-                {editedLead.enrichment_status === 'enriched' && (
-                  <div className="enrichment-results">
+                {/* Rows from the era when this endpoint invented biographies from
+                    a URL slug and wrote them here as fact. Kept, never trusted. */}
+                {editedLead.enrichment_status === 'unverified_ai' && (
+                  <div className="enrichment-unverified">
+                    <strong>Unverified — AI-generated, never checked against LinkedIn.</strong>
+                    <p>
+                      The fields below were invented by a model that could not see this
+                      person&apos;s profile. Treat every one of them as wrong until someone
+                      confirms it. Do not repeat them on a call.
+                    </p>
                     {editedLead.linkedin_headline && (
                       <div className="enrichment-field">
                         <span className="enrichment-field-label">Headline</span>
@@ -668,11 +678,22 @@ function LeadDetail() {
                         <span className="enrichment-field-value enrichment-field-pre">{editedLead.past_experience}</span>
                       </div>
                     )}
-                    {editedLead.enriched_at && (
-                      <div className="enrichment-timestamp">
-                        Enriched {new Date(editedLead.enriched_at).toLocaleDateString()} via AI
-                      </div>
-                    )}
+                  </div>
+                )}
+
+                {editedLead.enrichment_status === 'summarized' && (
+                  <div className="enrichment-results">
+                    <div className="enrichment-timestamp">
+                      Summarised {editedLead.enriched_at ? new Date(editedLead.enriched_at).toLocaleDateString() : ''} — the note is in the activity log below.
+                    </div>
+                  </div>
+                )}
+
+                {editedLead.enrichment_status === 'no_context' && (
+                  <div className="enrichment-results">
+                    <div className="enrichment-timestamp">
+                      Nothing on file to summarise yet — add a firm, lead type or notes first.
+                    </div>
                   </div>
                 )}
 
@@ -685,7 +706,7 @@ function LeadDetail() {
                 {enriching && (
                   <div className="enrichment-loading">
                     <span className="enrichment-spinner" />
-                    Analyzing LinkedIn profile with AI...
+                    Summarising what the CRM knows...
                   </div>
                 )}
               </div>
@@ -1139,14 +1160,19 @@ function LeadDetail() {
                 </>
               )}
 
-              {/* LinkedIn Enrichment Info */}
+              {/* Legacy AI-invented profile fields. Nothing writes these any more;
+                  they are shown only so the fabricated values aren't mistaken for fact. */}
               {(lead.current_position || lead.linkedin_headline || lead.education || lead.past_experience) && (
                 <>
                   <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Linkedin size={16} />
                       LinkedIn Profile
+                      <span className="enrichment-badge enrichment-badge-unverified_ai">unverified</span>
                     </label>
+                    <div className="enrichment-disclaimer">
+                      AI-generated from the profile URL alone and never verified. Assume it is wrong.
+                    </div>
                   </div>
 
                   {lead.linkedin_headline && (
