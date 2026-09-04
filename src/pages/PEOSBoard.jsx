@@ -9,7 +9,7 @@ import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, X } from 'lucide-react'
-import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
+import { isLinkedInUrl, nameFromLinkedInUrl, placeholderNameFromLinkedInUrl } from '../lib/linkedin'
 import { istToday, istAddDays } from '../lib/dateUtils'
 import { isAdminUser } from '../lib/admin'
 import { runBulk } from '../lib/bulkActions'
@@ -978,7 +978,10 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
     try {
       let lead = await findLeadByLinkedInUrl(url)
       if (!lead) {
-        const guessedName = nameFromLinkedInUrl(url) || 'Unknown'
+        // nameFromLinkedInUrl returns '' for a run-together slug it can't
+        // split. Fall back to the handle rather than a fake-looking name:
+        // this path is the one that filed 126 leads as "Liroyhaddad".
+        const guessedName = nameFromLinkedInUrl(url) || placeholderNameFromLinkedInUrl(url) || 'Unknown'
         lead = await createLead({
           name: guessedName,
           linkedin_url: url,
