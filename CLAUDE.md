@@ -24,6 +24,19 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 - Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 045). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- **Applying a migration (Sept 2026) — the Supabase CLI can do it, no dashboard paste needed.**
+  The CLI is linked to `lzydgdzjrgvqglxmyfjk` ("pf sales CRM") and the DB credential is
+  cached in the macOS keychain, so `supabase db push` connects on its own. There is no
+  `SUPABASE_ACCESS_TOKEN`, no `.supabase/access-token`, and no Postgres URL in any env
+  file — earlier sessions concluded from that that migrations were blocked. They are not.
+  - `supabase db push` reads `supabase/migrations/<timestamp>_name.sql`, NOT the repo's
+    `migrations/NNN_*.sql`. Copy the numbered file across, `--dry-run` first to confirm it
+    lists only your migration, then push. `supabase/` is gitignored — the numbered file in
+    `migrations/` stays the committed source of truth.
+  - `supabase db dump` / `db diff` need Docker Desktop and will fail without it. `db push`
+    does not — it connects directly.
+  - Verify with real queries afterwards (select the new column; prove a CHECK rejects what
+    it should). Never trust the CLI's success line alone.
 - **Auth email redirects (Sept 2026):** password reset, signup confirmation, and magic links all depend on Supabase Auth → URL Configuration, which is invisible from the code. If `redirectTo` is not in the **Redirect URLs** allowlist, Supabase *silently discards it* and falls back to the **Site URL** — the link still works, it just lands somewhere useless. This is what broke forgot-password for everyone: Site URL was `http://localhost:3000` and the prod domain was not allowlisted, so every reset email dropped the user on a dead localhost address. `Login.jsx` was correct the whole time. Correct values: Site URL `https://pocket-fund-crm.vercel.app`, Redirect URLs `https://pocket-fund-crm.vercel.app/**` + `http://localhost:5173/**`.
   - Probe it without sending mail (anon key only, no secrets):
     `curl -sD- -o/dev/null "https://lzydgdzjrgvqglxmyfjk.supabase.co/auth/v1/verify?token=probe&type=recovery&redirect_to=<urlencoded-url>" -H "apikey: $VITE_SUPABASE_ANON_KEY" | grep -i ^location:`

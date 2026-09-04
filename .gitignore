@@ -33,3 +33,4 @@ dist-ssr
 .context/
 .mcp.json
 .env*
+supabase/
