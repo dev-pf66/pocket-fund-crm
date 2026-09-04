@@ -54,7 +54,11 @@ export function fakeSupabase(responder = () => ({ data: null, error: null })) {
           op.range = [args[0], args[1]]
         } else if (method === 'limit') {
           op.limit = args[0]
-        } else if (method !== 'select' && method !== 'order') {
+        } else if (method === 'select') {
+          // Recorded so a test can assert WHICH columns were asked for — a
+          // missing column silently changes behaviour without erroring.
+          op.selectArgs = args[0]
+        } else if (method !== 'order') {
           op.filters.push([method, ...args])
         }
         return builder

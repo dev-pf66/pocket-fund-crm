@@ -23,6 +23,90 @@ import { advanceLeadStage } from './leads'
 import { promoteOutreachToLead } from './outreach'
 import { logActivityManual } from './misc'
 import { statusForOutcome, isPickup, isConversation, summarizeCalls, rate } from '../callOutcomes'
+import { phoneKey } from '../callList'
+
+/**
+ * Bulk-create leads for the call queue from a parsed call list.
+ *
+ * The twin of bulkCreateLeads (the LinkedIn queue) — same batch grouping, same
+ * round-robin assignment, same "dedupe or you reimport the same people"
+ * contract. The identifier is the phone rather than the profile URL, because
+ * that is what makes a lead callable: getCallQueue selects on a non-empty
+ * phone, so a lead without one can never appear no matter how it was created.
+ *
+ * Dedup compares phoneKey (last 10 digits), not the stored string. Numbers
+ * arrive formatted every way there is and an exact-string check would let the
+ * same person in once per format.
+ *
+ * @param {Array<{name,firm_name,phone}>} entries  from parseCallListText
+ */
+export async function bulkCreateCallLeads(entries, batchLabel, currentPersonId, assigneeIds = null) {
+  const cleaned = (entries || []).filter(e => phoneKey(e?.phone))
+  if (cleaned.length === 0) {
+    return { added: 0, skipped: 0, batchId: null, batchLabel: null, leads: [] }
+  }
+
+  // Dedupe within the paste itself first — a list pulled from two sources
+  // routinely contains the same person twice.
+  const seen = new Set()
+  const unique = []
+  for (const entry of cleaned) {
+    const key = phoneKey(entry.phone)
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(entry)
+  }
+
+  // Paginated: a plain select stops at PostgREST's 1000-row cap without
+  // erroring, which would silently defeat the dedupe this function exists for.
+  const existing = await fetchAllRows(() => supabase
+    .from('crm_leads')
+    .select('phone')
+    .not('phone', 'is', null)
+    .neq('phone', '')
+    .order('id'))
+  const existingKeys = new Set(existing.map(l => phoneKey(l.phone)).filter(Boolean))
+
+  const toInsert = unique.filter(e => !existingKeys.has(phoneKey(e.phone)))
+  const skipped = cleaned.length - toInsert.length
+
+  if (toInsert.length === 0) {
+    return { added: 0, skipped, batchId: null, batchLabel: null, leads: [] }
+  }
+
+  const batchId = crypto.randomUUID()
+  const label = (batchLabel || '').trim() || null
+  const now = new Date().toISOString()
+
+  const validAssignees = (assigneeIds || []).filter(Boolean)
+  const pool = validAssignees.length > 0 ? validAssignees : [currentPersonId]
+
+  const rows = toInsert.map((entry, i) => ({
+    name: entry.name || entry.phone,
+    firm_name: entry.firm_name || null,
+    phone: entry.phone,
+    stage: 'outreach',
+    lead_source: 'Call List',
+    // Explicit rather than relying on the column default: the call queue
+    // filters on do_not_call = false, and a null would drop the whole import.
+    do_not_call: false,
+    created_by: currentPersonId,
+    assigned_to: pool[i % pool.length],
+    last_activity_date: now,
+    last_activity_type: 'created',
+    import_batch_id: batchId,
+    import_batch_label: label
+  }))
+
+  const { data, error } = await supabase.from('crm_leads').insert(rows).select()
+  if (error) throw error
+
+  cacheClear('leads')
+  cacheClear('dashboard')
+
+  return { added: data.length, skipped, batchId, batchLabel: label, leads: data }
+}
+
 
 /**
  * Attach a transcript to a dial that has already been logged.
@@ -551,7 +635,9 @@ export async function getCallQueue(personId = null, { limit = 50, daysBackHistor
   const leads = await fetchAllRows(() => {
     let q = supabase
       .from('crm_leads')
-      .select('id, name, firm_name, phone, stage, lead_type, notes, next_follow_up_date, follow_up_note, assigned_to, do_not_call, linkedin_url')
+      // import_batch_* feed the Queue tab's grouping. Drop them and every
+      // imported list silently collapses into one 'ungrouped' pile.
+      .select('id, name, firm_name, phone, stage, lead_type, notes, next_follow_up_date, follow_up_note, assigned_to, do_not_call, linkedin_url, import_batch_id, import_batch_label')
       .not('phone', 'is', null)
       .neq('phone', '')
       .eq('do_not_call', false)
