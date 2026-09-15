@@ -19,7 +19,8 @@ const REQUIRED = [
   'CRON_SECRET',
   'ANTHROPIC_API_KEY',
   'TASK_TRACKER_API_URL',
-  'TASK_TRACKER_API_KEY'
+  'TASK_TRACKER_API_KEY',
+  'CALLHIPPO_API_TOKEN'
 ]
 
 export default async function handler(req, res) {
