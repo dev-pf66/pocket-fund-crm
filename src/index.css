@@ -5628,6 +5628,52 @@ input, select, textarea {
   margin-top: 6px;
 }
 
+.quick-add-hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--gray-600);
+}
+
+.quick-add-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Shown instead of the input when the pasted profile is already a lead. */
+.quick-add-duplicate {
+  border-color: var(--warning, #f59e0b);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+}
+
+.quick-add-duplicate-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--warning, #f59e0b);
+  margin-bottom: 6px;
+}
+
+.quick-add-duplicate-lead {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  text-decoration: none;
+}
+
+.quick-add-duplicate-lead:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.quick-add-duplicate-meta {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
 /* Lead Quick Actions */
 .lead-card-footer {
   display: flex;
@@ -8040,4 +8086,71 @@ input, select, textarea {
   background: color-mix(in srgb, var(--chip, #9ca3af) 14%, white);
   color: color-mix(in srgb, var(--chip, #9ca3af) 78%, #1f2937);
   border: 1px solid color-mix(in srgb, var(--chip, #9ca3af) 32%, white);
+}
+
+/* Add Lead form: an existing lead matches what's being typed. */
+.form-duplicate-warning {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #fffbeb;
+  border: 1px solid var(--warning);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--gray-700);
+  line-height: 1.45;
+}
+
+.form-duplicate-warning svg {
+  color: var(--warning);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.form-duplicate-warning a {
+  color: var(--primary);
+}
+
+/* Enrichment: the endpoint summarises CRM fields, it does not read LinkedIn. */
+.enrichment-disclaimer {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* Leads carrying biography fields invented by the old enrichment prompt. */
+.enrichment-unverified {
+  background: #fef2f2;
+  border: 1px solid var(--danger, #ef4444);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+
+.enrichment-unverified strong {
+  color: var(--danger, #ef4444);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.enrichment-unverified p {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.enrichment-badge-unverified_ai {
+  background: #fef2f2;
+  color: var(--danger, #ef4444);
+  border: 1px solid var(--danger, #ef4444);
+}
+
+.enrichment-badge-summarized,
+.enrichment-badge-no_context {
+  background: var(--gray-100);
+  color: var(--gray-600);
 }

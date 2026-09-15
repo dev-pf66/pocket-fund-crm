@@ -41,8 +41,34 @@ async function getCrmPerson(personId) {
   return data
 }
 
+// Sage rejects any task create that names no project:
+//   400 "deal_id or internal_project_id is required"
+// Nothing here ever sent one, so from mid-August 2026 every task this file
+// files — lead replies, follow-ups, kickoffs, manual tasks — and every task
+// the weekly digest files silently 400'd. Three weeks of digests were lost
+// before anyone noticed, because the failure alarm files a task too and died
+// of the same cause.
+//
+// Everything the CRM creates is sales work, so it lands in the "PF sales"
+// internal project unless the caller names its own. Hardcoded with an env
+// override on purpose: a missing env var is what disabled ALL tracker
+// automation once already, and a constant cannot go missing in production.
+const TT_PROJECT_ID = process.env.TASK_TRACKER_PROJECT_ID || '22f6f543-68bc-4dbf-be5b-27432ac649ba'
+
 export const tt = {
-  createTask: (payload) => ttFetch('/tasks', { method: 'POST', body: JSON.stringify(payload) }),
+  createTask: (payload = {}) => {
+    // A caller that picked its own project keeps it — deal_id satisfies the
+    // API just as well as internal_project_id, and passing both is muddled.
+    const hasProject = payload.deal_id != null || payload.internal_project_id != null
+    return ttFetch('/tasks', {
+      method: 'POST',
+      body: JSON.stringify({
+        source: 'crm',
+        ...(hasProject ? {} : { internal_project_id: TT_PROJECT_ID }),
+        ...payload
+      })
+    })
+  },
   updateTask: (id, updates) => ttFetch(`/tasks?id=${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
   completeNextPermaSubtask: (permaTaskId) =>
     ttFetch('/perma-tasks', { method: 'POST', body: JSON.stringify({ action: 'complete_next_subtask', perma_task_id: permaTaskId }) })

@@ -5,7 +5,7 @@
  */
 
 import { supabase } from '../supabase'
-import { normalizeLinkedInUrl } from '../linkedin'
+import { normalizeLinkedInUrl, linkedInProfileSlug } from '../linkedin'
 import { cacheGet, cacheSet, cacheClear, fireTTEvent, istDateStr, getDaysBetween, fetchAllRows } from './core'
 import { getCRMSettings } from './misc'
 
@@ -248,6 +248,74 @@ export async function findLeadByLinkedInUrl(linkedinUrl) {
     .select('*')
     .not('linkedin_url', 'is', null))
   return data.find(l => normalizeLinkedInUrl(l.linkedin_url) === normalized) || null
+}
+
+/**
+ * Look for an existing lead matching what is about to be created.
+ *
+ * The CSV importer has deduped since day one; the interactive add paths never
+ * did. That is how the same person ends up filed twice — Praveen Kumar and
+ * Edie Page each sit in `warm_active` from an earlier touch AND in `outreach`
+ * as a fresh cold lead — and someone cold-pitches a live conversation.
+ *
+ * Checks LinkedIn profile, then email, then name+firm, and returns the first
+ * hit as { lead, matchedOn }. Null means nothing matched.
+ *
+ * Never throws. A failed lookup must not block adding a lead, so it degrades
+ * to "no duplicate found" — the same call the importer makes.
+ *
+ * Unlike findLeadByLinkedInUrl this does NOT page the whole table: each probe
+ * is narrowed server-side to a handful of candidate rows, so there is no
+ * 1000-row truncation to hide behind. The ILIKE patterns can over-match
+ * (a longer slug containing this one, `_` acting as a wildcard), so every
+ * candidate is re-checked exactly on the client before it counts as a match.
+ */
+const DUPE_FIELDS = 'id, name, firm_name, email, linkedin_url, stage, assigned_to'
+
+export async function findDuplicateLead({ linkedin_url, email, name, firm_name } = {}) {
+  try {
+    const slug = linkedInProfileSlug(linkedin_url || '')
+    if (slug) {
+      const target = normalizeLinkedInUrl(linkedin_url)
+      const { data } = await supabase
+        .from('crm_leads')
+        .select(DUPE_FIELDS)
+        .ilike('linkedin_url', `%/in/${slug}%`)
+        .limit(50)
+      const hit = (data || []).find(l => normalizeLinkedInUrl(l.linkedin_url) === target)
+      if (hit) return { lead: hit, matchedOn: 'linkedin_url' }
+    }
+
+    const cleanEmail = (email || '').trim().toLowerCase()
+    if (cleanEmail) {
+      const { data } = await supabase
+        .from('crm_leads')
+        .select(DUPE_FIELDS)
+        .ilike('email', cleanEmail)
+        .limit(50)
+      const hit = (data || []).find(l => (l.email || '').trim().toLowerCase() === cleanEmail)
+      if (hit) return { lead: hit, matchedOn: 'email' }
+    }
+
+    const cleanName = (name || '').trim().toLowerCase()
+    if (cleanName) {
+      const cleanFirm = (firm_name || '').trim().toLowerCase()
+      const { data } = await supabase
+        .from('crm_leads')
+        .select(DUPE_FIELDS)
+        .ilike('name', cleanName)
+        .limit(50)
+      const hit = (data || []).find(l =>
+        (l.name || '').trim().toLowerCase() === cleanName &&
+        (l.firm_name || '').trim().toLowerCase() === cleanFirm)
+      if (hit) return { lead: hit, matchedOn: 'name_firm' }
+    }
+
+    return null
+  } catch (error) {
+    console.error('Duplicate lookup failed:', error)
+    return null
+  }
 }
 
 export async function createLead(leadData, currentPersonId) {

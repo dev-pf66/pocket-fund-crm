@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { isAuthorized } from './_auth.js'
 import { requireEnv } from './_env.js'
+import { isLinkedInUrl, nameFromLinkedInUrl, linkedInProfileSlug } from '../src/lib/linkedin.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -11,15 +12,37 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 })
 
-function isValidLinkedInUrl(url) {
-  try {
-    const parsed = new URL(url)
-    return parsed.hostname === 'linkedin.com' ||
-      parsed.hostname === 'www.linkedin.com' ||
-      parsed.hostname.endsWith('.linkedin.com')
-  } catch {
-    return false
-  }
+const LEAD_TYPES = ['PE Firm', 'Family Office', 'Independent Sponsor', 'Other']
+
+// This endpoint has no access to LinkedIn. It summarises what the CRM already
+// holds; the URL is an identifier, not a source.
+//
+// It used to ask the model to "generate realistic and plausible professional
+// enrichment data" from the URL slug and write the result to
+// linkedin_headline / current_position / past_experience / education as
+// though it were fact. All three leads it ever ran on had a blank firm name,
+// so it invented one each — Venn Capital, Stride Capital, Milestone Capital
+// Partners — plus degrees from ESCP, IIM Ahmedabad and ISB, and stamped the
+// rows `enrichment_status: 'enriched'`. Those four columns are no longer
+// written by anything. Do not reintroduce them here.
+function buildPrompt(facts) {
+  const lines = Object.entries(facts)
+    .filter(([, v]) => String(v || '').trim())
+    .map(([k, v]) => `- ${k}: ${v}`)
+    .join('\n')
+
+  return `You are writing a short internal CRM note for Pocket Fund's outreach team.
+
+Use ONLY the facts listed below. Do not add employers, job titles, schools, locations, dates, deal history, mutual connections, or anything else that is not stated here. You cannot see the LinkedIn profile. If the facts are too thin to say anything useful, return an empty summary — that is the correct answer, not a failure.
+
+Facts on record:
+${lines}
+
+Respond with JSON only, no markdown:
+{
+  "summary": "2-3 sentences on what we know about this lead and how to approach them, drawn strictly from the facts above. Empty string if there is nothing worth saying.",
+  "suggested_lead_type": "One of: ${LEAD_TYPES.join(', ')} — only if the facts above make it clear. Empty string otherwise."
+}`
 }
 
 export default async function handler(req, res) {
@@ -47,12 +70,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'linkedinUrl is required' })
   }
 
-  if (!isValidLinkedInUrl(linkedinUrl)) {
+  if (!isLinkedInUrl(linkedinUrl)) {
     return res.status(400).json({ error: 'Invalid LinkedIn URL' })
   }
 
-  // Preview mode: leadId omitted. Generate enrichment from provided context
-  // without touching the DB. Used by the Add Lead form to pre-fill fields.
+  if (!linkedInProfileSlug(linkedinUrl)) {
+    return res.status(400).json({ error: 'Not a LinkedIn personal profile URL (expected /in/...)' })
+  }
+
+  // Preview mode: leadId omitted. Summarise the context the caller supplies
+  // without touching the DB. Used by the Add Lead form.
   const previewMode = !leadId
 
   try {
@@ -77,60 +104,64 @@ export default async function handler(req, res) {
       }
       lead = data
 
-      // Mark as enriching
       await supabase
         .from('crm_leads')
         .update({ enrichment_status: 'enriching' })
         .eq('id', leadId)
     }
 
-    // Extract profile slug from URL for hints
-    const urlPath = new URL(linkedinUrl).pathname
-    const profileSlug = urlPath.replace(/^\/in\//, '').replace(/\/$/, '')
+    // Deterministic, not inferred: split the slug or return nothing. The form
+    // asks the user rather than filing someone as "Liroyhaddad".
+    const suggestedName = nameFromLinkedInUrl(linkedinUrl)
 
-    const previewInstruction = previewMode
-      ? `\n\nSince we're pre-filling an Add Lead form, ALSO infer a likely name (from the LinkedIn slug — format "first-last" → "First Last") and lead_type ("PE Firm", "Family Office", "Independent Sponsor", or "Other") based on the profile slug and firm name. Include a suggested_name and suggested_lead_type field in your response.`
-      : ''
+    const facts = {
+      Name: lead.name,
+      Firm: lead.firm_name,
+      'Lead type': lead.lead_type,
+      'Deal criteria': lead.deal_criteria,
+      'Notes on file': lead.notes
+    }
+    const hasFacts = Object.values(facts).some(v => String(v || '').trim())
+
+    // Nothing on file means nothing to summarise. Say so instead of inventing
+    // a profile — and don't spend a model call finding that out.
+    if (!hasFacts) {
+      const payload = {
+        linkedin_url: linkedinUrl,
+        suggested_name: suggestedName,
+        suggested_lead_type: '',
+        enrichment_notes: '',
+        insufficient_context: true
+      }
+
+      if (previewMode) {
+        return res.status(200).json({ success: true, preview: true, enrichment: payload })
+      }
+
+      await supabase
+        .from('crm_leads')
+        .update({
+          linkedin_url: linkedinUrl,
+          enrichment_status: 'no_context',
+          enriched_at: new Date().toISOString()
+        })
+        .eq('id', leadId)
+
+      return res.status(200).json({ success: true, enrichment: payload })
+    }
 
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `You are a CRM enrichment assistant for a fund placement agent (Pocket Fund). Based on the following lead information and their LinkedIn URL, generate realistic and plausible professional enrichment data. Respond with a JSON object only — no markdown, no explanation.
-
-Lead info:
-- Name: ${lead.name || 'Unknown'}
-- Firm: ${lead.firm_name || 'Unknown'}
-- Lead Type: ${lead.lead_type || 'Unknown'}
-- LinkedIn URL: ${linkedinUrl}
-- LinkedIn profile slug: ${profileSlug}
-- Current notes: ${lead.notes || 'None'}
-- Deal criteria: ${lead.deal_criteria || 'None'}
-
-Based on this person's name, firm, role type (${lead.lead_type}), and LinkedIn profile slug, generate plausible professional details. For someone at "${lead.firm_name || 'their firm'}" who is a "${lead.lead_type || 'finance professional'}", what would their background likely look like?${previewInstruction}
-
-Respond with this exact JSON structure:
-{
-  "linkedin_headline": "A realistic LinkedIn headline for this person (e.g., 'Managing Partner at XYZ Capital | Private Equity | Growth Investments')",
-  "current_position": "Their most likely current role and title at their firm",
-  "past_experience": "2-3 bullet points of plausible past roles, separated by newlines",
-  "education": "Most likely educational background (e.g., 'MBA, Wharton School of Business; BS Finance, NYU')",
-  "enrichment_notes": "Brief summary of key insights about this person's likely background and how to approach them"${previewMode ? `,
-  "suggested_name": "Inferred name from LinkedIn slug (First Last format)",
-  "suggested_lead_type": "One of: PE Firm, Family Office, Independent Sponsor, Other"` : ''}
-}`
-        }
-      ]
+      messages: [{ role: 'user', content: buildPrompt(facts) }]
     })
 
     const rawText = message.content[0].text.trim()
     const jsonText = rawText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
 
-    let enrichmentData
+    let parsed
     try {
-      enrichmentData = JSON.parse(jsonText)
+      parsed = JSON.parse(jsonText)
     } catch {
       if (!previewMode) {
         await supabase
@@ -141,55 +172,46 @@ Respond with this exact JSON structure:
       return res.status(500).json({ error: 'Failed to parse AI response', raw: rawText })
     }
 
-    // Validate and sanitize the enrichment fields
-    const validatedData = {
+    const summary = String(parsed.summary || '').slice(0, 1200)
+    // Anything outside the fixed list is the model freelancing — drop it.
+    const rawType = String(parsed.suggested_lead_type || '').trim()
+    const suggestedLeadType = LEAD_TYPES.includes(rawType) ? rawType : ''
+
+    const payload = {
       linkedin_url: linkedinUrl,
-      linkedin_headline: String(enrichmentData.linkedin_headline || '').slice(0, 300),
-      current_position: String(enrichmentData.current_position || '').slice(0, 200),
-      past_experience: String(enrichmentData.past_experience || ''),
-      education: String(enrichmentData.education || ''),
-      enrichment_status: 'enriched',
-      enriched_at: new Date().toISOString()
+      suggested_name: suggestedName,
+      suggested_lead_type: suggestedLeadType,
+      enrichment_notes: summary,
+      insufficient_context: false
     }
 
     if (previewMode) {
-      return res.status(200).json({
-        success: true,
-        preview: true,
-        enrichment: {
-          ...validatedData,
-          enrichment_notes: enrichmentData.enrichment_notes || '',
-          suggested_name: String(enrichmentData.suggested_name || '').slice(0, 120),
-          suggested_lead_type: String(enrichmentData.suggested_lead_type || '').slice(0, 40)
-        }
-      })
+      return res.status(200).json({ success: true, preview: true, enrichment: payload })
     }
 
-    // Update lead with enrichment data
     const { error: updateError } = await supabase
       .from('crm_leads')
-      .update(validatedData)
+      .update({
+        linkedin_url: linkedinUrl,
+        enrichment_status: 'summarized',
+        enriched_at: new Date().toISOString()
+      })
       .eq('id', leadId)
 
     if (updateError) throw updateError
 
-    // Log an activity note about the enrichment
-    await supabase
-      .from('crm_lead_activities')
-      .insert([{
-        lead_id: leadId,
-        activity_type: 'note',
-        activity_date: new Date().toISOString(),
-        notes: `LinkedIn profile enriched via AI. ${enrichmentData.enrichment_notes || ''}`
-      }])
+    if (summary) {
+      await supabase
+        .from('crm_lead_activities')
+        .insert([{
+          lead_id: leadId,
+          activity_type: 'note',
+          activity_date: new Date().toISOString(),
+          notes: `AI summary of CRM context (no LinkedIn data was fetched): ${summary}`
+        }])
+    }
 
-    return res.status(200).json({
-      success: true,
-      enrichment: {
-        ...validatedData,
-        enrichment_notes: enrichmentData.enrichment_notes || ''
-      }
-    })
+    return res.status(200).json({ success: true, enrichment: payload })
   } catch (error) {
     console.error('enrich-linkedin error:', error)
 
