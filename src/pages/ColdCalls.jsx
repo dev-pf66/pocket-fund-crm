@@ -5,7 +5,8 @@ import {
   logCallTranscript, getCallTranscriptIds, bulkCreateCallLeads
 } from '../lib/crm-api'
 import {
-  CALL_OUTCOMES, outcomeLabel, outcomeColor, fmtRate, fmtDuration, rate
+  CALL_OUTCOMES, outcomeLabel, outcomeColor, fmtRate, fmtDuration, rate,
+  isConversation
 } from '../lib/callOutcomes'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
@@ -120,6 +121,9 @@ function CallMode({ person, toast }) {
   const [loading, setLoading] = useState(true)
   const [queue, setQueue] = useState([])
   const [callbacks, setCallbacks] = useState([])
+  // Callbacks found from the QUEUE side (any lead assigned to me), as opposed
+  // to `callbacks`, which is only the ones I logged myself.
+  const [queueCallbacks, setQueueCallbacks] = useState([])
   const [exhausted, setExhausted] = useState([])
   const [cursor, setCursor] = useState(0)
   const [todayCount, setTodayCount] = useState(0)
@@ -158,6 +162,7 @@ function CallMode({ person, toast }) {
       ])
       setQueue(q.queue)
       setExhausted(q.exhausted)
+      setQueueCallbacks(q.callbacks)
       setCallbacks(cbs)
       setTodayCount(count)
       const todays = log.filter(r => r.outreach_date === istToday())
@@ -194,10 +199,25 @@ function CallMode({ person, toast }) {
         isCallback: true,
       }))
     const seen = new Set(cbLeads.map(l => l.id))
-    return [...cbLeads, ...queue.filter(l => !seen.has(l.id))]
-  }, [callbacks, queue])
+
+    // getCallbacksDue only returns callbacks THIS person logged; getCallQueue
+    // finds a due callback on any lead assigned to them, whoever dialled — and
+    // it holds those leads OUT of q.queue. Without this line, a lead whose
+    // callback was set by someone else (or before it was reassigned) falls out
+    // of both lists the moment the callback comes due, which is exactly the
+    // contact we can least afford to lose.
+    const fromQueue = queueCallbacks
+      .filter(l => !seen.has(l.id))
+      .map(l => ({ ...l, isCallback: true }))
+    for (const l of fromQueue) seen.add(l.id)
+
+    return [...cbLeads, ...fromQueue, ...queue.filter(l => !seen.has(l.id))]
+  }, [callbacks, queueCallbacks, queue])
 
   const current = workList[cursor] || null
+  // Counted off the work list, so the banner can never promise a callback the
+  // list cannot actually offer.
+  const callbackCount = workList.filter(l => l.isCallback).length
 
   const resetPanel = useCallback(() => {
     setPending(null)
@@ -318,7 +338,9 @@ function CallMode({ person, toast }) {
 
   const todaySummary = useMemo(() => {
     const pickups = todayRows.filter(r => r.connected).length
-    const convos = todayRows.filter(r => ['not_interested', 'callback', 'interested', 'meeting_booked', 'do_not_call'].includes(r.call_outcome)).length
+    // isConversation, never a second copy of the outcome list: a gatekeeper is
+    // a pickup and not a conversation, and that rule lives in one file.
+    const convos = todayRows.filter(r => isConversation(r.call_outcome)).length
     const meetings = todayRows.filter(r => r.call_outcome === 'meeting_booked').length
     return { pickups, convos, meetings }
   }, [todayRows])
@@ -336,10 +358,10 @@ function CallMode({ person, toast }) {
         <StatCard label="Meetings booked" value={todaySummary.meetings} sub="today" accent="#15803d" />
       </div>
 
-      {callbacks.length > 0 && (
+      {callbackCount > 0 && (
         <div className="card" style={{ marginBottom: '16px', borderLeft: '4px solid #0ea5e9' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
-            <Clock size={16} /> {callbacks.length} callback{callbacks.length === 1 ? '' : 's'} due — these are at the front of the queue
+            <Clock size={16} /> {callbackCount} callback{callbackCount === 1 ? '' : 's'} due — these are at the front of the queue
           </div>
         </div>
       )}
@@ -647,10 +669,12 @@ function FunnelView({ daysBack, personId, teamScope }) {
   // is visible as width rather than having to be read off the percentages.
   const levels = [
     { key: 'dials', label: 'Dials', value: data.dials, rateLabel: null, color: '#94a3b8', note: 'every call placed' },
-    { key: 'pickups', label: 'Pickups', value: data.pickups, rateLabel: fmtRate(data.pickupRate), color: '#f59e0b', note: 'a human answered' },
-    { key: 'conversations', label: 'Conversations', value: data.conversations, rateLabel: fmtRate(data.conversationRate), color: '#0ea5e9', note: 'reached the actual person' },
-    { key: 'positive', label: 'Interested', value: data.positive, rateLabel: fmtRate(data.positiveRate), color: '#16a34a', note: 'wants to keep talking' },
-    { key: 'meetings', label: 'Meetings booked', value: data.meetings, rateLabel: fmtRate(data.meetingRate), color: '#15803d', note: 'on the calendar' },
+    { key: 'pickups', label: 'Pickups', value: data.pickups, rateLabel: fmtRate(data.pickupRate), of: 'dials', color: '#f59e0b', note: 'a human answered' },
+    { key: 'conversations', label: 'Conversations', value: data.conversations, rateLabel: fmtRate(data.conversationRate), of: 'pickups', color: '#0ea5e9', note: 'reached the actual person' },
+    { key: 'positive', label: 'Interested', value: data.positive, rateLabel: fmtRate(data.positiveRate), of: 'conversations', color: '#16a34a', note: 'wants to keep talking' },
+    // meetingRate is meetings / CONVERSATIONS, not meetings / interested — so
+    // it says conversations. "of the level above" was wrong by one level.
+    { key: 'meetings', label: 'Meetings booked', value: data.meetings, rateLabel: fmtRate(data.meetingRate), of: 'conversations', color: '#15803d', note: 'on the calendar' },
   ]
 
   const peakHours = [...data.byHour]
@@ -664,7 +688,7 @@ function FunnelView({ daysBack, personId, teamScope }) {
         <StatCard label="Dials per meeting" value={data.dialsPerMeeting ? Math.round(data.dialsPerMeeting) : '—'} sub={data.meetings === 0 ? 'no meetings yet' : 'the channel’s unit cost'} />
         <StatCard label="Pickup rate" value={fmtRate(data.pickupRate, 1)} sub={`${data.pickups} of ${data.dials}`} accent="#f59e0b" />
         <StatCard label="Conversation rate" value={fmtRate(data.conversationRate, 1)} sub="of pickups reached the person" accent="#0ea5e9" />
-        <StatCard label="Avg talk time" value={fmtDuration(data.avgTalkSeconds)} sub="on connected calls" />
+        <StatCard label="Avg talk time" value={fmtDuration(data.avgTalkSeconds)} sub="on calls with a duration logged" />
       </div>
 
       <div className="card" style={{ marginBottom: '20px' }}>
@@ -678,7 +702,7 @@ function FunnelView({ daysBack, personId, teamScope }) {
               <span><strong>{l.label}</strong> <span style={{ color: '#9ca3af' }}>· {l.note}</span></span>
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                 <strong>{l.value}</strong>
-                {l.rateLabel && <span style={{ color: '#6b7280' }}> · {l.rateLabel} of the level above</span>}
+                {l.rateLabel && <span style={{ color: '#6b7280' }}> · {l.rateLabel} of {l.of}</span>}
               </span>
             </div>
             <div style={{ background: '#f3f4f6', borderRadius: '6px', height: '22px', overflow: 'hidden' }}>
