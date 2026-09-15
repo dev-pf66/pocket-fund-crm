@@ -30,12 +30,35 @@ if (!TOKEN) {
 // Their date format is YYYY/MM/DD (pattern-enforced in the spec).
 const fmt = (d) => `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 
-/** Mask anything that looks like a phone number, email, or long digit run. */
-function redact(value) {
+// Keys whose value is a person's contact detail whatever shape it arrives in.
+// CallHippo nests caller/callee objects, and a number delivered as a JSON
+// number rather than a string sails straight past a string-only mask.
+const CONTACT_KEY = /phone|number|mobile|callerid|caller|callee|contact|^from$|^to$/i
+
+/**
+ * Mask anything that looks like a phone number or an email — recursively,
+ * because the interesting fields are nested and the whole promise of this
+ * script is that its output is safe to paste into a chat. `key` is the field
+ * the value arrived under, so a bare numeric phone can be caught by name.
+ */
+function redact(value, key = '') {
+  if (Array.isArray(value)) return value.map((v) => redact(v, key))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redact(v, k)]))
+  }
+  if (typeof value === 'number' && CONTACT_KEY.test(key)) {
+    return `[masked, ${String(Math.trunc(Math.abs(value))).length} digits]`
+  }
   if (typeof value !== 'string') return value
-  return value
+  const masked = value
     .replace(/\+?\d[\d\s\-().]{6,}\d/g, (m) => `${m.slice(0, 3)}…${m.slice(-2)} [${m.replace(/\D/g, '').length} digits]`)
     .replace(/[\w.+-]+@[\w.-]+/g, 'name@masked')
+  // A short number under a phone-ish key (an extension, a 6-digit local line)
+  // is below the pattern's threshold but still someone's line.
+  if (masked === value && CONTACT_KEY.test(key) && /\d/.test(value)) {
+    return `[masked, ${value.replace(/\D/g, '').length} digits]`
+  }
+  return masked
 }
 
 function describe(value) {
@@ -99,7 +122,7 @@ async function main() {
 
   console.log(`\n=== ${records.length} RECORD(S). FIELDS ON THE FIRST ===`)
   for (const [k, v] of Object.entries(records[0])) {
-    console.log(`  ${k.padEnd(28)} ${describe(v).padEnd(34)} e.g. ${JSON.stringify(redact(v)).slice(0, 60)}`)
+    console.log(`  ${k.padEnd(28)} ${describe(v).padEnd(34)} e.g. ${JSON.stringify(redact(v, k)).slice(0, 60)}`)
   }
 
   // Union of keys — records vary by call type, and a field that only appears
