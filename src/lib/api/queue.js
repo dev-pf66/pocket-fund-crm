@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '../supabase'
-import { normalizeLinkedInUrl, nameFromLinkedInUrl } from '../linkedin'
+import { normalizeLinkedInUrl, nameFromLinkedInUrl, placeholderNameFromLinkedInUrl } from '../linkedin'
 import { cacheClear, fetchAllRows } from './core'
 import { logOutreach } from './outreach'
 
@@ -60,7 +60,13 @@ export async function bulkCreateLeads(urls, batchLabel, currentPersonId, assigne
   const pool = validAssignees.length > 0 ? validAssignees : [currentPersonId]
 
   const rows = toInsert.map((url, i) => ({
-    name: nameFromLinkedInUrl(url) || 'Unknown',
+    // A run-together slug ("michaeljmostek") has no boundary to split on, so
+    // nameFromLinkedInUrl returns '' rather than guess. The fallback must be
+    // the '@slug' placeholder, NOT the literal 'Unknown': 'Unknown' collapses
+    // every unsplittable import onto one indistinguishable name — 12 leads
+    // reached prod that way — while '@michaeljmostek' stays unique, reads as
+    // unresolved, and keeps the slug verbatim for a later backfill.
+    name: nameFromLinkedInUrl(url) || placeholderNameFromLinkedInUrl(url) || 'Unknown',
     linkedin_url: url,
     stage: 'outreach',
     lead_source: 'Bulk Import',
