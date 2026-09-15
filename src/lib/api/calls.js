@@ -739,3 +739,97 @@ export async function setDoNotCall(leadId, value = true) {
   cacheClear('leads')
   return data
 }
+
+// ============================================================================
+// IMPORTED CALLS — the claim queue
+// ============================================================================
+// CallHippo logs every call under one shared seat, so an imported call cannot
+// be attributed to an analyst by the API. It lands unclaimed (logged_by NULL)
+// and the person who made it claims it. Until then it counts toward nobody's
+// target — which is the honest state, and better than putting invented numbers
+// on somebody's scorecard.
+
+/**
+ * Calls imported from a dialer that nobody has claimed yet, newest first.
+ * `daysBack` bounds it because this is a working queue, not an archive.
+ */
+export async function getUnclaimedCalls({ daysBack = 30 } = {}) {
+  const since = istAddDays(istToday(), -daysBack)
+  return fetchAllRows(() => supabase
+    .from('crm_outreach_log')
+    .select(`${CALL_COLUMNS}, lead:crm_leads(id, name, firm_name, stage)`)
+    .eq('outreach_type', 'phone_call')
+    .not('provider_call_id', 'is', null)
+    .is('logged_by', null)
+    .gte('outreach_date', since)
+    // Total sort — paging an ordered query with ties can skip or repeat rows.
+    .order('called_at', { ascending: false })
+    .order('id', { ascending: false }))
+}
+
+/** How many calls are sitting unclaimed. Drives the tab badge; head:true so
+ *  no rows cross the wire. */
+export async function getUnclaimedCallCount({ daysBack = 30 } = {}) {
+  const since = istAddDays(istToday(), -daysBack)
+  const { count, error } = await supabase
+    .from('crm_outreach_log')
+    .select('id', { count: 'exact', head: true })
+    .eq('outreach_type', 'phone_call')
+    .not('provider_call_id', 'is', null)
+    .is('logged_by', null)
+    .gte('outreach_date', since)
+  if (error) throw error
+  return count || 0
+}
+
+/**
+ * Claim one imported call as yours, optionally classifying it in the same tap.
+ *
+ * Claiming is what makes the call count toward your target and your scorecard,
+ * so it only ever sets `logged_by` to the claiming person — there is no
+ * "claim on behalf of", deliberately. An outcome, when given, runs the full
+ * side-effect path (pipeline advance, DNC flag, callback date) exactly as a
+ * hand-logged call would.
+ */
+export async function claimCall(id, personId, { outcome = null, notes = null } = {}) {
+  if (!personId) throw new Error('claimCall needs the claiming person')
+
+  const patch = { logged_by: personId, claimed_at: new Date().toISOString() }
+  if (notes != null) patch.notes = notes
+
+  // Claim first, so a failure in the outcome path can't leave the call
+  // attributed to nobody after the user has already tapped.
+  const { data, error } = await supabase
+    .from('crm_outreach_log')
+    .update(patch)
+    .eq('id', id)
+    .is('logged_by', null)   // never steal a call someone else just claimed
+    .select()
+    .single()
+  if (error) throw error
+  if (!data) throw new Error('That call was already claimed by someone else')
+
+  // Classifying is the same code path as a hand-logged call: updateCall
+  // re-derives status/connected and fires the pipeline side effects.
+  if (outcome) return updateCall(data.id, { call_outcome: outcome }, personId)
+
+  cacheClear('calls')
+  cacheClear('dashboard')
+  return data
+}
+
+/** Release a call you claimed by mistake — back to the unclaimed pool.
+ *  Nothing is deleted; it just loses its owner and its outcome stays. */
+export async function unclaimCall(id, personId) {
+  const { data, error } = await supabase
+    .from('crm_outreach_log')
+    .update({ logged_by: null, claimed_at: null })
+    .eq('id', id)
+    .eq('logged_by', personId)   // you can only release your own
+    .select()
+    .single()
+  if (error) throw error
+  cacheClear('calls')
+  cacheClear('dashboard')
+  return data
+}

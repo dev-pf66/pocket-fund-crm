@@ -106,13 +106,22 @@ async function main() {
   for (const [k, v] of Object.entries(json)) console.log(`  ${k}: ${describe(v)}`)
 
   // Find the array of call records wherever they hung it.
+  // Confirmed shape (Sept 2026): { success, data: { callLogs: [...], hasNext } }.
+  // The fallbacks stay for the day they reshape it.
+  const deepFindArray = (o, depth = 0) => {
+    if (depth > 3 || !o || typeof o !== 'object') return null
+    for (const v of Object.values(o)) if (Array.isArray(v) && v.length) return v
+    for (const v of Object.values(o)) {
+      const found = deepFindArray(v, depth + 1)
+      if (found) return found
+    }
+    return null
+  }
   const records =
+    (Array.isArray(json.data?.callLogs) && json.data.callLogs) ||
     (Array.isArray(json) && json) ||
     (Array.isArray(json.data) && json.data) ||
-    (Array.isArray(json.result) && json.result) ||
-    (Array.isArray(json.data?.data) && json.data.data) ||
-    (Array.isArray(json.activityFeed) && json.activityFeed) ||
-    Object.values(json).find(Array.isArray)
+    deepFindArray(json)
 
   if (!records?.length) {
     console.log('\nNo call records in the window. Try a wider one: node scripts/callhippo-discover.js 30')

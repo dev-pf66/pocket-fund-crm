@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
+  getUnclaimedCalls, getUnclaimedCallCount, claimCall,
   getCallQueue, getCallFunnel, getCallerScorecard, getCallbacksDue,
   logCall, getTodayCallCount, setDoNotCall, getCallLog, MAX_CALL_ATTEMPTS,
   logCallTranscript, getCallTranscriptIds, bulkCreateCallLeads
@@ -64,6 +65,15 @@ function ColdCalls() {
 
   const scopeId = isAdmin && teamScope ? null : currentPerson?.id
 
+  // Badge on the Claim tab. Imported calls belong to nobody until somebody
+  // taps, so an unclaimed pile is the thing most worth surfacing on arrival.
+  const [unclaimedCount, setUnclaimedCount] = useState(0)
+  useEffect(() => {
+    let alive = true
+    getUnclaimedCallCount().then(n => { if (alive) setUnclaimedCount(n) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
   return (
     <div className="page-content">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
@@ -94,6 +104,15 @@ function ColdCalls() {
         <button className={`tab ${tab === 'call' ? 'active' : ''}`} onClick={() => setTab('call')}>
           <Phone size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />Call Mode
         </button>
+        <button className={`tab ${tab === 'claim' ? 'active' : ''}`} onClick={() => setTab('claim')}>
+          <Inbox size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />Claim
+          {unclaimedCount > 0 && (
+            <span style={{
+              marginLeft: 6, padding: '1px 7px', borderRadius: '999px', fontSize: '11px',
+              fontWeight: 700, color: 'white', background: '#dc2626'
+            }}>{unclaimedCount}</span>
+          )}
+        </button>
         <button className={`tab ${tab === 'funnel' ? 'active' : ''}`} onClick={() => setTab('funnel')}>
           <TrendingUp size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />Funnel
         </button>
@@ -106,6 +125,7 @@ function ColdCalls() {
       </div>
 
       {tab === 'call' && <CallMode person={currentPerson} toast={toast} />}
+      {tab === 'claim' && <ClaimView person={currentPerson} toast={toast} onCountChange={setUnclaimedCount} />}
       {tab === 'funnel' && <FunnelView daysBack={daysBack} personId={scopeId} teamScope={isAdmin && teamScope} />}
       {tab === 'queue' && <CallQueueView person={currentPerson} isAdmin={isAdmin} people={people} toast={toast} />}
       {tab === 'callers' && <CallersView daysBack={daysBack} />}
@@ -620,6 +640,175 @@ function CallMode({ person, toast }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ============================================================================
+// CLAIM — imported calls nobody owns yet
+// ============================================================================
+// CallHippo logs every call under one shared seat, so the importer cannot say
+// who dialled. A call arrives owned by nobody and counts toward nobody until
+// its caller claims it. Claiming and classifying are one tap where possible,
+// because a call sitting unclaimed is a call missing from the funnel.
+
+function ClaimView({ person, toast, onCountChange }) {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [busyId, setBusyId] = useState(null)
+  const [expanded, setExpanded] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getUnclaimedCalls({ daysBack: 30 })
+      setRows(data)
+      onCountChange?.(data.length)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [onCountChange])
+
+  useEffect(() => { load() }, [load])
+
+  async function claim(row, outcome) {
+    if (!person?.id || busyId) return
+    setBusyId(row.id)
+    try {
+      await claimCall(row.id, person.id, { outcome })
+      // Drop it from the list rather than refetching — the queue is a working
+      // surface and a full reload loses the user's place.
+      setRows(prev => {
+        const next = prev.filter(r => r.id !== row.id)
+        onCountChange?.(next.length)
+        return next
+      })
+      setExpanded(null)
+      toast?.(outcome ? `Claimed — ${outcomeLabel(outcome)}` : 'Claimed', 'success')
+    } catch (e) {
+      // The "already claimed" race is a normal outcome, not a crash: two
+      // people can tap the same call. Refresh so they see the truth.
+      toast?.(e.message, 'error')
+      if (/already claimed/i.test(e.message)) load()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  if (loading) return <div className="loading"><div className="spinner" /> Loading imported calls…</div>
+  if (error) return <div className="alert-banner alert-danger">Could not load imported calls: {error}</div>
+
+  if (rows.length === 0) {
+    return (
+      <div className="empty-state" style={{ textAlign: 'center', padding: '48px 24px' }}>
+        <Check size={40} style={{ opacity: 0.3 }} />
+        <h3 style={{ margin: '12px 0 4px' }}>Nothing to claim</h3>
+        <p style={{ color: '#6b7280', maxWidth: '460px', margin: '0 auto 16px' }}>
+          Every imported call has an owner. New ones appear here after the daily
+          CallHippo sync.
+        </p>
+        <button className="btn btn-secondary" onClick={load}><RefreshCw size={14} /> Check again</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: '16px', borderLeft: '4px solid #dc2626' }}>
+        <strong>{rows.length} call{rows.length === 1 ? '' : 's'} imported from CallHippo with no owner.</strong>
+        <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '14px' }}>
+          Everyone dials from one shared CallHippo seat, so the import can&apos;t tell who made
+          which call. Claim yours and they count toward your target and your numbers —
+          until then they count for nobody. Adding the outcome at the same time is what
+          puts them in the funnel.
+        </p>
+      </div>
+
+      {rows.map(row => {
+        const isOpen = expanded === row.id
+        const busy = busyId === row.id
+        return (
+          <div key={row.id} className="card" style={{ marginBottom: '8px', opacity: busy ? 0.6 : 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span
+                title={row.connected ? 'The line connected' : 'Never picked up'}
+                style={{
+                  width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
+                  background: row.connected ? '#16a34a' : '#9ca3af'
+                }}
+              />
+              <div style={{ minWidth: '180px' }}>
+                <div style={{ fontWeight: 600 }}>
+                  {row.lead?.name || row.lead_name || 'Unknown number'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                  {row.lead?.firm_name || row.firm_name || (row.lead_id ? '' : 'Not in the CRM')}
+                </div>
+              </div>
+              <div style={{ fontSize: '13px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                {row.phone_number}
+              </div>
+              <div style={{ fontSize: '13px', color: '#6b7280', marginLeft: 'auto', textAlign: 'right' }}>
+                {timeAgo(row.called_at)}
+                {row.call_duration_seconds > 0 && <> · {fmtDuration(row.call_duration_seconds)}</>}
+                <div style={{ fontSize: '11px' }}>
+                  {row.connected ? 'connected' : 'no pickup'}
+                </div>
+              </div>
+              {row.lead_id && (
+                <a className="btn btn-secondary btn-sm" href={`/leads/${row.lead_id}`} target="_blank" rel="noreferrer">
+                  <ExternalLink size={13} />
+                </a>
+              )}
+              <button
+                className="btn btn-primary btn-sm"
+                disabled={busy}
+                onClick={() => setExpanded(isOpen ? null : row.id)}
+              >
+                {isOpen ? 'Cancel' : 'This was me'}
+              </button>
+            </div>
+
+            {isOpen && (
+              <div style={{ marginTop: '12px', borderTop: '1px solid #f3f4f6', paddingTop: '12px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '8px' }}>
+                  How did it go? CallHippo knows the line {row.connected ? 'connected' : 'never connected'} —
+                  it can&apos;t know whether you reached the person.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: '6px' }}>
+                  {CALL_OUTCOMES.map(o => (
+                    <button
+                      key={o.value}
+                      className="btn btn-sm"
+                      disabled={busy}
+                      title={o.hint}
+                      onClick={() => claim(row, o.value)}
+                      style={{
+                        justifyContent: 'flex-start', border: `1px solid ${o.color}`,
+                        background: 'white', color: o.color, fontWeight: 600
+                      }}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ marginTop: '8px' }}
+                  disabled={busy}
+                  onClick={() => claim(row, null)}
+                >
+                  Claim without an outcome
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

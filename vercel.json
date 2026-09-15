@@ -29,6 +29,10 @@
     {
       "path": "/api/weekly-digest",
       "schedule": "30 3 * * 1"
+    },
+    {
+      "path": "/api/callhippo-sync",
+      "schedule": "0 2 * * *"
     }
   ]
 }
