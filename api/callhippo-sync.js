@@ -160,14 +160,42 @@ export default async function handler(req, res) {
   }
 
   const dryRun = req.query?.dry_run === '1'
-  // Their hard ceiling is one month; asking for more errors the whole request.
-  const days = Math.min(Number(req.query?.days) || 7, 29)
+  // DEFAULT TO THE FULL WINDOW, not to "since yesterday".
+  //
+  // CallHippo deletes call logs older than a month on this plan, so anything
+  // this job fails to collect inside 30 days is gone permanently — there is no
+  // re-fetch. A narrow daily window would mean one missed night = one lost
+  // night. Asking for the whole 29 days every run costs two extra pages and
+  // makes ANY single successful run repair every gap the API can still see:
+  // the job heals itself as long as it comes back within a month.
+  // provider_call_id is unique, so re-reading the same calls inserts nothing.
+  const days = Math.min(Number(req.query?.days) || 29, 29)
   const db = supabase()
   // run_key is the logical period, matching the weekly digest's contract —
   // the IST day the sync covered, so repeated runs on one day are legible.
   const runKey = istDateStr(Date.now())
 
   try {
+    // How long since this job last succeeded? A run that returns after a long
+    // silence is the signal that the cron stopped — and if the silence is
+    // approaching CallHippo's one-month retention, calls have already been
+    // lost. Reported in the response and the heartbeat so it is visible
+    // wherever anyone looks.
+    let daysSinceLastOk = null
+    try {
+      const { data: prev } = await db
+        .from('crm_cron_runs')
+        .select('ran_at')
+        .eq('job', 'callhippo-sync')
+        .eq('status', 'ok')
+        .order('ran_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (prev?.ran_at) {
+        daysSinceLastOk = Math.floor((Date.now() - Date.parse(prev.ran_at)) / 86400000)
+      }
+    } catch { /* never block the import on its own diagnostics */ }
+
     const end = new Date()
     const start = new Date(Date.now() - days * 86400000)
 
@@ -220,6 +248,10 @@ export default async function handler(req, res) {
 
     const summary = {
       window_days: days,
+      days_since_last_ok: daysSinceLastOk,
+      // True once a gap gets close enough to their retention wall that calls
+      // may already have aged out before we ever saw them.
+      data_may_have_been_lost: daysSinceLastOk != null && daysSinceLastOk >= 29,
       fetched: records.length,
       outgoing: outgoing.length,
       already_imported: outgoing.length - rows.length,

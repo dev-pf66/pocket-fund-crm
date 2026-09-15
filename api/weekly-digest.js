@@ -171,6 +171,60 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
   return { weekKey: lastStart, title: `Weekly Outreach Digest — w/o ${lastStart}`, body: lines.join('\n') }
 }
 
+/**
+ * Independent watchdog on the CallHippo importer, rendered as extra lines for
+ * the weekly digest.
+ *
+ * The importer writes its own heartbeat, but a cron that never FIRES writes
+ * nothing at all — and that failure is invisible in exactly the case that
+ * costs the most: CallHippo deletes call logs after about a month, so a
+ * silently dead sync destroys dials rather than delaying them.
+ *
+ * This digest is a separate cron on a separate schedule, so it still runs
+ * when that one doesn't. Two independent jobs failing in the same week is far
+ * less likely than one.
+ *
+ * Never throws — a watchdog must not be able to break the digest it rides on.
+ * Returns [] when the sync is healthy.
+ */
+async function callSyncWarningLines() {
+  try {
+    const { data } = await supabase
+      .from('crm_cron_runs')
+      .select('ran_at')
+      .eq('job', 'callhippo-sync')
+      .eq('status', 'ok')
+      .order('ran_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const ageDays = data?.ran_at
+      ? Math.floor((Date.now() - Date.parse(data.ran_at)) / 86400000)
+      : null
+
+    const FIX = '   Fix: curl -H "Authorization: Bearer $CRON_SECRET" https://pocket-fund-crm.vercel.app/api/callhippo-sync'
+
+    if (ageDays === null) {
+      return ['', '⚠️ CallHippo call sync has NEVER completed — no dials are being imported.', FIX]
+    }
+    // Daily job: one missed night is noise, two is a pattern.
+    if (ageDays >= 2) {
+      return [
+        '',
+        `⚠️ CallHippo call sync last succeeded ${ageDays} days ago.` +
+          (ageDays >= 25
+            ? ' CallHippo keeps only ~30 days of logs — dials are being permanently lost right now.'
+            : ' CallHippo keeps only ~30 days of logs, so this cannot wait.'),
+        FIX,
+      ]
+    }
+    return []
+  } catch (e) {
+    console.error('weekly-digest: call-sync watchdog failed', e)
+    return []
+  }
+}
+
 async function buildDigest() {
   const today = istDateStr()
   const lastStart = addDays(weekStart(today), -7)
@@ -195,7 +249,14 @@ async function buildDigest() {
       .gte('demo_date', prevStart).lte('demo_date', lastEnd))
   ])
 
-  return composeDigest({ people, outreach, meetings, demos, today })
+  const digest = composeDigest({ people, outreach, meetings, demos, today })
+
+  // Appended after composing so composeDigest stays pure and synchronous —
+  // its guardrail tests depend on that.
+  const warning = await callSyncWarningLines()
+  return warning.length
+    ? { ...digest, body: `${digest.body}\n${warning.join('\n')}` }
+    : digest
 }
 
 // Heartbeat. Best-effort by design: a logging failure must never be the reason
