@@ -833,3 +833,50 @@ export async function unclaimCall(id, personId) {
   cacheClear('dashboard')
   return data
 }
+
+// ============================================================================
+// SYNC HEALTH
+// ============================================================================
+
+/**
+ * Age of the last successful CallHippo import.
+ *
+ * This matters more than a normal cron-health check: CallHippo's plan drops
+ * call logs after about a month, so a sync that quietly stops does not delay
+ * data — it destroys it. Every day the job is down is a day of dials that can
+ * never be recovered.
+ *
+ * Surfaced as a banner on the Cold Calls page precisely because it needs no
+ * cron of its own to fire: the people who would lose the data are looking at
+ * this page anyway, which makes human attention the one alerting path that
+ * cannot itself silently stop.
+ *
+ * Returns { lastOkAt, ageDays, stale, critical, neverRun }.
+ */
+export async function getCallSyncStatus() {
+  const { data, error } = await supabase
+    .from('crm_cron_runs')
+    .select('ran_at, detail')
+    .eq('job', 'callhippo-sync')
+    .eq('status', 'ok')
+    .order('ran_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+
+  const lastOkAt = data?.ran_at || null
+  const ageDays = lastOkAt
+    ? Math.floor((Date.now() - Date.parse(lastOkAt)) / 86400000)
+    : null
+
+  return {
+    lastOkAt,
+    ageDays,
+    neverRun: !lastOkAt,
+    // Daily job: one missed night is noise, two is a pattern.
+    stale: ageDays == null || ageDays >= 2,
+    // Past this we are inside the margin where CallHippo starts deleting
+    // calls we never collected.
+    critical: ageDays == null || ageDays >= 25,
+  }
+}

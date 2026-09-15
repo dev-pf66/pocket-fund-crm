@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  getUnclaimedCalls, getUnclaimedCallCount, claimCall,
+  getUnclaimedCalls, getUnclaimedCallCount, claimCall, getCallSyncStatus,
   getCallQueue, getCallFunnel, getCallerScorecard, getCallbacksDue,
   logCall, getTodayCallCount, setDoNotCall, getCallLog, MAX_CALL_ATTEMPTS,
   logCallTranscript, getCallTranscriptIds, bulkCreateCallLeads
@@ -68,9 +68,11 @@ function ColdCalls() {
   // Badge on the Claim tab. Imported calls belong to nobody until somebody
   // taps, so an unclaimed pile is the thing most worth surfacing on arrival.
   const [unclaimedCount, setUnclaimedCount] = useState(0)
+  const [syncStatus, setSyncStatus] = useState(null)
   useEffect(() => {
     let alive = true
     getUnclaimedCallCount().then(n => { if (alive) setUnclaimedCount(n) }).catch(() => {})
+    getCallSyncStatus().then(s2 => { if (alive) setSyncStatus(s2) }).catch(() => {})
     return () => { alive = false }
   }, [])
 
@@ -99,6 +101,33 @@ function ColdCalls() {
           </div>
         )}
       </div>
+
+      {syncStatus?.stale && (
+        <div
+          className="alert-banner"
+          style={{
+            marginBottom: '16px', padding: '12px 14px', borderRadius: '8px',
+            background: syncStatus.critical ? '#fef2f2' : '#fffbeb',
+            border: `1px solid ${syncStatus.critical ? '#dc2626' : '#f59e0b'}`
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            <AlertTriangle size={18} style={{ color: syncStatus.critical ? '#dc2626' : '#b45309', flexShrink: 0, marginTop: '1px' }} />
+            <div>
+              <strong>
+                {syncStatus.neverRun
+                  ? 'Calls have never synced from CallHippo.'
+                  : `Calls haven't synced from CallHippo in ${syncStatus.ageDays} day${syncStatus.ageDays === 1 ? '' : 's'}.`}
+              </strong>
+              <div style={{ fontSize: '14px', marginTop: '4px', color: '#374151' }}>
+                {syncStatus.critical
+                  ? 'CallHippo deletes call logs after about a month, so dials may already be permanently lost. This needs fixing today.'
+                  : 'New dials won\u2019t appear here until it runs. CallHippo only keeps a month of history, so this can\u2019t be left.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="tabs">
         <button className={`tab ${tab === 'call' ? 'active' : ''}`} onClick={() => setTab('call')}>
