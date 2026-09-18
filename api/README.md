@@ -22,7 +22,7 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 { "error": "Unauthorized. Provide valid x-api-key header." }
 ```
 
-> **Cron endpoints** (`daily-leads`, `daily-leads-v2`) use `Authorization: Bearer CRON_SECRET` instead — they are triggered automatically by Vercel Cron and are not meant for manual use.
+> **Cron endpoints** (`weekly-digest`, `callhippo-sync`, `health`) use `Authorization: Bearer CRON_SECRET` instead — the first two are triggered automatically by Vercel Cron; `health` is for manual/monitoring use.
 
 ---
 
@@ -42,9 +42,10 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `GET` | [`/api/investors`](#get-apiinvestors) | API key | List investors (filterable + searchable) |
 | `GET` | [`/api/investors?id=`](#get-apiinvestorsid123) | API key | Get single investor by ID |
 | `POST` | [`/api/investors`](#post-apiinvestors) | API key | Create a new investor |
-| `GET` | `/api/daily-leads` | Cron secret | Auto-import leads from LinkedIn (v1) |
-| `GET` | `/api/daily-leads-v2` | Cron secret | Auto-import from LinkedIn + Crunchbase (v2) |
 | `POST` | [`/api/events/fire`](#post-apieventsfire) | Supabase JWT | Fire an internal app event (Task Tracker integration) |
+| `GET`/`POST` | [`/api/weekly-digest`](#cron-jobs-internal) | Cron secret | Per-analyst rollup posted to Sage (Mon 03:30 UTC) |
+| `POST` | [`/api/callhippo-sync`](#cron-jobs-internal) | Cron secret | Import CallHippo dials into `crm_outreach_log` (daily) |
+| `GET` | [`/api/health`](#cron-jobs-internal) | Cron secret | Missing-env + cron heartbeat report |
 
 ---
 
@@ -734,32 +735,38 @@ curl -X POST \
 
 ## Cron Jobs (Internal)
 
-These are triggered automatically by Vercel Cron. They use `Authorization: Bearer CRON_SECRET`, not the API key.
+These are triggered automatically by Vercel Cron (`vercel.json`). They use `Authorization: Bearer CRON_SECRET`, not the API key. (The old `daily-leads` / `daily-leads-v2` LinkedIn scrapers documented here previously were removed in August 2026 — they never successfully imported a lead. Recoverable from git history if ever revived.)
 
-### GET /api/daily-leads-v2
+### POST /api/weekly-digest
 
-**Schedule:** Daily at 9:00 AM UTC (`0 9 * * *`)
+**Schedule:** Monday 03:30 UTC = 9:00 IST (`30 3 * * 1`)
 
-Scrapes LinkedIn (and eventually Crunchbase) for potential business buyers, scores them, deduplicates against existing leads, and imports the top 10 into the CRM.
+Posts a per-analyst rollup of the past week's pipeline movement as a due-dated Sage task. Covers every non-archived person, zeros included. Idempotent per week via `crm_tt_mappings`; a failed run writes a `crm_cron_runs` heartbeat row and files its own high-priority Sage task.
 
-**Scoring criteria:** Profiles mentioning "acquisition", "M&A", "search fund", or "EIR" score highest (max 5). Profiles with 500+ connections get a bonus.
+### POST /api/callhippo-sync
+
+**Schedule:** Daily at 02:00 UTC (`0 2 * * *`). Can also be run by hand: `curl -H "Authorization: Bearer $CRON_SECRET" ".../api/callhippo-sync?days=30&dry_run=1"`.
+
+Imports outgoing CallHippo dials into `crm_outreach_log` (`outreach_type='phone_call'`), matched to a lead by the last 10 digits of phone. CallHippo deletes call logs older than ~30 days on the current plan with no backfill, so every run re-pulls the full ~29-day window — `provider_call_id` is uniquely indexed, so re-importing the same calls is a no-op. Calls always arrive **unclaimed** (`logged_by: null`, one shared CallHippo seat) and with **no outcome** (`call_outcome: null`) — a human claims and judges each one. Writes a `crm_cron_runs` heartbeat every run.
 
 **200 Response:**
 ```json
 {
-  "success": true,
-  "imported": 3,
-  "skipped": 7,
-  "breakdown": { "linkedin": 8, "crunchbase": 0 },
-  "leads": [
-    { "name": "Alex Chen", "company": "Pacific Equity", "source": "linkedin_auto" }
-  ]
+  "ok": true,
+  "window_days": 29,
+  "fetched": 214,
+  "outgoing": 180,
+  "already_imported": 150,
+  "to_insert": 30,
+  "matched_to_lead": 22,
+  "unmatched": 8,
+  "inserted": 30
 }
 ```
 
-### GET /api/daily-leads
+### GET /api/health
 
-Legacy v1 scraper (LinkedIn only). Superseded by `daily-leads-v2` but still functional.
+Reports missing required env vars (see `REQUIRED` in `api/health.js`) plus the last run of `weekly-digest` and `callhippo-sync` from `crm_cron_runs`, including whether a `callhippo-sync` gap is approaching CallHippo's 30-day retention wall (`data_may_have_been_lost`).
 
 ---
 
