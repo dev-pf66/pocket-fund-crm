@@ -2,13 +2,30 @@ import { useState, useEffect } from 'react'
 import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead, getEmailTemplates } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl, placeholderNameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
-import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
+import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, TrendingUp, Upload, Download, Edit2, Zap } from 'lucide-react'
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useToast } from '../components/Toast'
 import { dailyTargetOf, hasTarget } from './Dashboard'
 import { useSessionState } from '../hooks/useSessionState'
 import { istToday } from '../lib/dateUtils'
-import { parseCSVText, parseDateCell } from '../lib/csv'
+import { parseCSVText, parseDateCell, toCSV, downloadCSV } from '../lib/csv'
+
+// Columns for the "Export My Leads" download — the working set an analyst
+// needs to pick up their list outside the app, not every system column on
+// crm_leads (see api/README.md for the full schema).
+const LEAD_EXPORT_COLUMNS = [
+  { key: 'name', label: 'Name' },
+  { key: 'firm_name', label: 'Firm' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'linkedin_url', label: 'LinkedIn' },
+  { key: 'lead_type', label: 'Type' },
+  { key: 'stage', label: 'Stage' },
+  { key: 'lead_source', label: 'Source' },
+  { key: 'lead_score', label: 'Score' },
+  { key: 'next_follow_up_date', label: 'Next Follow-up' },
+  { key: 'notes', label: 'Notes' },
+]
 
 // Map free-text CSV values into the canonical dropdown keys the table uses.
 // Without this, a row that says "Cold Email" or "LinkedIn" would import as
@@ -81,6 +98,7 @@ function OutreachTracker() {
   const [savingEdits, setSavingEdits] = useState(false)
 
   const [quickLogging, setQuickLogging] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const [filter, setFilter] = useState({
     view: 'today', // 'today', 'week', 'all'
@@ -341,6 +359,29 @@ function OutreachTracker() {
     }
   }
 
+  // Every lead assigned to (or created by) the logged-in analyst, regardless
+  // of the Tracker's date/type/status filters above — this is their working
+  // list, not the current view.
+  async function handleExportLeads() {
+    if (!currentPerson?.id) return
+    setExporting(true)
+    try {
+      const myLeads = await getLeads({}, currentPerson.id)
+      if (myLeads.length === 0) {
+        toast.warn('No leads assigned to you yet')
+        return
+      }
+      const csv = toCSV(myLeads, LEAD_EXPORT_COLUMNS)
+      downloadCSV(`my-leads-${istToday()}.csv`, csv)
+      toast.success(`Exported ${myLeads.length} lead${myLeads.length === 1 ? '' : 's'}`)
+    } catch (error) {
+      console.error('Failed to export leads:', error)
+      toast.error('Export failed: ' + error.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   async function handleDelete(id) {
     if (!confirm('Delete this outreach entry?')) return
 
@@ -392,6 +433,15 @@ function OutreachTracker() {
       <div className="page-header">
         <h1>Tracker</h1>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleExportLeads}
+            disabled={exporting}
+            title="Export every lead assigned to you as a CSV"
+          >
+            <Download size={16} />
+            {exporting ? 'Exporting…' : 'Export My Leads'}
+          </button>
           <button
             className="btn btn-secondary"
             onClick={() => setShowCsvUpload(!showCsvUpload)}

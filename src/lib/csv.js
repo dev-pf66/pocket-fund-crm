@@ -37,6 +37,34 @@ export function parseCSVText(text) {
   return rows
 }
 
+// Quote a field per RFC 4180 whenever it contains a comma, quote or newline
+// — anything else round-trips through parseCSVText unquoted and unchanged.
+function csvField(value) {
+  const s = value === null || value === undefined ? '' : String(value)
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+// Serialize rows into an RFC-4180-ish CSV string. `columns` is
+// [{ key, label }] — key reads the row, label is the header text.
+export function toCSV(rows, columns) {
+  const header = columns.map(c => csvField(c.label)).join(',')
+  const lines = rows.map(row => columns.map(c => csvField(row[c.key])).join(','))
+  return [header, ...lines].join('\r\n')
+}
+
+// Trigger a browser download of `text` as a file named `filename`.
+export function downloadCSV(filename, text) {
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 // Parse a loose date string into YYYY-MM-DD, or null if it doesn't look like
 // a date. Used to guard CSV imports where a misaligned column could send a
 // non-date value (e.g. "Replied") into a Postgres DATE column.
