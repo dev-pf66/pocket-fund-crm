@@ -598,6 +598,84 @@ export async function getCallerScorecard({ daysBack = 30 } = {}) {
     .sort((a, b) => b.conversations - a.conversations || b.pickups - a.pickups || b.dials - a.dials)
 }
 
+/**
+ * Per-person, per-day dial counts — the "did everyone show up today" grid.
+ *
+ * The scorecard averages a window into one number per person, which hides the
+ * shape that actually matters: twenty dials on Monday and nothing for the rest
+ * of the week averages to the same four-a-day as a person who did four every
+ * day, and those are completely different problems.
+ *
+ * Unclaimed calls get their own row rather than being dropped. Everyone shares
+ * one CallHippo seat, so most imported dials have no owner — a grid that
+ * silently excluded them would report the team as idle on days they worked.
+ *
+ * Returns { days, rows, totals } where days is oldest → newest.
+ */
+export async function getDailyCallOutput({ daysBack = 14 } = {}) {
+  const today = istToday()
+  const since = istAddDays(today, -(daysBack - 1))
+
+  const [calls, people] = await Promise.all([
+    fetchAllRows(() => supabase
+      .from('crm_outreach_log')
+      .select('logged_by, outreach_date, connected, call_outcome')
+      .eq('outreach_type', 'phone_call')
+      .gte('outreach_date', since)
+      .order('id')),
+    fetchAllRows(() => supabase.from('people').select('id, name, is_archived').order('id')),
+  ])
+
+  const days = []
+  for (let i = 0; i < daysBack; i += 1) days.push(istAddDays(since, i))
+
+  const nameById = new Map(people.filter(p => !p.is_archived).map(p => [p.id, p.name]))
+
+  // 'unclaimed' is a string key so it can never collide with a person id.
+  const buckets = new Map()
+  const bucketFor = (key, name) => {
+    if (!buckets.has(key)) {
+      buckets.set(key, { key, name, byDay: new Map(), total: 0, connected: 0, conversations: 0 })
+    }
+    return buckets.get(key)
+  }
+
+  for (const c of calls) {
+    const key = c.logged_by == null ? 'unclaimed' : c.logged_by
+    // A call attributed to someone no longer on the roster still happened;
+    // label it rather than dropping the work.
+    const name = key === 'unclaimed' ? 'Unclaimed' : (nameById.get(c.logged_by) || 'Former teammate')
+    const b = bucketFor(key, name)
+    const day = c.outreach_date
+    b.byDay.set(day, (b.byDay.get(day) || 0) + 1)
+    b.total += 1
+    if (c.connected) b.connected += 1
+    if (isConversation(c.call_outcome)) b.conversations += 1
+  }
+
+  // Everyone on the roster gets a row even at zero — an empty row is the
+  // signal, and filtering to people with activity would hide exactly the
+  // person worth asking about.
+  for (const [id, name] of nameById) bucketFor(id, name)
+
+  const rows = [...buckets.values()]
+    .map(b => ({
+      ...b,
+      daily: days.map(d => b.byDay.get(d) || 0),
+      activeDays: days.filter(d => (b.byDay.get(d) || 0) > 0).length,
+    }))
+    .sort((a, b) => {
+      // Unclaimed sits last: it is a data-quality row, not a person.
+      if (a.key === 'unclaimed') return 1
+      if (b.key === 'unclaimed') return -1
+      return b.total - a.total || String(a.name).localeCompare(String(b.name))
+    })
+
+  const totals = days.map((_, i) => rows.reduce((sum, r) => sum + r.daily[i], 0))
+
+  return { days, rows, totals, daysBack }
+}
+
 // ============================================================================
 // THE CALL QUEUE
 // ============================================================================
