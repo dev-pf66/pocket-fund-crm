@@ -7,7 +7,25 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Valid enum values
 const VALID_STAGES = ['outreach', 'responded', 'meeting_booked', 'warm_active', 'client', 'reach_out_later', 'passed']
-const VALID_LEAD_TYPES = ['Independent Sponsor', 'PE Firm', 'Family Office', 'Other']
+// Fallback only. lead_type is admin-managed in crm_lead_type_options (migration
+// 022) and the UI reads it from there via useLeadTypes, so a hardcoded list here
+// drifts the moment an admin adds a type: the app writes it happily while this
+// API rejects it with a 400. Live data already contains CA, WealthMgr,
+// Lawyer MA, vCFO, CS and PrivateBanker — none of which this array knew about.
+const DEFAULT_LEAD_TYPES = ['Independent Sponsor', 'PE Firm', 'Family Office', 'Other']
+
+// Reads the admin-managed options, falling back to the defaults if the table is
+// absent (un-migrated project) or the read fails — mirrors the UI hook rather
+// than failing a write over a config lookup.
+async function getValidLeadTypes() {
+  try {
+    const { data, error } = await supabase.from('crm_lead_type_options').select('name')
+    if (error || !data?.length) return DEFAULT_LEAD_TYPES
+    return data.map(r => r.name)
+  } catch {
+    return DEFAULT_LEAD_TYPES
+  }
+}
 const VALID_LEAD_SOURCES = ['LinkedIn', 'Referral', 'Cold Email', 'Event', 'Website']
 
 // Fields allowed when creating a lead
@@ -125,11 +143,14 @@ async function handlePost(req, res) {
       })
     }
 
-    if (body.lead_type && !VALID_LEAD_TYPES.includes(body.lead_type)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid lead_type. Must be one of: ${VALID_LEAD_TYPES.join(', ')}`
-      })
+    if (body.lead_type) {
+      const validLeadTypes = await getValidLeadTypes()
+      if (!validLeadTypes.includes(body.lead_type)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid lead_type. Must be one of: ${validLeadTypes.join(', ')}`
+        })
+      }
     }
 
     if (body.lead_source && !VALID_LEAD_SOURCES.includes(body.lead_source)) {
