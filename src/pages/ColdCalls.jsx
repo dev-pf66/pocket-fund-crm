@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  getUnclaimedCalls, getUnclaimedCallCount, claimCall, getCallSyncStatus,
+  getUnclaimedCalls, getUnclaimedCallCount, claimCall, getCallSyncStatus, getDailyCallOutput,
   getCallQueue, getCallFunnel, getCallerScorecard, getCallbacksDue,
   logCall, getTodayCallCount, setDoNotCall, getCallLog, MAX_CALL_ATTEMPTS,
   logCallTranscript, getCallTranscriptIds, bulkCreateCallLeads
@@ -1045,6 +1045,123 @@ function FunnelView({ daysBack, personId, teamScope }) {
 // CALLERS — consistent? effective?
 // ============================================================================
 
+// Person × day dial counts. The scorecard below averages the same window into
+// one number each, which hides the shape: twenty dials on Monday and nothing
+// after averages to the same four-a-day as four every day, and those are
+// different conversations to have.
+function DailyOutputGrid({ daysBack }) {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    async function load() {
+      try {
+        const d = await getDailyCallOutput({ daysBack: Math.min(daysBack, 21) })
+        if (alive) setData(d)
+      } catch (e) {
+        if (alive) setError(e.message)
+      }
+    }
+    load()
+    return () => { alive = false }
+  }, [daysBack])
+
+  if (error) return <div className="alert-banner alert-danger">Could not load daily output: {error}</div>
+  if (!data) return null
+
+  const peak = Math.max(...data.rows.flatMap(r => r.daily), 1)
+  const isWeekend = (d) => [0, 6].includes(new Date(`${d}T12:00:00Z`).getUTCDay())
+
+  return (
+    <div className="card" style={{ marginBottom: '16px' }}>
+      <div className="card-header">
+        <h3 style={{ margin: 0 }}>Daily output</h3>
+        <span style={{ color: '#6b7280', fontSize: '13px' }}>dials per person per day · IST</span>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: '13px', width: '100%' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: '4px 8px 6px 0', minWidth: '130px' }}></th>
+              {data.days.map(d => (
+                <th key={d} style={{
+                  padding: '4px 2px', fontWeight: 500, fontSize: '10px',
+                  color: isWeekend(d) ? '#d1d5db' : '#9ca3af', textAlign: 'center', minWidth: '26px'
+                }}>
+                  {new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { day: 'numeric' })}
+                </th>
+              ))}
+              <th style={{ padding: '4px 0 6px 10px', textAlign: 'right', color: '#6b7280', fontSize: '11px' }}>Total</th>
+              <th style={{ padding: '4px 0 6px 8px', textAlign: 'right', color: '#6b7280', fontSize: '11px' }}>Days on</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.rows.map(r => (
+              <tr key={r.key}>
+                <td style={{
+                  padding: '3px 8px 3px 0', fontWeight: r.key === 'unclaimed' ? 400 : 600,
+                  color: r.key === 'unclaimed' ? '#b45309' : 'inherit', whiteSpace: 'nowrap'
+                }}>
+                  {r.name}
+                </td>
+                {r.daily.map((n, i) => (
+                  <td key={data.days[i]} style={{ padding: '2px' }}>
+                    <div
+                      title={`${r.name} · ${data.days[i]} · ${n} dial${n === 1 ? '' : 's'}`}
+                      style={{
+                        height: '22px', borderRadius: '3px', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        fontSize: '11px', fontVariantNumeric: 'tabular-nums',
+                        // Intensity by volume; a zero on a weekday is left
+                        // visibly blank because that is the thing to notice.
+                        background: n === 0
+                          ? (isWeekend(data.days[i]) ? '#fafafa' : '#f3f4f6')
+                          : `rgba(14, 165, 233, ${0.15 + 0.85 * (n / peak)})`,
+                        color: n === 0 ? '#d1d5db' : (n / peak > 0.55 ? 'white' : '#0c4a6e'),
+                        fontWeight: n > 0 ? 600 : 400,
+                      }}
+                    >
+                      {n || ''}
+                    </div>
+                  </td>
+                ))}
+                <td style={{ padding: '2px 0 2px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                  {r.total || <span style={{ color: '#d1d5db' }}>0</span>}
+                </td>
+                <td style={{ padding: '2px 0 2px 8px', textAlign: 'right', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                  {r.activeDays}
+                </td>
+              </tr>
+            ))}
+            <tr style={{ borderTop: '2px solid #e5e7eb' }}>
+              <td style={{ padding: '6px 8px 0 0', fontWeight: 700 }}>Team</td>
+              {data.totals.map((n, i) => (
+                <td key={data.days[i]} style={{
+                  padding: '6px 2px 0', textAlign: 'center', fontSize: '11px',
+                  fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+                  color: n === 0 ? '#d1d5db' : '#374151'
+                }}>{n || '·'}</td>
+              ))}
+              <td style={{ padding: '6px 0 0 10px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                {data.totals.reduce((a, b) => a + b, 0)}
+              </td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {data.rows.some(r => r.key === 'unclaimed' && r.total > 0) && (
+        <p style={{ fontSize: '12px', color: '#b45309', margin: '10px 0 0' }}>
+          Calls on the <strong>Unclaimed</strong> row were made — they just have no owner yet.
+          Everyone dials from one shared CallHippo seat, so until people claim their calls on the
+          Claim tab, that row holds work the per-person rows are missing.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function CallersView({ daysBack }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1072,15 +1189,20 @@ function CallersView({ daysBack }) {
   if (error) return <div className="alert-banner alert-danger">Could not load the scorecard: {error}</div>
   if (rows.length === 0) {
     return (
+      <div>
+        <DailyOutputGrid daysBack={daysBack} />
       <div className="empty-state" style={{ textAlign: 'center', padding: '48px 24px' }}>
         <Users size={40} style={{ opacity: 0.3 }} />
         <h3 style={{ margin: '12px 0 4px' }}>Nobody has logged a call in this window</h3>
       </div>
+          </div>
     )
   }
 
   return (
-    <div className="card">
+    <div>
+      <DailyOutputGrid daysBack={daysBack} />
+      <div className="card">
       <div className="card-header">
         <h3 style={{ margin: 0 }}>Consistency and effectiveness</h3>
         <span style={{ color: '#6b7280', fontSize: '13px' }}>
@@ -1126,6 +1248,7 @@ function CallersView({ daysBack }) {
         cold call on a Sunday. &ldquo;Cost&rdquo; is dials per meeting booked: high dials with a high cost is a
         script problem, low dials with a low cost is a volume problem.
       </p>
+      </div>
     </div>
   )
 }
