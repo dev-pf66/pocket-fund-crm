@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript, getOutreachForLead, getDemosForLead, createTrackerTask } from '../lib/crm-api'
+import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript, getOutreachForLead, getDemosForLead, createTrackerTask, getCallsForLead } from '../lib/crm-api'
 import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck, CheckSquare } from 'lucide-react'
 import { useToast } from '../components/Toast'
@@ -9,6 +9,7 @@ import FollowUpCard from '../components/FollowUpCard'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
 import { istToday, istAddDays } from '../lib/dateUtils'
+import { outcomeLabel, outcomeColor, fmtDuration } from '../lib/callOutcomes'
 
 const today = istToday
 const emptyActivity = () => ({ activity_type: 'call', notes: '', transcript: '', activity_date: today() })
@@ -141,6 +142,22 @@ function LeadDetail() {
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editedLead, setEditedLead] = useState(null)
+  // Every dial at this person — the lead-side answer to "have we called them,
+  // how many times, and what happened". Calls live in crm_outreach_log rather
+  // than the activity table, so the timeline below never showed them.
+  const [calls, setCalls] = useState([])
+  useEffect(() => {
+    let alive = true
+    async function loadCalls() {
+      try {
+        const c = await getCallsForLead(id)
+        if (alive) setCalls(c)
+      } catch { /* the rest of the page must still render */ }
+    }
+    loadCalls()
+    return () => { alive = false }
+  }, [id])
+
   const [showActivityForm, setShowActivityForm] = useSessionState(`ld:${id}:showActivityForm`, false)
   const [showTranscriptForm, setShowTranscriptForm] = useSessionState(`ld:${id}:showTranscriptForm`, false)
   const [newActivity, setNewActivity, clearNewActivity] = useSessionState(`ld:${id}:newActivity`, emptyActivity())
@@ -1361,6 +1378,67 @@ function LeadDetail() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Call history — separate from the activity timeline because calls
+            are logged as outreach rows, not activities, and because "how many
+            times have we tried this person" is its own question. */}
+        {calls.length > 0 && (
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h2 style={{ margin: 0 }}>Calls</h2>
+              <span style={{ color: 'var(--gray-600)', fontSize: '13px' }}>
+                {calls.length} dial{calls.length === 1 ? '' : 's'} ·{' '}
+                {calls.filter(c => c.connected).length} connected
+              </span>
+            </div>
+            <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+              <tbody>
+                {calls.map(c => (
+                  <tr key={c.id} style={{ borderTop: '1px solid var(--gray-100, #f3f4f6)' }}>
+                    <td style={{ padding: '7px 6px', width: '150px', color: 'var(--gray-600)', fontVariantNumeric: 'tabular-nums' }}>
+                      {c.called_at
+                        ? new Date(c.called_at).toLocaleString('en-US', {
+                            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                            timeZone: 'Asia/Kolkata'
+                          })
+                        : c.outreach_date}
+                    </td>
+                    <td style={{ padding: '7px 6px', width: '14px' }}>
+                      <span
+                        title={c.connected ? 'The line connected' : 'Never picked up'}
+                        style={{
+                          display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
+                          background: c.connected ? '#16a34a' : '#d1d5db'
+                        }}
+                      />
+                    </td>
+                    <td style={{ padding: '7px 6px' }}>
+                      {c.logged_by_person?.name
+                        || <span style={{ color: '#b45309' }}>unclaimed</span>}
+                    </td>
+                    <td style={{ padding: '7px 6px', color: outcomeColor(c.call_outcome), fontWeight: 500 }}>
+                      {c.call_outcome
+                        ? outcomeLabel(c.call_outcome)
+                        : <span style={{ color: 'var(--gray-400, #9ca3af)', fontWeight: 400 }}>no outcome</span>}
+                    </td>
+                    <td style={{ padding: '7px 6px', width: '70px', textAlign: 'right', color: 'var(--gray-600)' }}>
+                      {c.call_duration_seconds > 0 ? fmtDuration(c.call_duration_seconds) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {calls.some(c => c.notes) && (
+              <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--gray-600)' }}>
+                {calls.filter(c => c.notes).map(c => (
+                  <div key={c.id} style={{ padding: '4px 0' }}>
+                    <strong>{c.outreach_date}:</strong> {c.notes}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

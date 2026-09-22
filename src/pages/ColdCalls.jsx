@@ -151,6 +151,9 @@ function ColdCalls() {
         <button className={`tab ${tab === 'callers' ? 'active' : ''}`} onClick={() => setTab('callers')}>
           <Users size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />Callers
         </button>
+        <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
+          <FileText size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />History
+        </button>
       </div>
 
       {tab === 'call' && <CallMode person={currentPerson} toast={toast} />}
@@ -158,6 +161,7 @@ function ColdCalls() {
       {tab === 'funnel' && <FunnelView daysBack={daysBack} personId={scopeId} teamScope={isAdmin && teamScope} />}
       {tab === 'queue' && <CallQueueView person={currentPerson} isAdmin={isAdmin} people={people} toast={toast} />}
       {tab === 'callers' && <CallersView daysBack={daysBack} />}
+      {tab === 'history' && <HistoryView daysBack={daysBack} people={people} isAdmin={isAdmin} />}
     </div>
   )
 }
@@ -1456,6 +1460,151 @@ function AddCallListModal({ personId, isAdmin, people, onClose, onDone }) {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// HISTORY — who called whom
+// ============================================================================
+// The Callers tab answers "is this person consistent and effective" in
+// aggregate. It cannot answer "what did they actually DO", which is the
+// question you ask before a one-on-one. This is the drill-down: one row per
+// call, who made it, who they reached, and how it went.
+//
+// Unattributed calls are shown, not hidden. Everyone shares one CallHippo
+// seat, so an imported call has no owner until somebody claims it — and a
+// review that quietly dropped those would under-report the work.
+
+function HistoryView({ daysBack, people, isAdmin }) {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [who, setWho] = useState('all')
+  const [outcomeFilter, setOutcomeFilter] = useState('all')
+
+  useEffect(() => {
+    let alive = true
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        // Non-admins are scoped to themselves by RLS anyway; passing null
+        // keeps unclaimed rows visible so they can recognise their own calls.
+        const d = await getCallLog({ daysBack })
+        if (alive) setRows(d)
+      } catch (e) {
+        if (alive) setError(e.message)
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    load()
+    return () => { alive = false }
+  }, [daysBack])
+
+  const filtered = useMemo(() => rows.filter(r => {
+    if (who === 'unclaimed' && r.logged_by) return false
+    if (who !== 'all' && who !== 'unclaimed' && String(r.logged_by) !== String(who)) return false
+    if (outcomeFilter === 'none' && r.call_outcome) return false
+    if (outcomeFilter !== 'all' && outcomeFilter !== 'none' && r.call_outcome !== outcomeFilter) return false
+    return true
+  }), [rows, who, outcomeFilter])
+
+  // Grouped by day so a review reads as "what happened on Tuesday" rather
+  // than as an undifferentiated list.
+  const byDay = useMemo(() => {
+    const m = new Map()
+    for (const r of filtered) {
+      const d = r.outreach_date || 'undated'
+      if (!m.has(d)) m.set(d, [])
+      m.get(d).push(r)
+    }
+    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+  }, [filtered])
+
+  if (loading) return <div className="loading"><div className="spinner" /> Loading call history…</div>
+  if (error) return <div className="alert-banner alert-danger">Could not load call history: {error}</div>
+
+  const unclaimedCount = rows.filter(r => !r.logged_by).length
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <select className="form-select" style={{ width: 'auto' }} value={who} onChange={e => setWho(e.target.value)}>
+          <option value="all">Everyone</option>
+          {unclaimedCount > 0 && <option value="unclaimed">Unclaimed ({unclaimedCount})</option>}
+          {(people || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <select className="form-select" style={{ width: 'auto' }} value={outcomeFilter} onChange={e => setOutcomeFilter(e.target.value)}>
+          <option value="all">Any outcome</option>
+          <option value="none">No outcome yet</option>
+          {CALL_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: 'auto' }}>
+          {filtered.length} call{filtered.length === 1 ? '' : 's'} · last {daysBack} days
+          {!isAdmin && ' · you only see calls you can access'}
+        </span>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="empty-state" style={{ textAlign: 'center', padding: '40px' }}>
+          <PhoneOff size={36} style={{ opacity: 0.3 }} />
+          <h3 style={{ margin: '12px 0 4px' }}>No calls match</h3>
+          <p style={{ color: '#6b7280' }}>Try a wider window or a different filter.</p>
+        </div>
+      ) : byDay.map(([day, calls]) => (
+        <div key={day} className="card" style={{ marginBottom: '12px' }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <h3 style={{ margin: 0, fontSize: '15px' }}>{day === 'undated' ? 'Undated' : fmtDate(day)}</h3>
+            <span style={{ color: '#6b7280', fontSize: '13px' }}>
+              {calls.length} dial{calls.length === 1 ? '' : 's'} ·{' '}
+              {calls.filter(c => c.connected).length} connected
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+              <tbody>
+                {calls.map(c => (
+                  <tr key={c.id} style={{ borderTop: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '7px 6px', width: '70px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                      {c.called_at
+                        ? new Date(c.called_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+                        : '—'}
+                    </td>
+                    <td style={{ padding: '7px 6px', width: '14px' }}>
+                      <span
+                        title={c.connected ? 'The line connected' : 'Never picked up'}
+                        style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: c.connected ? '#16a34a' : '#d1d5db' }}
+                      />
+                    </td>
+                    <td style={{ padding: '7px 6px' }}>
+                      {c.lead?.id ? (
+                        <a href={`/leads/${c.lead.id}`} style={{ fontWeight: 500 }}>{c.lead.name}</a>
+                      ) : (
+                        <span style={{ color: '#6b7280' }}>{c.lead_name || c.phone_number || 'Unknown'}</span>
+                      )}
+                      {c.lead?.firm_name && <span style={{ color: '#9ca3af' }}> · {c.lead.firm_name}</span>}
+                      {!c.lead?.id && <span style={{ color: '#9ca3af', fontSize: '12px' }}> · not in the CRM</span>}
+                    </td>
+                    <td style={{ padding: '7px 6px', width: '130px' }}>
+                      {c.logged_by_person?.name
+                        ? <span style={{ fontWeight: 500 }}>{c.logged_by_person.name}</span>
+                        : <span style={{ color: '#b45309', fontSize: '13px' }}>unclaimed</span>}
+                    </td>
+                    <td style={{ padding: '7px 6px', width: '140px', color: outcomeColor(c.call_outcome), fontWeight: 500 }}>
+                      {c.call_outcome ? outcomeLabel(c.call_outcome) : <span style={{ color: '#9ca3af', fontWeight: 400 }}>no outcome</span>}
+                    </td>
+                    <td style={{ padding: '7px 6px', width: '70px', textAlign: 'right', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                      {c.call_duration_seconds > 0 ? fmtDuration(c.call_duration_seconds) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

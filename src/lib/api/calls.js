@@ -441,6 +441,27 @@ async function getCallMetricRows(daysBack, personId = null) {
  * Also returns `attempts` — pickup rate by attempt number — which is the
  * evidence for whether the 6th dial is worth making.
  */
+/**
+ * Every call ever logged against one lead, newest first — the lead-side
+ * answer to "have we called them, how many times, and what happened".
+ *
+ * Deliberately NOT date-bounded, unlike getCallLog: on a lead page the whole
+ * history is the point. "We've tried him six times since June" is the fact
+ * that decides whether to try a seventh.
+ */
+export async function getCallsForLead(leadId) {
+  if (!leadId) return []
+  return fetchAllRows(() => supabase
+    .from('crm_outreach_log')
+    .select(`${CALL_COLUMNS}, logged_by_person:logged_by(id, name)`)
+    .eq('outreach_type', 'phone_call')
+    .eq('lead_id', leadId)
+    // Total sort — called_at is null on rows logged before it existed, so id
+    // is what keeps paging deterministic.
+    .order('called_at', { ascending: false })
+    .order('id', { ascending: false }))
+}
+
 export async function getCallFunnel({ daysBack = 30, personId = null } = {}) {
   const rows = await getCallMetricRows(daysBack, personId)
   const summary = summarizeCalls(rows)
