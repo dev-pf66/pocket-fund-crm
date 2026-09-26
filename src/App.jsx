@@ -17,6 +17,7 @@ import LeadDetail from './pages/LeadDetail'
 import Investors from './pages/Investors'
 import InvestorDetail from './pages/InvestorDetail'
 import { isAdminUser } from './lib/admin'
+import { normaliseEmail, findPersonByEmail } from './lib/identity'
 
 // After a deploy, users with a cached index.html reference chunk filenames
 // that no longer exist on the CDN. Detect that failure mode and reload once
@@ -86,19 +87,27 @@ function AppContent() {
     try {
       const allPeople = await getPeople()
 
-      let person = allPeople.find(p => p.email === email)
+      // Case-insensitive by way of the shared helper — see src/lib/identity.js
+      // for why this must match how RLS resolves identity.
+      const wanted = normaliseEmail(email)
+      let person = findPersonByEmail(allPeople, email)
 
       if (!person) {
         const { data: newPerson, error } = await supabase
           .from('people')
-          .insert([{ name: email.split('@')[0], email }])
+          .insert([{ name: email.split('@')[0], email: wanted }])
           .select()
           .single()
 
-        if (!error && newPerson) {
-          person = newPerson
-          allPeople.push(newPerson)
+        if (error) {
+          // Don't let this fail silently: with no person row the app has no
+          // identity, every per-user query returns nothing, and the screen
+          // just looks empty. Surface it instead.
+          console.error('Failed to self-heal missing person row:', error)
+          throw error
         }
+        person = newPerson
+        allPeople.push(newPerson)
       }
 
       // Archived accounts keep their data but can't use the app.

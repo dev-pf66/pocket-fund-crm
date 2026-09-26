@@ -16,7 +16,10 @@ export async function isAuthorized(req) {
       if (!error && data?.user) return true
     } catch { /* fall through to api-key check */ }
   }
-  const apiKey = req.headers['x-api-key'] || req.query?.api_key
+  // Header only. A key in the query string ends up in Vercel access logs,
+  // browser history and outbound Referer headers — i.e. permanently leaked in
+  // places nobody thinks to rotate.
+  const apiKey = req.headers['x-api-key']
   const validKey = process.env.CRM_API_KEY
   return Boolean(validKey) && apiKey === validKey
 }
