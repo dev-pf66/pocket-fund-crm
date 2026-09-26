@@ -178,6 +178,11 @@ export async function getLeads(filters = {}, personId = null) {
       .select('*')
       .order('updated_at', { ascending: false })
 
+    // Archived leads are retained in full but are out of the working book by
+    // default — every board, count and rollup that runs through here should
+    // agree on that. Pass includeArchived to see them (the Archive view does).
+    if (!filters.includeArchived) query = query.eq('is_archived', false)
+
     if (filters.stage) query = query.eq('stage', filters.stage)
     if (filters.lead_type) query = query.eq('lead_type', filters.lead_type)
     if (filters.needs_sample_deals !== undefined) query = query.eq('needs_sample_deals', filters.needs_sample_deals)
@@ -269,8 +274,14 @@ export async function findLeadByLinkedInUrl(linkedinUrl) {
  * 1000-row truncation to hide behind. The ILIKE patterns can over-match
  * (a longer slug containing this one, `_` acting as a wildcard), so every
  * candidate is re-checked exactly on the client before it counts as a match.
+ *
+ * ARCHIVED LEADS ARE DELIBERATELY INCLUDED HERE. Do not add
+ * .eq('is_archived', false) to the probes below — archiving hides a lead from
+ * the working surfaces, it does not forget that we already know this person.
+ * Filter them out and the next import cheerfully re-creates every archived
+ * lead as brand new, which is the one outcome archiving exists to avoid.
  */
-const DUPE_FIELDS = 'id, name, firm_name, email, linkedin_url, stage, assigned_to'
+const DUPE_FIELDS = 'id, name, firm_name, email, linkedin_url, stage, assigned_to, is_archived'
 
 export async function findDuplicateLead({ linkedin_url, email, name, firm_name } = {}) {
   try {
@@ -580,6 +591,7 @@ export async function getFollowUpsDueToday(personId = null) {
   let query = supabase
     .from('crm_leads')
     .select('*')
+    .eq('is_archived', false)
     .or(`next_follow_up_date.eq.${today},reach_out_later_date.eq.${today}`)
     .neq('stage', 'passed')
 
@@ -599,6 +611,7 @@ export async function getLeadsNeedingSamples(personId = null) {
     .from('crm_leads')
     .select('*')
     .eq('needs_sample_deals', true)
+    .eq('is_archived', false)
     .neq('stage', 'passed')
 
   if (personId) query = query.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
@@ -707,6 +720,7 @@ export async function getWeeklyStats(personId = null) {
       let q = supabase
         .from('crm_leads')
         .select('stage, created_at, updated_at')
+        .eq('is_archived', false)
       if (personId) q = q.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
       return q
     })
@@ -846,6 +860,7 @@ export async function getAssignedLeads(personId) {
   const { data, error } = await supabase
     .from('crm_leads')
     .select('*')
+    .eq('is_archived', false)
     .eq('assigned_to', personId)
     .order('assigned_date', { ascending: false })
 

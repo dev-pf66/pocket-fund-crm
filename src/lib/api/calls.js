@@ -740,6 +740,7 @@ export async function getCallQueue(personId = null, { limit = 50, daysBackHistor
       .not('phone', 'is', null)
       .neq('phone', '')
       .eq('do_not_call', false)
+      .eq('is_archived', false)
       // Cold calling works the top of the funnel. Won and dead leads are out.
       .not('stage', 'in', '("client","passed")')
       .order('id')

@@ -93,6 +93,7 @@ export async function getTodayQueue(personId, { limit = 25 } = {}) {
     .from('crm_leads')
     .select('*')
     .eq('assigned_to', personId)
+    .eq('is_archived', false)
     .in('stage', TODAY_QUEUE_STAGES)
   if (error) throw error
 
@@ -172,6 +173,7 @@ export async function getFollowUpsDue(personId) {
     .from('crm_leads')
     .select('*')
     .eq('assigned_to', personId)
+    .eq('is_archived', false)
     .not('stage', 'in', '(passed,client)')
   if (error) throw error
 
@@ -210,6 +212,7 @@ export async function getEscalations(personId = null, { limit = 10 } = {}) {
     let q = supabase
       .from('crm_leads')
       .select('*')
+      .eq('is_archived', false)
       .not('stage', 'in', '(passed,client)')
     if (personId) q = q.eq('assigned_to', personId)
     return q
@@ -246,6 +249,7 @@ export async function getUnassignedLeads() {
   return fetchAllRows(() => supabase
     .from('crm_leads')
     .select('id, name, stage')
+    .eq('is_archived', false)
     .is('assigned_to', null)
     .not('stage', 'in', '(passed,client)'))
 }
@@ -314,6 +318,7 @@ export async function getTodayCounters(personId) {
   const leadsQ = supabase
     .from('crm_leads')
     .select('id, stage, created_at, last_activity_date')
+    .eq('is_archived', false)
     .eq('assigned_to', personId)
     .not('stage', 'in', '(passed,client)')
 

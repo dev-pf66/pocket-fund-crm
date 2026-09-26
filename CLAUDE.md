@@ -83,6 +83,35 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     load someone who asked not to be called.
   - Recordings are a pasted CallHippo URL on the call row (`recording_url`). A CallHippo webhook
     that auto-logs dials is the obvious next step and is why `provider_call_id` (unique) exists.
+- **Notifications are derived, not typed in (Sept 2026).** The bell used to watch one
+  column — `crm_leads.next_follow_up_date`, scoped to `assigned_to` — so it nagged the whole
+  team about ~10 rows while 158 leads that had *replied* sat untouched for over a week and 158
+  engaged leads had no owner at all (every notification surface filters on `assigned_to`, so an
+  unowned lead was structurally invisible). `src/lib/api/notifications.js` now derives the feed
+  from state the DB already holds: promised callbacks (`crm_outreach_log.callback_at`, **time
+  preserved** — a 3pm callback is not "sometime today"), demos (`crm_demos.demo_datetime`),
+  scheduled follow-ups on leads **and on sellers/partners** (those columns existed since
+  migrations 033/020 and nothing had ever read them), engaged leads gone quiet, and unowned
+  engaged leads (admin-only).
+  - Staleness is **continuous**. `getFollowUpsDue` in `today.js` still pings on
+    `marks.has(daysStale)` — day 3/7/14 *exactly*, then silence forever; that exact-match is why
+    179 engaged leads scored nothing. Don't copy that pattern.
+  - There is **no display floor**. The old page hid anything >14 days overdue. Forgetting is now
+    an explicit act — you archive the lead. If it's in the pipeline, it counts.
+  - Sources run under `Promise.allSettled`: one failing source degrades that source and is
+    reported in `errors`, rather than silently shortening the list.
+  - The badge counts overdue + due-today only. Never count upcoming work into it.
+- **Archiving leads (migration 049).** `crm_leads.is_archived` / `archived_at` /
+  `archived_reason`, mirroring `people.is_archived` (029). Archived leads are out of every board,
+  count, queue and notification, but **nothing is deleted** and un-archiving is one flag flip.
+  Admin → "Archive old leads" is preview-first (per-stage breakdown before any write) with a
+  one-click undo keyed on `archived_at`; per-lead Archive/Restore is on the lead detail page, and
+  the Pipeline board has a Show/Hide Archived filter.
+  - **Dedupe deliberately still sees archived leads** (`findDuplicateLead`, the import probe in
+    `queue.js`). Filter them out and the next import re-creates the entire archive as new leads.
+    There's a guardrail test on this — don't "fix" it.
+  - Clients are never swept. `getLeads` takes `{ includeArchived }`; `/api/leads` takes
+    `?include_archived=true`; `/api/analytics` excludes them unconditionally.
 - Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view. Shipped July 2026 (`feature/today-tab` PR merged).
 - Dev's standing product decisions (July 2026): Tracker/Queue/Log stay three separate pages; all five contact tables stay (leads, sellers, investors, partners, demos).
 

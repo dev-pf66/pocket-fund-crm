@@ -4,16 +4,16 @@ import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../App'
 import { isAdminUser } from '../lib/admin'
 import CommandPalette from './CommandPalette'
-import { useFollowUpCount } from '../hooks/useFollowUpCount'
+import { useNotificationCount } from '../hooks/useNotificationCount'
 import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun, Search, Bell, PhoneCall } from 'lucide-react'
 
 function Layout() {
   const { signOut } = useAuth()
   const { currentPerson } = useApp()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const followUps = useFollowUpCount(currentPerson?.id)
-
   const isAdmin = isAdminUser(currentPerson)
+  // Admins additionally get the unowned-lead signal, so the badge has to know.
+  const notifications = useNotificationCount(currentPerson?.id, { isAdmin })
 
   // Grouped nav — sections keep the eleven items from reading as one flat
   // "which page do I use?" list. Each item carries a `show` flag; groups with
@@ -23,7 +23,7 @@ function Layout() {
       label: 'Daily Work',
       items: [
         { to: '/today', label: 'Today', icon: <Sun size={18} /> },
-        { to: '/notifications', label: 'Notifications', icon: <Bell size={18} />, badge: followUps.total, badgeUrgent: followUps.overdue > 0 },
+        { to: '/notifications', label: 'Notifications', icon: <Bell size={18} />, badge: notifications.total, badgeUrgent: notifications.overdue > 0 },
         { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
         { to: '/outreach', label: 'Tracker', icon: <Target size={18} /> },
         { to: '/outreach-queue', label: 'Queue', icon: <Inbox size={18} /> },

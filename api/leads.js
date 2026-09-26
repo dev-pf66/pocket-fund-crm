@@ -47,7 +47,10 @@ function authenticate(req) {
 }
 
 // Fields allowed when updating a lead via PATCH
-const PATCH_FIELDS = ['assigned_to', 'stage', 'next_follow_up_date', 'follow_up_note', 'notes']
+// is_archived is patchable so the archive is operable from the API too, not
+// only from the Admin UI. archived_at/archived_reason are set by the app's
+// own helpers; a bare flag flip here is still fully reversible.
+const PATCH_FIELDS = ['assigned_to', 'stage', 'next_follow_up_date', 'follow_up_note', 'notes', 'is_archived']
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -77,7 +80,7 @@ export default async function handler(req, res) {
 
 async function handleGet(req, res) {
   try {
-    const { id, stage, lead_type, limit = 100 } = req.query
+    const { id, stage, lead_type, limit = 100, include_archived } = req.query
 
     // Single lead by ID
     if (id) {
@@ -97,12 +100,18 @@ async function handleGet(req, res) {
       return res.status(200).json({ success: true, data })
     }
 
-    // List leads with filters
+    // List leads with filters. Archived leads are out of the working book by
+    // default so this agrees with the app's boards and counts; pass
+    // ?include_archived=true to see them.
     let query = supabase
       .from('crm_leads')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(parseInt(limit))
+
+    if (include_archived !== 'true') {
+      query = query.eq('is_archived', false)
+    }
 
     if (stage) {
       query = query.eq('stage', stage)
