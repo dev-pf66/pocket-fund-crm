@@ -264,7 +264,9 @@ Update an existing lead by ID. `id` can be a query param or a body field. Only t
 | `assigned_to` | integer | Person ID to assign the lead to (`null` to unassign) |
 | `stage` | string | See [Stage enum](#stage) |
 | `next_follow_up_date` | string | ISO date (`YYYY-MM-DD`) |
+| `follow_up_note` | string | What to say when you circle back |
 | `notes` | string | |
+| `is_archived` | boolean | Take the lead off the boards / put it back. Reversible; nothing is deleted |
 
 **Example:**
 ```bash

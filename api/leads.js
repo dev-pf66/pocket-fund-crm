@@ -47,7 +47,10 @@ function authenticate(req) {
 }
 
 // Fields allowed when updating a lead via PATCH
-const PATCH_FIELDS = ['assigned_to', 'stage', 'next_follow_up_date', 'follow_up_note', 'notes']
+// is_archived is patchable so the archive is operable from the API too, not
+// only from the Admin UI. archived_at/archived_reason are set by the app's
+// own helpers; a bare flag flip here is still fully reversible.
+const PATCH_FIELDS = ['assigned_to', 'stage', 'next_follow_up_date', 'follow_up_note', 'notes', 'is_archived']
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
