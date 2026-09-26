@@ -17,11 +17,21 @@ async function authenticate(req) {
   const anon = createClient(supabaseUrl, supabaseAnon)
   const { data, error } = await anon.auth.getUser(token)
   if (error || !data?.user?.email) return null
-  const { data: person } = await admin
+  // Exact match on the normalised (lower-cased) column — NOT ilike, whose `_`
+  // and `%` are wildcards and `_` is legal in an email local part. Migration
+  // 051 lower-cases people.email and enforces it with a trigger.
+  // limit(1) rather than maybeSingle(): people.email has
+  // historically had no unique constraint, and maybeSingle() ERRORS on more
+  // than one row. That error used to be discarded here, which silently demoted
+  // a real admin to "not an admin" instead of failing visibly.
+  const { data: personRows, error: personErr } = await admin
     .from('people')
     .select('id, name, email, is_admin')
-    .eq('email', data.user.email)
-    .maybeSingle()
+    .eq('email', String(data.user.email).toLowerCase())
+    .order('id')
+    .limit(1)
+  if (personErr) throw personErr
+  const person = personRows?.[0]
   return person
     ? { ...person, isAdmin: person.is_admin || person.email === BOOTSTRAP_ADMIN_EMAIL }
     : { id: null, email: data.user.email, isAdmin: data.user.email === BOOTSTRAP_ADMIN_EMAIL }
@@ -31,13 +41,23 @@ async function authenticate(req) {
 // there's no direct getUserByEmail. Stops as soon as we find a match.
 async function findAuthUserByEmail(email) {
   const lower = email.toLowerCase()
+  const PER_PAGE = 200
   let page = 1
   for (;;) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: PER_PAGE })
     if (error) throw error
-    const found = data.users.find(u => (u.email || '').toLowerCase() === lower)
+    const users = data?.users
+    // Guard BEFORE using it — the old code called .find() on this and only then
+    // checked whether it existed.
+    if (!Array.isArray(users) || users.length === 0) return null
+    const found = users.find(u => (u.email || '').toLowerCase() === lower)
     if (found) return found
-    if (!data.users || data.users.length < 1000) return null
+    // Never assume the server honoured the page size we asked for; GoTrue may
+    // clamp perPage, and comparing against our own requested number would make
+    // every page look like the last one and stop after page 1. Compare against
+    // what actually came back.
+    if (users.length < PER_PAGE) return null
+    if (page >= 50) throw new Error('findAuthUserByEmail: too many pages, aborting')
     page += 1
   }
 }

@@ -34,13 +34,20 @@ export async function signUpWithEmail(email, password, name) {
   })
   if (error) throw error
 
-  // Create person record if signup successful
-  if (data.user) {
+  // Create the person record if we already have a session. With email
+  // confirmation enabled, signUp() returns no session, so this insert runs as
+  // `anon` and is correctly refused by the people INSERT policy (migration
+  // 050). That is not a failure: App.jsx creates the row on first successful
+  // login, where the request is authenticated and the email is known-good.
+  // Logged at debug level so it stops looking like a real error in the console.
+  if (data.user && data.session) {
     const { error: personError } = await supabase
       .from('people')
-      .insert([{ email, name }])
+      .insert([{ email: String(email).toLowerCase(), name }])
 
-    if (personError) console.error('Failed to create person record:', personError)
+    if (personError) {
+      console.debug('Person row not created at signup; first login will create it:', personError.message)
+    }
   }
 
   return data

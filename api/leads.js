@@ -46,7 +46,9 @@ const ALLOWED_FIELDS = [
 ]
 
 function authenticate(req) {
-  const apiKey = req.headers['x-api-key'] || req.query.api_key
+  // Header only — a key in the query string leaks into access logs, browser
+  // history and Referer headers. See api/_auth.js.
+  const apiKey = req.headers['x-api-key']
   const validKey = process.env.CRM_API_KEY
   // Boolean(validKey) first: without it, an unset CRM_API_KEY makes
   // `undefined === undefined` true and every unauthenticated request

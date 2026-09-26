@@ -13,7 +13,7 @@ Every request must include your API key via **one** of:
 | Method | Format |
 |--------|--------|
 | Header (preferred) | `x-api-key: YOUR_KEY` |
-| Query param | `?api_key=YOUR_KEY` |
+| ~~Query param~~ | **Removed Sept 2026** — `?api_key=` leaked the key into access logs, browser history and `Referer` headers. Use the header. |
 
 The key is stored in the `CRM_API_KEY` Vercel environment variable.
 
