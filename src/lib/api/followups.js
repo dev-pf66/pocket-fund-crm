@@ -249,6 +249,7 @@ export async function getFollowUpNotifications(personId = null, { limit = 8 } = 
   let q = supabase
     .from('crm_leads')
     .select('id, name, firm_name, stage, assigned_to, next_follow_up_date, follow_up_note, follow_up_cadence')
+    .eq('is_archived', false)
     .not('next_follow_up_date', 'is', null)
     .lte('next_follow_up_date', today)
     .gte('next_follow_up_date', floor)
@@ -286,6 +287,7 @@ export async function getFollowUpBoard(personId = null, { upcomingDays = 14, ove
   let q = supabase
     .from('crm_leads')
     .select('*')
+    .eq('is_archived', false)
     .not('next_follow_up_date', 'is', null)
     .lte('next_follow_up_date', horizon)
     .gte('next_follow_up_date', floor)

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript, getOutreachForLead, getDemosForLead, createTrackerTask, getCallsForLead } from '../lib/crm-api'
+import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript, getOutreachForLead, getDemosForLead, createTrackerTask, getCallsForLead, setLeadArchived } from '../lib/crm-api'
 import { useApp } from '../App'
-import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck, CheckSquare } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck, CheckSquare, Archive, ArchiveRestore } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import StageChip from '../components/StageChip'
 import FollowUpCard from '../components/FollowUpCard'
@@ -289,6 +289,23 @@ function LeadDetail() {
     }
   }
 
+  // Archive is the reversible sibling of Delete: the row, its activities and
+  // its calls all stay, it just leaves the boards, the counts and the
+  // notification feed. It also keeps blocking duplicate imports.
+  async function handleToggleArchived() {
+    const next = !lead.is_archived
+    try {
+      const updated = await setLeadArchived(id, next)
+      setLead(updated)
+      toast.success(next
+        ? `${lead.name} archived — out of the boards, still fully here`
+        : `${lead.name} restored to the pipeline`)
+    } catch (error) {
+      console.error('Failed to change archived state:', error)
+      toast.error(`Failed to ${next ? 'archive' : 'restore'} lead`)
+    }
+  }
+
   async function handleAddActivity() {
     try {
       const { transcript, ...activityPayload } = newActivity
@@ -461,6 +478,16 @@ function LeadDetail() {
                 <Edit2 size={16} />
                 More Fields
               </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handleToggleArchived}
+                title={lead.is_archived
+                  ? 'Put this lead back on the boards'
+                  : 'Take this lead off the boards and out of notifications. Nothing is deleted.'}
+              >
+                {lead.is_archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                {lead.is_archived ? 'Restore' : 'Archive'}
+              </button>
               <button className="btn btn-danger" onClick={handleDelete}>
                 <Trash2 size={16} />
                 Delete
@@ -483,6 +510,26 @@ function LeadDetail() {
           )}
         </div>
       </div>
+
+      {/* An archived lead still opens normally — it just isn't on any board.
+          Say so plainly, or the page looks identical and the sweep looks like
+          data loss. */}
+      {lead.is_archived && (
+        <div className="card" style={{
+          padding: '12px 16px', marginBottom: '16px',
+          background: '#f9fafb', border: '1px solid #e5e7eb'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#374151' }}>
+            <Archive size={15} />
+            <span>
+              <strong>Archived</strong>
+              {lead.archived_at && ` on ${new Date(lead.archived_at).toLocaleDateString()}`}
+              {lead.archived_reason && ` — ${lead.archived_reason}`}.
+              {' '}Off the boards and out of notifications. Nothing was deleted; Restore puts it back.
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="lead-detail-grid">
         {/* Lead Info Card */}

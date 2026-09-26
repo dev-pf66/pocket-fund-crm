@@ -62,6 +62,12 @@ List leads with optional filters. Returns newest first.
 | `stage` | string | — | Filter by pipeline stage |
 | `lead_type` | string | — | Filter by lead type |
 | `limit` | integer | `100` | Max results to return |
+| `include_archived` | `true` | off | Include archived leads (excluded by default, so this agrees with the app's boards) |
+
+> **Archived leads are excluded by default.** Archiving (`is_archived`) takes a
+> lead out of the working surfaces without deleting anything — see the Archive
+> section in `CLAUDE.md`. `/api/analytics` excludes them unconditionally, since
+> those are the live pipeline's conversion rates.
 
 **Example:**
 ```bash

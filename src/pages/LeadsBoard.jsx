@@ -148,6 +148,9 @@ function LeadsBoard() {
   const [createdFilter, setCreatedFilter] = useSessionState('lb:createdFilter', 'all')
   const [hasEmail, setHasEmail] = useSessionState('lb:hasEmail', 'all')
   const [hasPhone, setHasPhone] = useSessionState('lb:hasPhone', 'all')
+  // Archived leads are out of the board by default. The toggle is the answer
+  // to "where did they go" — archiving hides a lead, it never loses one.
+  const [showArchived, setShowArchived] = useSessionState('lb:showArchived', false)
 
   // Saved searches state
   const [savedSearches, setSavedSearches] = useState(() => loadSavedSearches())
@@ -158,14 +161,14 @@ function LeadsBoard() {
   useEffect(() => {
     loadLeads()
     getCRMSettings().then(setSettings).catch(console.error)
-  }, [currentPerson?.id, isAdmin])
+  }, [currentPerson?.id, isAdmin, showArchived])
 
   const loadLeads = useCallback(async function loadLeads() {
     if (!currentPerson?.id) return
     try {
       // Admins pull everything (leadScopeId null); non-admins pull their own.
       const [data, demoIds, statusMap] = await Promise.all([
-        getLeads({}, leadScopeId),
+        getLeads({ includeArchived: showArchived }, leadScopeId),
         getDemoLeadIds(leadScopeId).catch(() => new Set()),
         getLeadLatestOutreachStatus(leadScopeId).catch(() => new Map())
       ])
@@ -177,7 +180,7 @@ function LeadsBoard() {
     } finally {
       setLoading(false)
     }
-  }, [currentPerson?.id, leadScopeId])
+  }, [currentPerson?.id, leadScopeId, showArchived])
 
   const handleDragStart = useCallback(function handleDragStart(e, lead) {
     setDraggedLead(lead)
@@ -879,6 +882,14 @@ function LeadsBoard() {
                       <button className={`filter-chip small ${hasPhone === 'all' ? 'active' : ''}`} onClick={() => setHasPhone('all')}>Any</button>
                       <button className={`filter-chip small ${hasPhone === 'yes' ? 'active' : ''}`} onClick={() => setHasPhone('yes')}>Yes</button>
                       <button className={`filter-chip small ${hasPhone === 'no' ? 'active' : ''}`} onClick={() => setHasPhone('no')}>No</button>
+                    </div>
+                  </div>
+
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Archived</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className={`filter-chip small ${!showArchived ? 'active' : ''}`} onClick={() => setShowArchived(false)}>Hide</button>
+                      <button className={`filter-chip small ${showArchived ? 'active' : ''}`} onClick={() => setShowArchived(true)}>Show</button>
                     </div>
                   </div>
                 </div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
 import { getPeople, setUserAdmin, deleteUser, adminSetUserPassword, generateTempPassword, setUserArchived, setUserTargets } from '../lib/supabase'
-import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption } from '../lib/crm-api'
+import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption, previewArchiveSweep, runArchiveSweep, undoArchiveSweep } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
 import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound, Archive, ArchiveRestore, Target } from 'lucide-react'
 import { isAdminUser } from '../lib/admin'
@@ -92,6 +92,190 @@ function FieldOptionsSection({ title, fieldName, hint }) {
             </button>
           </form>
         </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Archive old leads — the bulk sweep.
+ *
+ * Preview-first, always. Flagging several hundred rows is reversible, but
+ * everyone's board changes at once, so the numbers are shown broken down by
+ * stage BEFORE anything is written: "archive 316 leads" and "archive 134
+ * people who replied to us" are the same sentence until you split it up.
+ *
+ * Nothing here deletes. The sweep sets is_archived and stamps archived_at,
+ * and the last sweep can be undone whole from the button that appears after
+ * it runs.
+ */
+function ArchiveSweepSection() {
+  const { currentPerson } = useApp()
+  const { toast } = useToast()
+  const [days, setDays] = useState(90)
+  const [includeEngaged, setIncludeEngaged] = useState(true)
+  const [keepScheduled, setKeepScheduled] = useState(true)
+  const [preview, setPreview] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [lastSweep, setLastSweep] = useState(null)
+
+  const options = { days, includeEngaged, keepScheduled }
+
+  async function handlePreview() {
+    setBusy(true)
+    setLastSweep(null)
+    try {
+      setPreview(await previewArchiveSweep(options))
+    } catch (err) {
+      console.error('Archive preview failed:', err)
+      toast.error(`Preview failed: ${err.message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleRun() {
+    if (!preview || preview.total === 0) return
+    setBusy(true)
+    try {
+      const result = await runArchiveSweep(options, currentPerson?.id)
+      setLastSweep(result)
+      setPreview(null)
+      toast.success(`Archived ${result.archived} leads`)
+    } catch (err) {
+      console.error('Archive sweep failed:', err)
+      toast.error(`Sweep failed: ${err.message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleUndo() {
+    if (!lastSweep?.archivedAt) return
+    setBusy(true)
+    try {
+      const { restored } = await undoArchiveSweep(lastSweep.archivedAt)
+      setLastSweep(null)
+      toast.success(`Restored ${restored} leads`)
+    } catch (err) {
+      console.error('Undo failed:', err)
+      toast.error(`Undo failed: ${err.message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+        <Archive size={18} />
+        <h2 style={{ margin: 0, fontSize: '18px' }}>Archive old leads</h2>
+      </div>
+      <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+        Takes leads nobody has touched in a long time out of the boards, the counts and the
+        notification feed. Nothing is deleted — every row, activity and call is kept, and
+        archived leads still block duplicate imports. Clients are never swept.
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end', marginBottom: '14px' }}>
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+            No activity in (days)
+          </label>
+          <input
+            type="number" min="1" max="3650" value={days}
+            onChange={e => { setDays(Number(e.target.value)); setPreview(null) }}
+            disabled={busy}
+            style={{ width: '110px', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+          />
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#374151' }}>
+          <input
+            type="checkbox" checked={includeEngaged} disabled={busy}
+            onChange={e => { setIncludeEngaged(e.target.checked); setPreview(null) }}
+          />
+          Include leads that replied (responded / meeting / warm)
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#374151' }}>
+          <input
+            type="checkbox" checked={keepScheduled} disabled={busy}
+            onChange={e => { setKeepScheduled(e.target.checked); setPreview(null) }}
+          />
+          Keep anything with a follow-up scheduled
+        </label>
+        <button className="btn btn-secondary" onClick={handlePreview} disabled={busy}>
+          {busy && !preview ? 'Counting…' : 'Preview'}
+        </button>
+      </div>
+
+      {preview && (
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '14px', background: '#f9fafb' }}>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '8px' }}>
+            {preview.total} of {preview.scanned} live leads would be archived
+            <span style={{ fontWeight: 400, color: '#6b7280', fontSize: '13px' }}>
+              {' '}— nothing touched since {preview.criteria.cutoff}
+            </span>
+          </div>
+
+          {preview.total > 0 && (
+            <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                {Object.entries(preview.byStage).sort((a, b) => b[1] - a[1]).map(([stage, n]) => (
+                  <span key={stage} style={{
+                    fontSize: '12px', padding: '3px 8px', borderRadius: '4px',
+                    background: 'white', border: '1px solid #e5e7eb', color: '#374151'
+                  }}>
+                    {stage.replace(/_/g, ' ')}: <strong>{n}</strong>
+                  </span>
+                ))}
+              </div>
+
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
+                Oldest {Math.min(preview.sample.length, 20)}:
+              </div>
+              <div style={{ maxHeight: '190px', overflowY: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+                {preview.sample.map(s => (
+                  <div key={s.id} style={{
+                    display: 'flex', justifyContent: 'space-between', gap: '10px',
+                    padding: '6px 10px', fontSize: '12px', borderBottom: '1px solid #f3f4f6'
+                  }}>
+                    <span style={{ color: '#111827' }}>
+                      {s.name || 'Unknown'}{s.firm_name ? ` — ${s.firm_name}` : ''}
+                    </span>
+                    <span style={{ color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                      {s.stage.replace(/_/g, ' ')} · {s.lastTouched}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                className="btn btn-primary"
+                onClick={handleRun}
+                disabled={busy}
+                style={{ marginTop: '12px' }}
+              >
+                <Archive size={14} /> {busy ? 'Archiving…' : `Archive these ${preview.total}`}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {lastSweep && (
+        <div style={{
+          border: '1px solid #bbf7d0', background: '#f0fdf4', borderRadius: '8px',
+          padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: '12px', flexWrap: 'wrap'
+        }}>
+          <div style={{ fontSize: '13px', color: '#166534' }}>
+            Archived <strong>{lastSweep.archived}</strong> leads with no activity in {lastSweep.criteria.days} days.
+            They are out of the boards and the feed, and fully recoverable.
+          </div>
+          <button className="btn btn-sm btn-secondary" onClick={handleUndo} disabled={busy}>
+            <ArchiveRestore size={14} /> Undo this sweep
+          </button>
+        </div>
       )}
     </div>
   )
@@ -411,6 +595,8 @@ function Admin() {
           </>
         )}
       </div>
+
+      <ArchiveSweepSection />
 
       <FieldOptionsSection title="Industry Options" fieldName="industry" hint="Shown in the outreach log — the lead's sector." />
       <FieldOptionsSection title="Deal Size Options" fieldName="deal_size" hint="Shown in the outreach log — target deal value." />

@@ -21,7 +21,7 @@ import {
 } from '../lib/crm-api'
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
 import { useToast } from '../components/Toast'
-import { notifyFollowUpsChanged } from '../hooks/useFollowUpCount'
+import { notifyFollowUpsChanged } from '../hooks/useNotificationCount'
 import { isAdminUser } from '../lib/admin'
 import StageChip from '../components/StageChip'
 import StalenessBadge from '../components/StalenessBadge'

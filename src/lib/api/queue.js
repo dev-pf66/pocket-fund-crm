@@ -37,6 +37,10 @@ export async function bulkCreateLeads(urls, batchLabel, currentPersonId, assigne
   // Paginated: a plain select stops at PostgREST's 1000-row cap without
   // erroring, which would silently defeat the dedupe this function exists for
   // once crm_leads outgrows it — reimporting existing people as duplicates.
+  //
+  // Archived leads are included on purpose — see findDuplicateLead. An archived
+  // lead is still someone we know; skipping them here would re-import the
+  // entire archive on the next upload.
   const existing = await fetchAllRows(() => supabase
     .from('crm_leads')
     .select('linkedin_url')
@@ -108,6 +112,7 @@ export async function getOutreachQueue(currentPersonId) {
     .from('crm_leads')
     .select('*')
     .eq('assigned_to', currentPersonId)
+    .eq('is_archived', false)
     .eq('stage', 'outreach')
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -124,6 +129,7 @@ export async function getOutreachQueue(currentPersonId) {
     const batchLeads = await fetchAllRows(() => supabase
       .from('crm_leads')
       .select('id, import_batch_id')
+      .eq('is_archived', false)
       .eq('assigned_to', currentPersonId)
       .in('import_batch_id', batchIds))
     const batchTouched = await getTouchedLeadIds(batchLeads.map(l => l.id))

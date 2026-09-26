@@ -33,9 +33,13 @@ export default async function handler(req, res) {
   try {
     // Paged: every number below is a .filter().length over this array, so a
     // silent 1000-row truncation would report wrong conversion rates.
+    // Archived leads are excluded: these are the live pipeline's conversion
+    // rates, and a stage count here that disagrees with the board it's meant
+    // to explain is worse than no number at all.
     const leads = await fetchAllRows(() => supabase
       .from('crm_leads')
-      .select('id, stage, lead_source'))
+      .select('id, stage, lead_source')
+      .eq('is_archived', false))
 
     // Calculate analytics
     const stages = {

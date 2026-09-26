@@ -11,7 +11,7 @@ import {
 } from '../lib/crm-api'
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
 import { useToast } from './Toast'
-import { notifyFollowUpsChanged } from '../hooks/useFollowUpCount'
+import { notifyFollowUpsChanged } from '../hooks/useNotificationCount'
 
 const QUICK = [
   [1, 'Tomorrow'],
