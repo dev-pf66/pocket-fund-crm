@@ -28,6 +28,7 @@ vi.mock('../src/lib/supabase', () => ({
 }))
 
 const { getNotificationFeed, getNotificationCounts } = await import('../src/lib/api/notifications.js')
+const { istToday, istAddDays } = await import('../src/lib/dateUtils.js')
 
 const SETTINGS = {
   id: 1,
@@ -36,12 +37,21 @@ const SETTINGS = {
   active_conversation_threshold: 14
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
+// IST, not UTC. These helpers used to build dates with
+// `new Date().toISOString().slice(0, 10)` while the code under test reasons in
+// IST via istToday/istDateStr. For the 5.5 hours between 18:30 and 24:00 UTC the
+// two disagree by a day, so "a follow-up due today" was read by the app as
+// overdue and this file failed — every evening, IST, which is exactly when the
+// people who own this repo are working. Deriving from the app's own dateUtils
+// means the two cannot drift apart again.
+const today = () => istToday()
 function daysAgo(n) {
-  return new Date(Date.now() - n * 86400000).toISOString()
+  // Returned as a timestamp (some callers pass it to activity_date), anchored on
+  // the IST calendar day so it lands on the day the app thinks it does.
+  return new Date(`${istAddDays(istToday(), -n)}T12:00:00+05:30`).toISOString()
 }
 function daysAhead(n) {
-  return new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
+  return istAddDays(istToday(), n)
 }
 
 /**
