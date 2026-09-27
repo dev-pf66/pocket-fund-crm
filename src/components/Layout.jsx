@@ -5,7 +5,16 @@ import { useApp } from '../App'
 import { isAdminUser } from '../lib/admin'
 import CommandPalette from './CommandPalette'
 import { useNotificationCount } from '../hooks/useNotificationCount'
-import { LayoutDashboard, Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Inbox, Handshake, Presentation, Store, Sun, Search, Bell, PhoneCall } from 'lucide-react'
+import { buildNavGroups } from '../lib/nav'
+import { Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Handshake, Presentation, Store, Sun, Search, PhoneCall } from 'lucide-react'
+
+// Icon names live in src/lib/nav.js so that module stays pure and testable
+// (there is no component-test setup here, and the node-environment suite cannot
+// import JSX). This map is the only place they become elements.
+const ICONS = {
+  Sun, Target, PhoneCall, ClipboardList, Users, Presentation, Store, Briefcase,
+  Handshake, BarChart3, Mail, FileText, Shield, HelpCircle
+}
 
 function Layout() {
   const { signOut } = useAuth()
@@ -15,50 +24,12 @@ function Layout() {
   // Admins additionally get the unowned-lead signal, so the badge has to know.
   const notifications = useNotificationCount(currentPerson?.id, { isAdmin })
 
-  // Grouped nav — sections keep the eleven items from reading as one flat
-  // "which page do I use?" list. Each item carries a `show` flag; groups with
-  // no visible items are dropped.
-  const navGroups = [
-    {
-      label: 'Daily Work',
-      items: [
-        { to: '/today', label: 'Today', icon: <Sun size={18} /> },
-        { to: '/notifications', label: 'Notifications', icon: <Bell size={18} />, badge: notifications.total, badgeUrgent: notifications.overdue > 0 },
-        { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-        { to: '/outreach', label: 'Tracker', icon: <Target size={18} /> },
-        { to: '/outreach-queue', label: 'Queue', icon: <Inbox size={18} /> },
-        { to: '/cold-calls', label: 'Cold Calls', icon: <PhoneCall size={18} /> },
-        { to: '/outreach-admin', label: 'Log', icon: <ClipboardList size={18} /> },
-      ],
-    },
-    {
-      label: 'Pipelines',
-      items: [
-        { to: '/pipeline', label: 'Pipeline', icon: <Users size={18} /> },
-        { to: '/pe-os', label: 'PE OS', icon: <Presentation size={18} /> },
-        { to: '/sellers', label: 'Indian Sellers', icon: <Store size={18} /> },
-        { to: '/investors', label: 'Investors', icon: <Briefcase size={18} /> },
-        { to: '/partners', label: 'Partners', icon: <Handshake size={18} /> },
-      ],
-    },
-    {
-      label: 'Insights',
-      items: [
-        { to: '/analytics', label: 'Analytics', icon: <BarChart3 size={18} /> },
-      ],
-    },
-    {
-      label: 'Setup',
-      items: [
-        { to: '/templates', label: 'Templates', icon: <Mail size={18} />, show: isAdmin },
-        { to: '/samples', label: 'Sample Deals', icon: <FileText size={18} />, show: isAdmin },
-        { to: '/admin', label: 'Admin', icon: <Shield size={18} />, show: isAdmin },
-        { to: '/help', label: 'Help', icon: <HelpCircle size={18} /> },
-      ],
-    },
-  ]
-    .map(g => ({ ...g, items: g.items.filter(i => i.show !== false) }))
-    .filter(g => g.items.length > 0)
+  // Grouped nav. The structure lives in src/lib/nav.js — pure data, so the
+  // shape is pinned by test/nav-shape.test.js. Sept 2026: Today absorbed
+  // Notifications and Dashboard as sub-tabs, Queue lost its entry and Log went
+  // admin-only, taking an analyst's menu from 14 items to 10. Every route still
+  // exists; see that module for the reasoning.
+  const navGroups = buildNavGroups({ isAdmin, notifications })
 
   return (
     <div className="app-layout">
@@ -95,9 +66,11 @@ function Layout() {
         <nav>{navGroups.map(group => (
           <div key={group.label} className="nav-group">
             <div className="nav-group-label">{group.label}</div>
-            {group.items.map(item => (
+            {group.items.map(item => {
+              const Icon = ICONS[item.icon]
+              return (
               <NavLink key={item.to} to={item.to} onClick={() => setMobileMenuOpen(false)}>
-                {item.icon}{item.label}
+                {Icon && <Icon size={18} />}{item.label}
                 {item.badge > 0 && (
                   <span
                     title={item.badgeUrgent ? 'Overdue follow-ups' : 'Follow-ups due today'}
@@ -112,7 +85,8 @@ function Layout() {
                   </span>
                 )}
               </NavLink>
-            ))}
+              )
+            })}
           </div>
         ))}</nav>
         <div className="user-info">

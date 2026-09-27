@@ -270,6 +270,18 @@ Update an existing lead by ID. `id` can be a query param or a body field. Only t
 | `follow_up_note` | string | What to say when you circle back |
 | `notes` | string | |
 | `is_archived` | boolean | Take the lead off the boards / put it back. Reversible; nothing is deleted |
+| `lead_type` | string | Buyer type. See [Lead Type enum](#lead-type) |
+| `lead_channel` | string | How they found us (`Inbound — YouTube`, `Outbound — LinkedIn`, …). Options are admin-editable in `crm_field_options` |
+| `buying_timeline` | string | How soon they are buying |
+| `investment_thesis` | string | What they are actually looking for |
+| `prior_acquisitions` | string | What they have bought before |
+| `engagement_model` | string | Retainer / success fee / both |
+
+> The six fields above are the **required info** set. A lead that has reached `responded` is
+> expected to carry `lead_channel` and `lead_type`; from `meeting_booked` onward all six are
+> expected. This is enforced as a **flag, never a gate** — the API will not reject an incomplete
+> lead, and the CRM shows a banner naming what is missing. The policy lives in
+> `src/lib/leadHealth.js`.
 
 **Example:**
 ```bash
