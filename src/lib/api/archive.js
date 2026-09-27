@@ -31,7 +31,19 @@ export const NEVER_SWEEP_STAGES = ['client']
 /** Engaged means someone on the other side actually responded to us. */
 export const ENGAGED_STAGES = ['responded', 'meeting_booked', 'warm_active']
 
-export const DEFAULT_SWEEP_DAYS = 90
+// 60, not 90 — because the 90-day band has already been cleared.
+//
+// The first sweep ran at 90 days on 2026-09-26 and archived 306 leads, 150 of
+// them engaged and every one of those 91+ days quiet (146 past 120 days). It
+// did its job. What it left behind is the June/July 2026 import cohort, which
+// sits in the 61-90 day band: on 2026-09-27 that was 304 workable leads at 60+
+// days quiet and exactly ZERO at 90+, so leaving the default at 90 would have
+// made every subsequent Preview report nothing to do.
+//
+// Re-measure before changing this again. The distribution moves every time a
+// sweep runs, and a threshold tuned to last month's table reads as "the
+// feature is broken" when it is really just finished.
+export const DEFAULT_SWEEP_DAYS = 60
 
 /**
  * The day a lead was last genuinely touched. Falls back to created_at so an

@@ -113,8 +113,12 @@ describe('sweepCriteria', () => {
     expect(() => sweepCriteria({ days: 'soon' })).toThrow(/positive/)
   })
 
-  it('defaults to 90 days', () => {
-    expect(sweepCriteria().days).toBe(90)
+  it('defaults to 60 days, not 90', () => {
+    // The 90-day sweep already ran (2026-09-26, 306 leads) and cleared that
+    // band. On 2026-09-27 the live table had 304 workable leads at 60+ days
+    // quiet and ZERO at 90+, so a 90-day default would report nothing to do
+    // while the June/July 2026 import cohort sat untouched in the 61-90 band.
+    expect(sweepCriteria().days).toBe(60)
   })
 })
 

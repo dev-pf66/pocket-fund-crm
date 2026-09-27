@@ -28,13 +28,21 @@ async function getValidLeadTypes() {
 }
 const VALID_LEAD_SOURCES = ['LinkedIn', 'Referral', 'Cold Email', 'Event', 'Website']
 
-// Fields allowed when creating a lead
+// Fields allowed when creating a lead.
+//
+// assigned_to / created_by are on this list because THIS ENDPOINT WAS THE
+// SOURCE OF THE UNOWNED LEADS. It whitelisted neither, so every lead created
+// over HTTP landed with both NULL — 203 leads, and still happening: one was
+// created unowned on 2026-09-27. The browser paths have defaulted ownership to
+// the creator since July 2026 (createLead in src/lib/api/leads.js); the API
+// silently did not, and an unowned lead is invisible to every non-admin under
+// RLS (migration 018) and absent from every per-person surface.
 const ALLOWED_FIELDS = [
   'name', 'email', 'phone', 'firm_name', 'linkedin_url',
   'lead_type', 'deal_criteria', 'lead_source', 'stage', 'notes',
   'initial_conversation', 'needs_sample_deals', 'next_follow_up_date', 'follow_up_note',
   'reach_out_later_date', 'aum', 'investment_thesis', 'portfolio_size',
-  'fund_vintage'
+  'fund_vintage', 'assigned_to', 'created_by'
 ]
 
 function authenticate(req) {
@@ -169,6 +177,19 @@ async function handlePost(req, res) {
       })
     }
 
+    // Every lead needs an owner, and this endpoint has no logged-in user to
+    // infer one from — it authenticates with a shared API key, so the caller
+    // has to say who the lead belongs to. Rejecting is the only honest option:
+    // defaulting to some house account would put leads in a book nobody reads,
+    // and defaulting to NULL is the bug this replaces.
+    const ownerId = body.assigned_to ?? body.created_by
+    if (ownerId === undefined || ownerId === null || ownerId === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'assigned_to (or created_by) is required — a lead with no owner is invisible to everyone but an admin. Pass the person id of whoever this lead belongs to.'
+      })
+    }
+
     // Whitelist fields
     const insert = {}
     for (const field of ALLOWED_FIELDS) {
@@ -176,6 +197,13 @@ async function handlePost(req, res) {
         insert[field] = body[field]
       }
     }
+
+    // Whichever one the caller supplied, both end up set — the boards filter on
+    // `created_by OR assigned_to` but the owner LABEL reads assigned_to, so a
+    // lead with only one of them shows up owned by nobody.
+    insert.assigned_to = insert.assigned_to ?? ownerId
+    insert.created_by = insert.created_by ?? ownerId
+    insert.assigned_date = new Date().toISOString()
 
     const { data, error } = await supabase
       .from('crm_leads')
