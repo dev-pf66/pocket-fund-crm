@@ -295,7 +295,7 @@ function LeadDetail() {
   async function handleToggleArchived() {
     const next = !lead.is_archived
     try {
-      const updated = await setLeadArchived(id, next)
+      const updated = await setLeadArchived(id, next, { currentPersonId: currentPerson?.id })
       setLead(updated)
       toast.success(next
         ? `${lead.name} archived — out of the boards, still fully here`

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, moveLead, updateLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus, bulkMarkTouched } from '../lib/crm-api'
+import { getLeads, moveLead, updateLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus, bulkMarkTouched, leadOwnerId } from '../lib/crm-api'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import LeadCard from '../components/LeadCard'
@@ -315,13 +315,18 @@ function LeadsBoard() {
       }
 
       // Assignment filter
-      if (assignmentFilter === 'mine' && lead.assigned_to !== currentPerson?.id) continue
-      if (assignmentFilter === 'unassigned' && lead.assigned_to != null) continue
+      // leadOwnerId, not assigned_to: the board lists a lead if you created it
+      // OR own it, and the card already says "Added by <you>", so filtering on
+      // assigned_to alone filed your own leads under "Unassigned" and hid them
+      // from "My Leads".
+      const ownerId = leadOwnerId(lead)
+      if (assignmentFilter === 'mine' && ownerId !== currentPerson?.id) continue
+      if (assignmentFilter === 'unassigned' && ownerId != null) continue
 
       // Analyst filter (specific person — admins use this to drill into a
       // teammate's book, separate from the My/Unassigned chips above).
       if (analystFilter !== 'all') {
-        if (String(lead.assigned_to ?? '') !== String(analystFilter)) continue
+        if (String(ownerId ?? '') !== String(analystFilter)) continue
       }
 
       // Latest outreach response. 'never_contacted' = no entry in the map.

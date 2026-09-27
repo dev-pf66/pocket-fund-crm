@@ -181,6 +181,8 @@ Content-Type: application/json
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | `name` | string | **Yes** | Lead name (cannot be empty) |
+| `assigned_to` | integer | **Yes** | Person id who owns this lead. Required — a lead with no owner is invisible to everyone but an admin under RLS, and absent from every per-person surface. `created_by` is accepted in its place; whichever you send, both are set. |
+| `created_by` | integer | No | Defaults to `assigned_to` |
 | `email` | string | No | |
 | `phone` | string | No | |
 | `firm_name` | string | No | |
@@ -208,6 +210,7 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Jane Smith",
+    "assigned_to": 16,
     "email": "jane@acmecap.com",
     "firm_name": "Acme Capital",
     "lead_type": "PE Firm",

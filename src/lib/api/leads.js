@@ -24,6 +24,29 @@ const STAGE_ORDER = ['outreach', 'responded', 'meeting_booked', 'warm_active', '
 const stageRank = (stage) => STAGE_ORDER.indexOf(stage)
 
 /**
+ * Who owns this lead, for filtering and for the owner label.
+ *
+ * The scoped list queries below match on `created_by OR assigned_to` — you see
+ * a lead if you made it or if it was given to you — but the surfaces that
+ * NAME the owner read assigned_to alone. An analyst's own leads therefore
+ * appeared inside their own book labelled "Unassigned", and the reasonable
+ * conclusion was that the CRM had lost them. 132 leads were in that state
+ * (41% of the table had no assigned_to at all).
+ *
+ * Migration 050 backfilled assigned_to from created_by, so the stored data is
+ * now consistent. This keeps the two in agreement if they diverge again —
+ * `PATCH /api/leads` accepts `assigned_to: null`, which is one call away from
+ * recreating the whole problem.
+ *
+ * Returns null only when the database records neither, which is the honest
+ * answer for the ~203 June/July 2026 imports that named no actor. Those are
+ * genuinely unowned and belong in the unowned bucket, not attributed to a guess.
+ */
+export function leadOwnerId(lead) {
+  return lead?.assigned_to ?? lead?.created_by ?? null
+}
+
+/**
  * Append a stage transition to the audit trail.
  *
  * crm_leads.stage only holds where a lead is NOW — the old value is

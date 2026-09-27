@@ -65,7 +65,7 @@ describe('POST /api/leads — lead_type reads the config table', () => {
   it('accepts an admin-added type that the old hardcoded list rejected', async () => {
     h.options = [{ name: 'PE Firm' }, { name: 'Other' }, { name: 'Partner' }]
     const r = res()
-    await handler(post({ name: 'Bytera', lead_type: 'Partner' }), r)
+    await handler(post({ name: 'Bytera', assigned_to: 16, lead_type: 'Partner' }), r)
 
     expect(r.statusCode).not.toBe(400)
     expect(h.inserted).toMatchObject({ name: 'Bytera', lead_type: 'Partner' })
@@ -74,7 +74,7 @@ describe('POST /api/leads — lead_type reads the config table', () => {
   it('still rejects a type that is in neither the table nor the defaults', async () => {
     h.options = [{ name: 'PE Firm' }, { name: 'Partner' }]
     const r = res()
-    await handler(post({ name: 'Nope', lead_type: 'Wizard' }), r)
+    await handler(post({ name: 'Nope', assigned_to: 16, lead_type: 'Wizard' }), r)
 
     expect(r.statusCode).toBe(400)
     expect(r.body.error).toContain('Invalid lead_type')
@@ -84,7 +84,7 @@ describe('POST /api/leads — lead_type reads the config table', () => {
   it('falls back to the built-in defaults when the options read fails', async () => {
     h.optionsError = { message: 'relation "crm_lead_type_options" does not exist' }
     const r = res()
-    await handler(post({ name: 'Acme', lead_type: 'PE Firm' }), r)
+    await handler(post({ name: 'Acme', assigned_to: 16, lead_type: 'PE Firm' }), r)
 
     expect(r.statusCode).not.toBe(400)
     expect(h.inserted).toMatchObject({ lead_type: 'PE Firm' })
@@ -93,7 +93,7 @@ describe('POST /api/leads — lead_type reads the config table', () => {
   it('does not block a create that omits lead_type entirely', async () => {
     h.optionsError = { message: 'boom' }
     const r = res()
-    await handler(post({ name: 'No Type' }), r)
+    await handler(post({ name: 'No Type', assigned_to: 16 }), r)
 
     expect(r.statusCode).not.toBe(400)
   })

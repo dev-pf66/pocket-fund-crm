@@ -31,7 +31,19 @@ export const NEVER_SWEEP_STAGES = ['client']
 /** Engaged means someone on the other side actually responded to us. */
 export const ENGAGED_STAGES = ['responded', 'meeting_booked', 'warm_active']
 
-export const DEFAULT_SWEEP_DAYS = 90
+// 60, not 90 — because the 90-day band has already been cleared.
+//
+// The first sweep ran at 90 days on 2026-09-26 and archived 306 leads, 150 of
+// them engaged and every one of those 91+ days quiet (146 past 120 days). It
+// did its job. What it left behind is the June/July 2026 import cohort, which
+// sits in the 61-90 day band: on 2026-09-27 that was 304 workable leads at 60+
+// days quiet and exactly ZERO at 90+, so leaving the default at 90 would have
+// made every subsequent Preview report nothing to do.
+//
+// Re-measure before changing this again. The distribution moves every time a
+// sweep runs, and a threshold tuned to last month's table reads as "the
+// feature is broken" when it is really just finished.
+export const DEFAULT_SWEEP_DAYS = 60
 
 /**
  * The day a lead was last genuinely touched. Falls back to created_at so an
@@ -137,7 +149,7 @@ export async function runArchiveSweep(options = {}, currentPersonId = null) {
     const chunk = preview.ids.slice(i, i + CHUNK)
     const { data, error } = await supabase
       .from('crm_leads')
-      .update({ is_archived: true, archived_at: stamp, archived_reason: reason })
+      .update({ is_archived: true, archived_at: stamp, archived_reason: reason, archived_by: currentPersonId })
       .in('id', chunk)
       .select('id')
     if (error) throw error
@@ -146,14 +158,23 @@ export async function runArchiveSweep(options = {}, currentPersonId = null) {
 
   cacheClear('leads')
   // archivedAt is the undo handle: every row in this sweep carries it.
+  // archived_by (migration 051) is on the rows too, not just in this return
+  // value — "who buried 300 leads" is the first question asked afterwards, and
+  // it used to be unanswerable the moment this function returned.
   return { archived, archivedAt: stamp, criteria: preview.criteria, byStage: preview.byStage, by: currentPersonId }
 }
 
-/** Archive or restore one lead. The per-row escape hatch from a bulk sweep. */
-export async function setLeadArchived(leadId, archived = true, { reason = null } = {}) {
+/**
+ * Archive or restore one lead. The per-row escape hatch from a bulk sweep.
+ *
+ * Restoring clears archived_by along with the stamp and the reason: the row is
+ * live again, and leaving an actor on it would read as though it were still
+ * archived by that person.
+ */
+export async function setLeadArchived(leadId, archived = true, { reason = null, currentPersonId = null } = {}) {
   const updates = archived
-    ? { is_archived: true, archived_at: new Date().toISOString(), archived_reason: reason || 'Archived by hand' }
-    : { is_archived: false, archived_at: null, archived_reason: null }
+    ? { is_archived: true, archived_at: new Date().toISOString(), archived_reason: reason || 'Archived by hand', archived_by: currentPersonId }
+    : { is_archived: false, archived_at: null, archived_reason: null, archived_by: null }
 
   const { data, error } = await supabase
     .from('crm_leads')
@@ -188,7 +209,7 @@ export async function undoArchiveSweep(archivedAt) {
   if (!archivedAt) throw new Error('undoArchiveSweep needs the sweep timestamp')
   const { data, error } = await supabase
     .from('crm_leads')
-    .update({ is_archived: false, archived_at: null, archived_reason: null })
+    .update({ is_archived: false, archived_at: null, archived_reason: null, archived_by: null })
     .eq('archived_at', archivedAt)
     .select('id')
   if (error) throw error
