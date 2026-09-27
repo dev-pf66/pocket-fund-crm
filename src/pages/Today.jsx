@@ -17,7 +17,8 @@ import {
   markLeadTouched,
   pingDevOnLead,
   updateLead,
-  daysStaleFor
+  daysStaleFor,
+  leadOwnerId
 } from '../lib/crm-api'
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
 import { useToast } from '../components/Toast'
@@ -628,7 +629,7 @@ function Today() {
               settings={settings}
               busy={pendingId === lead.id}
               pinged={pingedIds.has(lead.id)}
-              ownerName={isAdmin ? (personById.get(lead.assigned_to)?.name || 'Unassigned') : null}
+              ownerName={isAdmin ? (personById.get(leadOwnerId(lead))?.name || 'Unassigned') : null}
               onPing={handlePingDev}
             />
           ))

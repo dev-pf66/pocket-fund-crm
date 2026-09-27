@@ -38,6 +38,14 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     does not — it connects directly.
   - Verify with real queries afterwards (select the new column; prove a CHECK rejects what
     it should). Never trust the CLI's success line alone.
+  - **`LegacyDbPushMissingLocalError` ("remote migration versions not found in local
+    migrations directory") does NOT mean the push is blocked.** `supabase/` is gitignored, so
+    that directory is per-machine scratch and drifts from the remote ledger whenever another
+    machine or a dashboard edit applies something. `supabase migration list` names the
+    remote-only version. Fix it by adding a local placeholder file with that exact timestamp
+    (a comment plus `SELECT 1;`) so the two agree. Do **not** take the CLI's suggested
+    `migration repair --status reverted <version>` — that version *was* applied, and marking
+    it reverted makes the ledger lie about production.
 - **Auth email redirects (Sept 2026):** password reset, signup confirmation, and magic links all depend on Supabase Auth → URL Configuration, which is invisible from the code. If `redirectTo` is not in the **Redirect URLs** allowlist, Supabase *silently discards it* and falls back to the **Site URL** — the link still works, it just lands somewhere useless. This is what broke forgot-password for everyone: Site URL was `http://localhost:3000` and the prod domain was not allowlisted, so every reset email dropped the user on a dead localhost address. `Login.jsx` was correct the whole time. Correct values: Site URL `https://pocket-fund-crm.vercel.app`, Redirect URLs `https://pocket-fund-crm.vercel.app/**` + `http://localhost:5173/**`.
   - Probe it without sending mail (anon key only, no secrets):
     `curl -sD- -o/dev/null "https://lzydgdzjrgvqglxmyfjk.supabase.co/auth/v1/verify?token=probe&type=recovery&redirect_to=<urlencoded-url>" -H "apikey: $VITE_SUPABASE_ANON_KEY" | grep -i ^location:`

@@ -137,7 +137,7 @@ export async function runArchiveSweep(options = {}, currentPersonId = null) {
     const chunk = preview.ids.slice(i, i + CHUNK)
     const { data, error } = await supabase
       .from('crm_leads')
-      .update({ is_archived: true, archived_at: stamp, archived_reason: reason })
+      .update({ is_archived: true, archived_at: stamp, archived_reason: reason, archived_by: currentPersonId })
       .in('id', chunk)
       .select('id')
     if (error) throw error
@@ -146,14 +146,23 @@ export async function runArchiveSweep(options = {}, currentPersonId = null) {
 
   cacheClear('leads')
   // archivedAt is the undo handle: every row in this sweep carries it.
+  // archived_by (migration 051) is on the rows too, not just in this return
+  // value — "who buried 300 leads" is the first question asked afterwards, and
+  // it used to be unanswerable the moment this function returned.
   return { archived, archivedAt: stamp, criteria: preview.criteria, byStage: preview.byStage, by: currentPersonId }
 }
 
-/** Archive or restore one lead. The per-row escape hatch from a bulk sweep. */
-export async function setLeadArchived(leadId, archived = true, { reason = null } = {}) {
+/**
+ * Archive or restore one lead. The per-row escape hatch from a bulk sweep.
+ *
+ * Restoring clears archived_by along with the stamp and the reason: the row is
+ * live again, and leaving an actor on it would read as though it were still
+ * archived by that person.
+ */
+export async function setLeadArchived(leadId, archived = true, { reason = null, currentPersonId = null } = {}) {
   const updates = archived
-    ? { is_archived: true, archived_at: new Date().toISOString(), archived_reason: reason || 'Archived by hand' }
-    : { is_archived: false, archived_at: null, archived_reason: null }
+    ? { is_archived: true, archived_at: new Date().toISOString(), archived_reason: reason || 'Archived by hand', archived_by: currentPersonId }
+    : { is_archived: false, archived_at: null, archived_reason: null, archived_by: null }
 
   const { data, error } = await supabase
     .from('crm_leads')
@@ -188,7 +197,7 @@ export async function undoArchiveSweep(archivedAt) {
   if (!archivedAt) throw new Error('undoArchiveSweep needs the sweep timestamp')
   const { data, error } = await supabase
     .from('crm_leads')
-    .update({ is_archived: false, archived_at: null, archived_reason: null })
+    .update({ is_archived: false, archived_at: null, archived_reason: null, archived_by: null })
     .eq('archived_at', archivedAt)
     .select('id')
   if (error) throw error
