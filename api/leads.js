@@ -58,7 +58,15 @@ function authenticate(req) {
 // is_archived is patchable so the archive is operable from the API too, not
 // only from the Admin UI. archived_at/archived_reason are set by the app's
 // own helpers; a bare flag flip here is still fully reversible.
-const PATCH_FIELDS = ['assigned_to', 'stage', 'next_follow_up_date', 'follow_up_note', 'notes', 'is_archived']
+// The required-info fields (migration 052) are patchable so the /crm skill and
+// any agent can fill them — the channel question in particular is missing on
+// every lead in the database, and backfilling 115 leads through the UI one
+// dropdown at a time is not a plan.
+const PATCH_FIELDS = [
+  'assigned_to', 'stage', 'next_follow_up_date', 'follow_up_note', 'notes', 'is_archived',
+  'lead_type', 'lead_channel', 'buying_timeline', 'investment_thesis',
+  'prior_acquisitions', 'engagement_model'
+]
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')

@@ -5,9 +5,11 @@ import { useApp } from '../App'
 import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck, CheckSquare, Archive, ArchiveRestore } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import StageChip from '../components/StageChip'
+import LeadHealthFlag from '../components/LeadHealthFlag'
 import FollowUpCard from '../components/FollowUpCard'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
+import { useFieldOptions } from '../hooks/useFieldOptions'
 import { istToday, istAddDays } from '../lib/dateUtils'
 import { outcomeLabel, outcomeColor, fmtDuration } from '../lib/callOutcomes'
 
@@ -176,6 +178,11 @@ function LeadDetail() {
     { value: '', label: 'Select type...' },
     ...rawLeadTypes.map(t => ({ value: t.name, label: t.name }))
   ]
+  // The required-info vocabularies (migration 052). Admin-editable, not frozen
+  // in the bundle — same reason the hardcoded lead_type list was removed.
+  const channelOptions = useFieldOptions('lead_channel', 'How did they find us?')
+  const timelineOptions = useFieldOptions('buying_timeline', 'How soon are they buying?')
+  const engagementOptions = useFieldOptions('engagement_model', 'Retainer or success fee?')
 
   useEffect(() => {
     loadData()
@@ -530,6 +537,12 @@ function LeadDetail() {
           </div>
         </div>
       )}
+
+      {/* The required-info / stale / no-transcript flag. A flag, never a gate —
+          it names what is missing and blocks nothing. transcripts is already
+          loaded on this page, so the transcript check is real rather than
+          guessed; passing null would make it claim nothing. */}
+      <LeadHealthFlag lead={lead} hasTranscript={transcripts.length > 0} />
 
       <div className="lead-detail-grid">
         {/* Lead Info Card */}
@@ -978,6 +991,68 @@ function LeadDetail() {
                   options={leadTypeOptions}
                   placeholder="Click to set type"
                   renderValue={(v) => <span className="lead-type-badge">{v}</span>}
+                />
+              </div>
+
+              {/* Required info (migration 052 + src/lib/leadHealth.js). These are
+                  the questions Dev and Om agreed every lead should answer;
+                  LeadHealthFlag above names whichever are still blank. Channel is
+                  first because it is the one that answers "is inbound or outbound
+                  working" and it is missing on every lead in the database. */}
+              <div className="info-item">
+                <label>How they found us</label>
+                <InlineField
+                  value={lead.lead_channel || ''}
+                  onSave={(v) => saveField('lead_channel', v)}
+                  type="select"
+                  options={channelOptions}
+                  placeholder="Click to set channel"
+                />
+              </div>
+
+              <div className="info-item">
+                <label>Buying timeline</label>
+                <InlineField
+                  value={lead.buying_timeline || ''}
+                  onSave={(v) => saveField('buying_timeline', v)}
+                  type="select"
+                  options={timelineOptions}
+                  placeholder="Click to set timeline"
+                />
+              </div>
+
+              <div className="info-item">
+                <label>Acquisitions so far</label>
+                <InlineField
+                  value={lead.prior_acquisitions || ''}
+                  onSave={(v) => saveField('prior_acquisitions', v)}
+                  multiline
+                  placeholder="Click to add — how many, what kind"
+                />
+              </div>
+
+              {/* investment_thesis is also editable in the "More Fields" form, but
+                  that form only DISPLAYS it when non-empty — so the one lead that
+                  needs it most showed nothing at all and the flag pointed at a
+                  field with no visible input. Surfaced here with the rest. */}
+              <div className="info-item">
+                <label>Do they have a thesis</label>
+                <InlineField
+                  value={lead.investment_thesis || ''}
+                  onSave={(v) => saveField('investment_thesis', v)}
+                  multiline
+                  placeholder="Click to add — what are they actually looking for"
+                />
+              </div>
+
+              <div className="info-item">
+                <label>Retainer or success fee</label>
+                <InlineField
+                  value={lead.engagement_model || ''}
+                  onSave={(v) => saveField('engagement_model', v)}
+                  type="select"
+                  options={engagementOptions}
+                  placeholder="Click to set"
                 />
               </div>
 

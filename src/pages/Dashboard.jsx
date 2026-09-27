@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import { getCRMDashboardData, getOutreachStatsByPerson, getWeeklyFunnel, getMovementWeekOverWeek, cachePeek } from '../lib/crm-api'
 import { useApp } from '../App'
 import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
-import { TrendingUp, AlertCircle, Calendar, Activity, Clock, FlaskConical, Target } from 'lucide-react'
+import { TrendingUp, AlertCircle, Calendar, Clock, FlaskConical, Target } from 'lucide-react'
 import { isAdminUser } from '../lib/admin'
 import { buildDailyCounts, computeMetrics, replyRateColor } from '../lib/outreachMetrics'
 import StageChip from '../components/StageChip'
+import Scoreboard from '../components/Scoreboard'
 
 const FUNNEL_WEEK_OPTIONS = [4, 8, 12]
 
@@ -161,25 +162,6 @@ function Dashboard() {
   const rangeLabel = SUMMARY_RANGES.find(r => r.key === summaryRange)?.label || 'This Week'
 
   // Today's counts, independent of the selected summary range.
-  const todayCounts = useMemo(() => {
-    const map = new Map()
-    for (const r of outreachRows) {
-      if (r.outreach_date === today) map.set(r.logged_by, (map.get(r.logged_by) || 0) + 1)
-    }
-    return map
-  }, [outreachRows, today])
-
-  // Today's list order: me pinned top, then by count desc, then name — so the
-  // leader is obvious at a glance in the compact row layout.
-  const todayPeople = useMemo(() => {
-    return [...visiblePeople].sort((a, b) => {
-      const aMe = a.id === currentPerson?.id, bMe = b.id === currentPerson?.id
-      if (aMe !== bMe) return aMe ? -1 : 1
-      const ca = todayCounts.get(a.id) || 0, cb = todayCounts.get(b.id) || 0
-      if (cb !== ca) return cb - ca
-      return (a.name || '').localeCompare(b.name || '')
-    })
-  }, [visiblePeople, todayCounts, currentPerson?.id])
 
   // Per-person stats within the selected summary range.
   const personStats = useMemo(() => {
@@ -235,36 +217,18 @@ function Dashboard() {
         touchesThisWeek={myMetrics.thisWeekCount}
       />
 
-      {/* Today's Outreach */}
-      <div className="card dashboard-card">
-        <div className="dashboard-card-header">
-          <h2><Activity size={20} /> Today's Outreach</h2>
-          <span className="dashboard-date-label">{fmtDate(today)}</span>
-        </div>
-        <div className="today-outreach-list">
-          {todayPeople.map(person => {
-            const todayCount = todayCounts.get(person.id) || 0
-            const personTarget = dailyTargetOf(person)
-            const pct = hasTarget(personTarget) ? Math.min(100, (todayCount / personTarget) * 100) : 0
-            const hit = hasTarget(personTarget) && todayCount >= personTarget
-            const isMe = person.id === currentPerson?.id
-            return (
-              <div key={person.id} className={`today-outreach-row${isMe ? ' today-outreach-row-me' : ''}`}>
-                <span className="person-outreach-name">
-                  {person.name}
-                  {isMe && <span className="person-outreach-you">you</span>}
-                </span>
-                <div className="today-outreach-row-bar">
-                  <div className={`today-outreach-row-fill${hit ? ' hit' : ''}`} style={{ width: `${pct}%` }} />
-                </div>
-                <span className={`today-outreach-row-count${hit ? ' hit' : ''}`}>
-                  {todayCount}<span className="goal"> / {personTarget}</span>
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      {/* Per-person weekly scoreboard.
+          REPLACED the "Today's Outreach" card, which drew a progress bar per
+          person against their daily target. Targets were deliberately set to 0
+          in Aug 2026 (low-volume, high-targeting motion) and EVERY person in
+          the database has 0 or NULL, so `hasTarget` was false for everyone and
+          that card rendered an empty grey bar with a denominator of 0 —
+          "8 / 0" for the one person actually logging outreach. It measured
+          volume against a quota that had been abandoned.
+          The scoreboard shows the three KPIs Dev named plus what is rotting.
+          Targets stay supported and fluid: set one and it means something
+          again; leave it and there is no meter rather than a broken one. */}
+      <Scoreboard />
 
       {/* Team summary — selectable window */}
       <div className="card dashboard-card">

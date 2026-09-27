@@ -120,6 +120,42 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     There's a guardrail test on this — don't "fix" it.
   - Clients are never swept. `getLeads` takes `{ includeArchived }`; `/api/leads` takes
     `?include_archived=true`; `/api/analytics` excludes them unconditionally.
+- **Lead health: required info + the running 30-day clock (Sept 2026, Dev's call).** Policy lives
+  in `src/lib/leadHealth.js` — pure, so the flag on the lead page and the count on the scoreboard
+  can never disagree. Migration 052 added `lead_channel`, `buying_timeline`, `prior_acquisitions`,
+  `engagement_model`; `lead_type` and `investment_thesis` are reused.
+  - **It is a FLAG, NEVER A GATE.** Dev: "it will be a basic flag if it's not all the info."
+    Nothing blocks a save — not the UI, not `POST/PATCH /api/leads`. A hard gate in a shared CRM
+    gets worked around and you get invented data instead of a flag (this DB already carries three
+    leads with fabricated enrichment).
+  - **Two tiers, and don't collapse them.** `lead_channel` + `lead_type` are required from
+    `responded`; all six from `meeting_booked` (Dev's words: "a minimum amount of information once
+    you're putting it in MeetingBooked"). Requiring all six from `responded` flagged **115 of 116**
+    engaged leads — a flag that is always on is not a flag. Nothing is required at `outreach`.
+  - **The 30-day clock is a RUNNING clock** — a rolling window from last touch that resets when the
+    lead is worked, evaluated continuously. Do NOT reintroduce the `marks.has(daysStale)`
+    exact-day-match pattern; that is why 179 engaged leads scored nothing. A lead with a follow-up
+    scheduled today-or-later is never in breach (same rule as the archive sweep — two surfaces
+    disagreeing about whether a lead is abandoned makes both untrustworthy).
+  - `lead_channel` is its own column, NOT more values in `lead_source`: Dev wants a countable
+    inbound-vs-outbound split ("in sales we put in 30 hours, in SEO 10"), which needs a closed
+    vocabulary. Options are admin-editable via `crm_field_options` (`useFieldOptions` hook).
+- **Per-person scoreboard (`src/lib/api/scoreboard.js`, `src/components/Scoreboard.jsx`).** The
+  panel Om asked for: outreach done, dials, meetings booked, follow-ups set/done, plus the three
+  un-windowed breach counts (stale 30d, missing info, no transcript). Lives on the Numbers tab.
+  - **It REPLACED the "Today's Outreach" card**, which drew a per-person progress bar against
+    `daily_outreach_target`. Those targets were deliberately zeroed Aug 2026 and *every* person in
+    the DB is 0/NULL, so the card rendered an empty bar and "8 / 0" for the one person logging
+    work. Targets stay supported and **fluid** (Dev) — set one and it means something; don't
+    resurrect a meter that divides by zero.
+  - Meetings booked comes from `crm_lead_stage_events`, which is append-only and still holds
+    retired stage names (`cold_outreach` 27, `warm_lead` 2). **Map old→new when grouping by stage**
+    or history silently under-counts.
+  - "Follow-up done" is matched on the `Followed up…` note prefix that `logFollowUpTouch` writes —
+    ugly, but it is the only marker. Do NOT count all notes: 214 of the last 416 activities were
+    auto-generated "Lead created in CRM" rows, which would turn one import into a week of work.
+  - Team totals sum **only the listed rows**; unattributed outreach is reported separately, never
+    folded in. `dev+localtest` is filtered out of every per-person grid.
 - Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view. Shipped July 2026 (`feature/today-tab` PR merged).
 - **The left menu is data, in `src/lib/nav.js`** (Sept 2026) — pure and icon-free (names resolved
   to elements by an `ICONS` map in `Layout.jsx`) so `test/nav-shape.test.js` can pin the shape in
