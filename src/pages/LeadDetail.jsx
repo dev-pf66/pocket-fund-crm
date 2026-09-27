@@ -6,6 +6,7 @@ import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Sa
 import { useToast } from '../components/Toast'
 import StageChip from '../components/StageChip'
 import LeadHealthFlag from '../components/LeadHealthFlag'
+import TranscriptDigest from '../components/TranscriptDigest'
 import FollowUpCard from '../components/FollowUpCard'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
@@ -543,6 +544,12 @@ function LeadDetail() {
           loaded on this page, so the transcript check is real rather than
           guessed; passing null would make it claim nothing. */}
       <LeadHealthFlag lead={lead} hasTranscript={transcripts.length > 0} />
+
+      {/* Every call with this lead, summarised, at the top — Om's "that's all
+          I'd need to jog my memory up". Pure read of ai_analysis, which is
+          already computed and stored when a transcript is pasted, so this costs
+          no API credits. The full per-transcript detail stays below. */}
+      <TranscriptDigest transcripts={transcripts} />
 
       <div className="lead-detail-grid">
         {/* Lead Info Card */}

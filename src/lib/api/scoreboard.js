@@ -31,17 +31,14 @@ import { istDateStr, fetchAllRows } from './core'
 // Importing it from core lints clean and is undefined at runtime.
 import { istWeekStart } from '../dateUtils'
 import { isStaleBreach, isMissingInfo, STALE_BREACH_DAYS } from '../leadHealth'
+import { isMeetingBooked, isMeetingHeld } from '../meetingCounts'
 
-/**
- * Stage names retired by the Sept 2026 restructure, mapped to what they became.
- *
- * crm_lead_stage_events is an append-only audit trail, so it still holds
- * `cold_outreach` (27 events) and `warm_lead` (2) from before the merge. Any
- * count that groups by stage and does not map these silently under-reports the
- * history it exists to preserve.
- */
-const RETIRED_STAGES = { cold_outreach: 'outreach', new_lead: 'outreach', warm_lead: 'warm_active', active_conversation: 'warm_active' }
-const canonicalStage = (stage) => RETIRED_STAGES[stage] ?? stage
+// The retired-stage map and both meeting definitions live in
+// src/lib/meetingCounts.js, shared with api/weekly-digest.js. Dev, 27 Sept:
+// "Sage and CRM should not at all disagree with meetings." They did — the digest
+// counted activity_type IN ('call','meeting') and called the total "meetings",
+// while this counted stage events into meeting_booked. Both numbers are worth
+// having; using one word for them was the bug.
 
 /** Monday-to-today IST, the same week boundary the funnel and streaks use. */
 export function currentWeekBounds(today = istDateStr()) {
@@ -108,6 +105,7 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
     dials: 0,
     replies: 0,
     meetingsBooked: 0,
+    meetingsHeld: 0,
     followUpsScheduled: 0,
     followUpsDone: 0,
     staleBreaches: 0,
@@ -137,7 +135,7 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
   }
 
   for (const e of stageEvents || []) {
-    if (canonicalStage(e.to_stage) !== 'meeting_booked') continue
+    if (!isMeetingBooked(e)) continue
     const b = bucket(e.changed_by)
     if (b) b.meetingsBooked++
   }
@@ -147,6 +145,12 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
   // is counting every note, and 214 of the last 416 were auto-generated "Lead
   // created in CRM" rows, which would turn an import into a week of hard work.
   for (const a of activities || []) {
+    // Meetings HELD — the same definition the Monday Sage digest uses, so the
+    // two reports agree by construction rather than by coincidence.
+    if (isMeetingHeld(a)) {
+      const held = bucket(a.logged_by)
+      if (held) held.meetingsHeld++
+    }
     if (!/^Followed up/.test(a.notes || '')) continue
     const b = bucket(a.logged_by)
     if (b) b.followUpsDone++
@@ -166,7 +170,7 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
   }
 
   const listed = [...rows.values()].sort((a, b) =>
-    (b.outreachDone + b.meetingsBooked) - (a.outreachDone + a.meetingsBooked) ||
+    (b.outreachDone + b.meetingsBooked + b.meetingsHeld) - (a.outreachDone + a.meetingsBooked + a.meetingsHeld) ||
     String(a.name ?? '').localeCompare(String(b.name ?? '')))
 
   const team = listed.reduce((acc, r) => {
