@@ -156,6 +156,27 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     auto-generated "Lead created in CRM" rows, which would turn one import into a week of work.
   - Team totals sum **only the listed rows**; unattributed outreach is reported separately, never
     folded in. `dev+localtest` is filtered out of every per-person grid.
+- **"Meetings" means one thing, defined in `src/lib/meetingCounts.js`** (Sept 2026, Dev: "Sage and
+  CRM should not at all disagree with meetings"). They did — three numbers were in play:
+  - The Monday Sage digest counted `activity_type IN ('call','meeting')` and printed the total as
+    "meetings", so **a logged phone call was reported to Dev as a meeting**. Fixed: held-only.
+  - That activity is auto-logged when a lead **LEAVES** `meeting_booked` (because the stage means
+    "agreed to meet", not "met") — so it is a meeting **HELD**. The digest's own comment claimed it
+    counted leads *entering* meeting_booked, which was wrong in both directions and is how the
+    drift survived review.
+  - The scoreboard counted stage events **INTO** `meeting_booked` — a meeting **BOOKED**.
+  Both are worth knowing ("is work coming" vs "did work land"). The module defines `isMeetingHeld`,
+  `isMeetingBooked` and `canonicalStage`; the digest and the scoreboard both import it, and
+  **neither says "meetings" without saying which**. The digest prints "meetings held"; the
+  scoreboard has separate Booked and Held columns. `api/` can import pure `src/lib` modules — it
+  already does for `linkedin.js` and `task-tracker.js`. Guardrail: `test/meeting-counts.test.js`.
+- **Transcript digest (`src/components/TranscriptDigest.jsx`)** — every call with a lead
+  summarised at the top of the lead page (Om: "a summarized meeting note for all 3 transcripts in
+  one place... all I'd need to jog my memory"). A pure **read** of `ai_analysis`, which
+  `api/analyze-transcript.js` already computes and stores when a transcript is pasted (26 of 39 on
+  file have one), so it **costs no API credits** — the credit concern applies to generating
+  analysis, which stays a deliberate click. Unanalysed transcripts are listed as unanalysed, never
+  skipped: a silently shorter list reads as "no call happened".
 - Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view. Shipped July 2026 (`feature/today-tab` PR merged).
 - **The left menu is data, in `src/lib/nav.js`** (Sept 2026) — pure and icon-free (names resolved
   to elements by an `ICONS` map in `Layout.jsx`) so `test/nav-shape.test.js` can pin the shape in

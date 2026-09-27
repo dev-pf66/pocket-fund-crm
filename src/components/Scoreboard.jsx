@@ -89,7 +89,12 @@ function Scoreboard() {
               <th style={{ textAlign: 'right', padding: '8px' }} title="Leads in their book, excluding archived">Book</th>
               <th style={{ textAlign: 'right', padding: '8px' }} title="Outreach rows logged this week — dials included">Outreach</th>
               <th style={{ textAlign: 'right', padding: '8px' }} title="Of which phone dials">Dials</th>
-              <th style={{ textAlign: 'right', padding: '8px' }} title="Leads moved into meeting_booked this week">Meetings</th>
+              {/* Two columns, never one called "Meetings". The Monday Sage digest
+                  reports meetings HELD; this used to report BOOKED under the same
+                  word, which is how the two came to disagree. Both are worth
+                  knowing — "is work coming" vs "did work land". */}
+              <th style={{ textAlign: 'right', padding: '8px' }} title="Leads moved INTO meeting_booked this week — agreed to meet, may not have happened yet">Booked</th>
+              <th style={{ textAlign: 'right', padding: '8px' }} title="Meetings that actually happened — the same number the Monday Sage digest reports">Held</th>
               <th style={{ textAlign: 'right', padding: '8px' }} title="Leads with a follow-up date set for today or later">F/U set</th>
               <th style={{ textAlign: 'right', padding: '8px' }} title="Follow-ups actually marked done this week">F/U done</th>
               <th style={{ textAlign: 'right', padding: '8px', color: '#b91c1c' }}
@@ -113,6 +118,7 @@ function Scoreboard() {
                   <N value={r.outreachDone} />
                   <N value={r.dials} muted />
                   <N value={r.meetingsBooked} />
+                  <N value={r.meetingsHeld} />
                   <N value={r.followUpsScheduled} />
                   <N value={r.followUpsDone} />
                   <N value={r.staleBreaches} warn />
@@ -129,6 +135,7 @@ function Scoreboard() {
               <N value={team.outreachDone} />
               <N value={team.dials} />
               <N value={team.meetingsBooked} />
+              <N value={team.meetingsHeld} />
               <N value={team.followUpsScheduled} />
               <N value={team.followUpsDone} />
               <N value={team.staleBreaches} warn />

@@ -13,6 +13,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { tt } from '../src/lib/integrations/task-tracker.js'
+import { MEETING_HELD_ACTIVITY_TYPES } from '../src/lib/meetingCounts.js'
 import { requireEnv } from './_env.js'
 import { fetchAllRows } from './_db.js'
 
@@ -118,11 +119,18 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
   // Outcomes lead, volume is context (Dev's call, Aug 2026). Sales moved to a
   // deliberately smaller, more targeted motion, so ranking by raw send count
   // reported the new strategy as a decline. Meetings are the strongest signal
-  // available here — entering meeting_booked auto-logs a meeting activity — so
-  // they head the line, then replies, with touch count kept only as the
-  // denominator that makes the reply rate meaningful.
+  // available here, so they head the line, then replies, with touch count kept
+  // only as the denominator that makes the reply rate meaningful.
+  //
+  // These are meetings HELD, and the wording says so. The meeting activity is
+  // auto-logged when a lead LEAVES meeting_booked moving forward, because
+  // meeting_booked means "agreed to meet", not "met" — so this number is
+  // conversations that happened, not bookings made. The comment here used to
+  // claim it counted leads "entering meeting_booked", which was wrong in both
+  // directions and is how the CRM scoreboard and this digest came to report
+  // different things under the same word.
   lines.push(
-    `TEAM — what moved: ${team.meetings} meetings (${delta(team.meetings, team.prevMeetings)}) · ` +
+    `TEAM — what moved: ${team.meetings} meetings held (${delta(team.meetings, team.prevMeetings)}) · ` +
     `${team.replies} replies (${pct(team.replies, team.outreach)}% of ${team.outreach} touches, ${delta(team.replies, team.prevReplies)}) · ` +
     `${team.demos} demos${team.signups ? ` (${team.signups} signed up)` : ''}`
   )
@@ -153,7 +161,7 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
 
   for (const [name, s] of active) {
     lines.push(
-      `${name}: ${s.meetings} meetings (${delta(s.meetings, s.prevMeetings)}) · ` +
+      `${name}: ${s.meetings} meetings held (${delta(s.meetings, s.prevMeetings)}) · ` +
       `${s.replies} replies (${pct(s.replies, s.outreach)}% of ${s.outreach} touches, ${delta(s.outreach, s.prevOutreach)})` +
       `${s.demos ? ` · ${s.demos} demos` : ''}${s.signups ? ` · ${s.signups} signups` : ''}`
     )
@@ -241,7 +249,13 @@ async function buildDigest() {
       .gte('outreach_date', prevStart).lte('outreach_date', lastEnd)),
     fetchAllRows(() => supabase.from('crm_lead_activities')
       .select('logged_by, activity_date')
-      .in('activity_type', ['call', 'meeting'])
+      // MEETINGS HELD ONLY. This used to be ['call', 'meeting'], so a logged
+      // phone call was reported to Dev as a meeting in the first line of the
+      // Monday digest. Calls belong in the outreach/dial counts, where they
+      // already are. Shared with the CRM scoreboard via meetingCounts.js so the
+      // two cannot drift — Dev, 27 Sept: "Sage and CRM should not at all
+      // disagree with meetings."
+      .in('activity_type', MEETING_HELD_ACTIVITY_TYPES)
       .gte('activity_date', prevStart).lt('activity_date', addDays(lastEnd, 1))),
     fetchAllRows(() => supabase.from('crm_demos')
       .select('created_by, demo_date, stage')
