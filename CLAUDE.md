@@ -104,8 +104,13 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - Staleness is **continuous**. `getFollowUpsDue` in `today.js` still pings on
     `marks.has(daysStale)` — day 3/7/14 *exactly*, then silence forever; that exact-match is why
     179 engaged leads scored nothing. Don't copy that pattern.
-  - There is **no display floor**. The old page hid anything >14 days overdue. Forgetting is now
-    an explicit act — you archive the lead. If it's in the pipeline, it counts.
+  - There is **no display floor for follow-ups**. The old page hid anything >14 days overdue.
+    Forgetting is now an explicit act — you archive the lead. If it's in the pipeline, it counts.
+    **Superseded in one specific place (Sept 2026, Dev's explicit call):** the 30-day *disposition*
+    breach IS windowed — see `STALE_SURFACE_WINDOW_DAYS` below. The two rules solve different
+    problems: no-floor stops a follow-up going quiet forever after day 14; the window stops a
+    73-lead backlog landing on one person in a single morning. The backlog is still counted and
+    still flagged — only the nagging is windowed.
   - Sources run under `Promise.allSettled`: one failing source degrades that source and is
     reported in `errors`, rather than silently shortening the list.
   - The badge counts overdue + due-today only. Never count upcoming work into it.
@@ -140,6 +145,27 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - `lead_channel` is its own column, NOT more values in `lead_source`: Dev wants a countable
     inbound-vs-outbound split ("in sales we put in 30 hours, in SEO 10"), which needs a closed
     vocabulary. Options are admin-editable via `crm_field_options` (`useFieldOptions` hook).
+- **The 30-day disposition (migration 053, `disposeLead`, `DispositionModal`).** Dev: "the whole
+  point of the thirty day thing is that the person who's responsible for the lead has to update
+  it... if the lead is dead we have to mark it as dead, or if they've said get back to me after
+  three months we need a way for the person to be updated like that."
+  - Five answers: `working` (nothing wrong, answers the clock) · `later` (→ `reach_out_later`) ·
+    `dead` (→ `passed`) · `investor` / `partner` (→ `passed`, reason recorded). One click from the
+    flag on the lead page.
+  - **`dead` REQUIRES a reason** from `crm_field_options.dead_reason` — admin-editable, so Admin →
+    field options extends it with no deploy (Dev: "a drop down, to which they can add more
+    reasons... the administration can be in the admin side"). **`later` REQUIRES a date** — "get
+    back to me in three months" with no date is indistinguishable from forgetting. These are the
+    only gates in the lead-health work, and they gate the *content of a deliberate action*, not the
+    ability to save a lead.
+  - `disposed_at` counts as a touch in `daysSinceTouch`, so answering the clock resets it. The
+    clock asks "has someone said what is happening", not "has a row changed".
+  - **Never archives and never deletes.** A passed lead stays in the pipeline's passed column so
+    the team can see what was lost and why. Archiving is a separate bulk admin act.
+  - **`STALE_SURFACE_WINDOW_DAYS = 30`** — a breach surfaces only if it crossed the clock within
+    the last 30 days. `isStaleBreach` stays true for the whole backlog (73 leads today; 41 surface,
+    32 do not). If a refactor makes the two agree, 32 leads silently cease to exist — there is a
+    guardrail test on exactly that.
 - **Per-person scoreboard (`src/lib/api/scoreboard.js`, `src/components/Scoreboard.jsx`).** The
   panel Om asked for: outreach done, dials, meetings booked, follow-ups set/done, plus the three
   un-windowed breach counts (stale 30d, missing info, no transcript). Lives on the Numbers tab.
@@ -156,6 +182,15 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     auto-generated "Lead created in CRM" rows, which would turn one import into a week of work.
   - Team totals sum **only the listed rows**; unattributed outreach is reported separately, never
     folded in. `dev+localtest` is filtered out of every per-person grid.
+  - Two stale columns, not one: **Needs update** (`staleThisMonth`, crossed the clock in the last
+    30 days — this week's work) and **Backlog** (`staleBreaches`, everything past it). Collapsing
+    them loses Dev's distinction between work and debt.
+  - **Archiving a person does not reassign their records.** `setUserArchived` flips
+    `people.is_archived` and leaves every `assigned_to` pointing at them, so their leads go
+    invisible-but-owned. Pravar (id 17, archived) still held 1 lead and 2 sellers months later;
+    reassigned to Siddhant on 2026-09-28 (Dev's call). `created_by`/`logged_by`/`changed_by` were
+    deliberately left — that is history, and rewriting it would falsify past weeks' attribution.
+    Worth wiring a reassign prompt into the archive action.
 - **"Meetings" means one thing, defined in `src/lib/meetingCounts.js`** (Sept 2026, Dev: "Sage and
   CRM should not at all disagree with meetings"). They did — three numbers were in play:
   - The Monday Sage digest counted `activity_type IN ('call','meeting')` and printed the total as
