@@ -121,7 +121,30 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - Clients are never swept. `getLeads` takes `{ includeArchived }`; `/api/leads` takes
     `?include_archived=true`; `/api/analytics` excludes them unconditionally.
 - Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view. Shipped July 2026 (`feature/today-tab` PR merged).
-- Dev's standing product decisions (July 2026): Tracker/Queue/Log stay three separate pages; all five contact tables stay (leads, sellers, investors, partners, demos).
+- **The left menu is data, in `src/lib/nav.js`** (Sept 2026) — pure and icon-free (names resolved
+  to elements by an `ICONS` map in `Layout.jsx`) so `test/nav-shape.test.js` can pin the shape in
+  the node-environment suite. Adding a tab means editing that module, and the test will tell you
+  the item count changed. An analyst sees 10 items, an admin 13.
+  - **`/today` is a merged workspace** (`src/pages/TodayWorkspace.jsx`): Today + Notifications +
+    Numbers (Dashboard) as sub-tabs under ONE menu entry, using the app's `.tabs`/`.tab` pattern.
+    It is a shell — each sub-tab mounts the existing page component untouched, and only the
+    active one is mounted, so the page does not fetch three times. They were three answers to
+    "what should I do today" and overlapped in their reads (Today + Dashboard both call
+    `getMovementWeekOverWeek`; Dashboard + Analytics both call `getOutreachStatsByPerson`).
+  - The overdue badge moved to the **Today** nav entry. Don't add a second one to the
+    Notifications sub-tab — it would duplicate a number already on screen and cost a second
+    `useNotificationCount`, which derives the whole feed on mount/focus/change/5-min poll.
+  - **`/notifications`, `/dashboard` and `/outreach-queue` are still live routes.** Losing a tab
+    never means losing a page here — deep links, bookmarks and the command palette keep working,
+    and restoring a tab is one line in `nav.js`. There's a guardrail test on this.
+- Dev's standing product decisions: all five contact tables stay (leads, sellers, investors,
+  partners, demos) — July 2026, unchanged. Tracker/Queue/Log remain three separate **pages**
+  (July 2026), but **Sept 2026 (Dev's call) removed Queue's top-level tab and made Log
+  admin-only**: `getOutreachQueue` ("my leads at stage outreach with no outreach_log row at all",
+  grouped by import batch) is a subset of Today's queue and Cold Calls has its own Queue sub-tab;
+  Log reads team-wide history and self-scopes to the one person for a non-admin, making it a
+  weaker Tracker. Queue's unique affordance was the import-batch grouping — that's what an
+  analyst gives up.
 
 ## Dev environment
 

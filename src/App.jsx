@@ -10,7 +10,7 @@ import Signup from './pages/Signup'
 import ResetPassword from './pages/ResetPassword'
 
 // Eagerly loaded — these are the main pages users navigate between
-import Today from './pages/Today'
+import TodayWorkspace from './pages/TodayWorkspace'
 import Dashboard from './pages/Dashboard'
 import LeadsBoard from './pages/LeadsBoard'
 import LeadDetail from './pages/LeadDetail'
@@ -169,7 +169,12 @@ function AppContent() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="today" element={<Today />} />
+              {/* /today is the merged workspace: Today + Notifications +
+                  Numbers as sub-tabs under one menu entry (Sept 2026).
+                  /notifications and /dashboard stay routed on purpose — deep
+                  links, bookmarks and the command palette keep working, and
+                  nothing is deleted. */}
+              <Route path="today" element={<TodayWorkspace />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="pipeline" element={<LeadsBoard />} />
