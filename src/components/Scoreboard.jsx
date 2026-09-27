@@ -97,9 +97,18 @@ function Scoreboard() {
               <th style={{ textAlign: 'right', padding: '8px' }} title="Meetings that actually happened — the same number the Monday Sage digest reports">Held</th>
               <th style={{ textAlign: 'right', padding: '8px' }} title="Leads with a follow-up date set for today or later">F/U set</th>
               <th style={{ textAlign: 'right', padding: '8px' }} title="Follow-ups actually marked done this week">F/U done</th>
+              {/* Two numbers on purpose. "Needs update" is what crossed the clock
+                  recently and is this week's work; "backlog" is everything past it,
+                  still owed an answer but not flooding the queue. Dev's call:
+                  "let's just do the last thirty days — let those start coming up.
+                  And for the backlog, keep them as unupdated so we have to update it." */}
               <th style={{ textAlign: 'right', padding: '8px', color: '#b91c1c' }}
-                  title={`Leads untouched for ${STALE_BREACH_DAYS}+ days with no follow-up scheduled — a running clock, not a one-off deadline`}>
-                Stale {STALE_BREACH_DAYS}d
+                  title={`Crossed the ${STALE_BREACH_DAYS}-day clock within the last 30 days — this week's work`}>
+                Needs update
+              </th>
+              <th style={{ textAlign: 'right', padding: '8px', color: '#b91c1c' }}
+                  title={`Every lead past the ${STALE_BREACH_DAYS}-day clock, including the older backlog that no longer nags`}>
+                Backlog
               </th>
               <th style={{ textAlign: 'right', padding: '8px', color: '#b91c1c' }} title="Leads missing required info for the stage they have reached">No info</th>
               <th style={{ textAlign: 'right', padding: '8px', color: '#b91c1c' }} title="Leads at meeting stage or beyond with no transcript on file">No transcript</th>
@@ -121,6 +130,7 @@ function Scoreboard() {
                   <N value={r.meetingsHeld} />
                   <N value={r.followUpsScheduled} />
                   <N value={r.followUpsDone} />
+                  <N value={r.staleThisMonth} warn />
                   <N value={r.staleBreaches} warn />
                   <N value={r.missingInfo} warn />
                   <N value={r.needsTranscript} warn />
@@ -138,6 +148,7 @@ function Scoreboard() {
               <N value={team.meetingsHeld} />
               <N value={team.followUpsScheduled} />
               <N value={team.followUpsDone} />
+              <N value={team.staleThisMonth} warn />
               <N value={team.staleBreaches} warn />
               <N value={team.missingInfo} warn />
               <N value={team.needsTranscript} warn />

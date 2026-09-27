@@ -30,7 +30,7 @@ import { istDateStr, fetchAllRows } from './core'
 // istWeekStart lives in dateUtils, NOT core — core only re-exports istDateStr.
 // Importing it from core lints clean and is undefined at runtime.
 import { istWeekStart } from '../dateUtils'
-import { isStaleBreach, isMissingInfo, STALE_BREACH_DAYS } from '../leadHealth'
+import { isStaleBreach, shouldSurfaceBreach, isMissingInfo, STALE_BREACH_DAYS } from '../leadHealth'
 import { isMeetingBooked, isMeetingHeld } from '../meetingCounts'
 
 // The retired-stage map and both meeting definitions live in
@@ -109,6 +109,7 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
     followUpsScheduled: 0,
     followUpsDone: 0,
     staleBreaches: 0,
+    staleThisMonth: 0,
     missingInfo: 0,
     needsTranscript: 0,
     liveLeads: 0,
@@ -163,7 +164,10 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
     if (!b) continue
     b.liveLeads++
     if (lead.next_follow_up_date && lead.next_follow_up_date >= today) b.followUpsScheduled++
+    // Both: staleBreaches is the whole backlog (Dev: "keep them as unupdated so
+    // we have to update it"), staleThisMonth is what actually surfaces now.
     if (isStaleBreach(lead, { today })) b.staleBreaches++
+    if (shouldSurfaceBreach(lead, { today })) b.staleThisMonth++
     if (isMissingInfo(lead)) b.missingInfo++
     const reachedMeeting = ['meeting_booked', 'warm_active', 'client'].includes(lead.stage)
     if (reachedMeeting && !withTranscript.has(lead.id)) b.needsTranscript++

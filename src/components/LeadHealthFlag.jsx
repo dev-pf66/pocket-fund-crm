@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { AlertTriangle, FileText, Clock } from 'lucide-react'
-import { missingRequiredFields, isStaleBreach, daysSinceTouch, STALE_BREACH_DAYS } from '../lib/leadHealth'
+import { missingRequiredFields, isStaleBreach, daysSinceTouch, daysOverClock, shouldSurfaceBreach, STALE_BREACH_DAYS } from '../lib/leadHealth'
+import DispositionModal from './DispositionModal'
 
 /**
  * The flag, not a gate.
@@ -21,11 +23,13 @@ import { missingRequiredFields, isStaleBreach, daysSinceTouch, STALE_BREACH_DAYS
  * null (or omit it) when the caller has not looked, and no transcript claim is
  * made. Never report a missing transcript we did not check for.
  */
-function LeadHealthFlag({ lead, hasTranscript = null }) {
+function LeadHealthFlag({ lead, hasTranscript = null, onUpdated }) {
+  const [showDisposition, setShowDisposition] = useState(false)
   if (!lead || lead.is_archived) return null
 
   const missing = missingRequiredFields(lead)
   const stale = isStaleBreach(lead)
+  const surfacing = shouldSurfaceBreach(lead)
   const staleDays = daysSinceTouch(lead)
   const reachedMeeting = ['meeting_booked', 'warm_active', 'client'].includes(lead.stage)
   const needsTranscript = hasTranscript !== null && reachedMeeting && !hasTranscript
@@ -56,10 +60,31 @@ function LeadHealthFlag({ lead, hasTranscript = null }) {
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '14px', color: '#92400e' }}>
           <Clock size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
           <span>
-            <strong>No touch in {staleDays} days</strong> and nothing scheduled — past the{' '}
-            {STALE_BREACH_DAYS}-day mark. Either work it, book a date, or mark it passed.
+            <strong>No update in {staleDays} days</strong> and nothing scheduled — {daysOverClock(lead)} days
+            past the {STALE_BREACH_DAYS}-day mark
+            {!surfacing && <> (older backlog, so it is not in this week&rsquo;s queue — still needs an answer)</>}.
+            {' '}
+            {/* One click from the warning to the fix. A flag that tells you off
+                without offering the action is why nobody actioned it. */}
+            <button
+              onClick={() => setShowDisposition(true)}
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                color: '#92400e', fontWeight: 700, textDecoration: 'underline'
+              }}
+            >
+              Say what is happening
+            </button>
           </span>
         </div>
+      )}
+
+      {showDisposition && (
+        <DispositionModal
+          lead={lead}
+          onClose={() => setShowDisposition(false)}
+          onDone={onUpdated}
+        />
       )}
 
       {needsTranscript && (

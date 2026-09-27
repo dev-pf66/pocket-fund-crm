@@ -29,6 +29,28 @@
 export const STALE_BREACH_DAYS = 30
 
 /**
+ * How long after crossing the clock a breach keeps SURFACING in the working
+ * queue and the notification feed.
+ *
+ * Dev, 27 Sept 2026, on the 73-lead backlog: "the backlog is fine... let's just
+ * do the last two weeks, or the last thirty days — let those start coming up.
+ * And for the backlog, just keep them as unupdated for now so that we have to
+ * update it." So a breach that crossed recently is work for this week; one that
+ * crossed months ago stays flagged and stays counted, but does not shout.
+ *
+ * NOTE THIS IS A DISPLAY FLOOR, and the Sept 2026 notification rework
+ * deliberately removed one ("There is no display floor... Forgetting is now an
+ * explicit act — you archive the lead"). Dev overruled that here, knowingly: the
+ * two rules were solving different problems. The no-floor rule stopped a
+ * follow-up going quiet forever after day 14. This stops 73 leads landing on one
+ * person's queue in a single morning, which is its own way of being ignored.
+ * The backlog does not disappear — isStaleBreach still returns true for all of
+ * it, the scoreboard still counts all of it, and the lead page still flags it.
+ * Only the nagging is windowed.
+ */
+export const STALE_SURFACE_WINDOW_DAYS = 30
+
+/**
  * Pipeline order, for "this field is required from stage X onward".
  * Mirrors STAGE_ORDER in src/lib/api/leads.js. `passed` and `reach_out_later`
  * sit outside it and never require anything.
@@ -115,15 +137,33 @@ export function isMissingInfo(lead) {
 }
 
 /**
- * Days since the lead was last touched, falling back to when it was created so
- * an imported lead nobody ever worked still ages. Null when neither date is on
- * file — unknown, which is not the same as fresh.
+ * Days since anyone last said anything about this lead.
+ *
+ * `disposed_at` counts as a touch, and deliberately so: the clock measures "has
+ * someone said what is happening with this", not merely "has a row changed". An
+ * owner who opens a lead and records a disposition has answered the question the
+ * clock is asking, even if nothing else about the lead moved.
+ *
+ * Falls back to created_at so an imported lead nobody ever worked still ages.
+ * Null when no date is on file at all — unknown, which is not the same as fresh.
  */
 export function daysSinceTouch(lead, now = new Date()) {
-  const ref = lead?.last_activity_date || lead?.created_at
-  if (!ref) return null
+  const candidates = [lead?.last_activity_date, lead?.disposed_at, lead?.created_at].filter(Boolean)
+  if (!candidates.length) return null
+  // Most recent wins — a lead touched today and disposed last month is not stale.
+  const ref = candidates.reduce((a, b) => (new Date(a) > new Date(b) ? a : b))
   const ms = now - new Date(ref)
   return Math.floor(ms / 86400000)
+}
+
+/**
+ * How far PAST the clock this lead is. Negative or null means not in breach.
+ * Exported because "crossed recently" and "crossed months ago" are different
+ * kinds of work and the queue needs to tell them apart.
+ */
+export function daysOverClock(lead, { now = new Date(), days = STALE_BREACH_DAYS } = {}) {
+  const d = daysSinceTouch(lead, now)
+  return d == null ? null : d - days
 }
 
 /**
@@ -148,6 +188,22 @@ export function isStaleBreach(lead, { today = null, now = new Date(), days = STA
 }
 
 /**
+ * Should this breach be pushed at someone right now, as opposed to merely
+ * counted?
+ *
+ * True only for a lead that crossed the clock within STALE_SURFACE_WINDOW_DAYS.
+ * Everything older is still a breach — still flagged on the lead, still in the
+ * scoreboard's count — it just is not in this week's queue. See the note on
+ * STALE_SURFACE_WINDOW_DAYS for why this floor exists when the notification
+ * rework removed one.
+ */
+export function shouldSurfaceBreach(lead, opts = {}) {
+  if (!isStaleBreach(lead, opts)) return false
+  const over = daysOverClock(lead, opts)
+  return over != null && over <= (opts.window ?? STALE_SURFACE_WINDOW_DAYS)
+}
+
+/**
  * Everything wrong with one lead, for the badge on the lead page and the
  * per-person counts on the scoreboard.
  *
@@ -163,7 +219,9 @@ export function leadBreaches(lead, { hasTranscript = null, today = null, now = n
     missingInfo: missing.length > 0,
     missingFields: missing,
     staleBreach: isStaleBreach(lead, { today, now }),
+    staleSurfacing: shouldSurfaceBreach(lead, { today, now }),
     staleDays: daysSinceTouch(lead, now),
+    daysOverClock: daysOverClock(lead, { now }),
     // null means "not checked" — never report a missing transcript we did not look for.
     needsTranscript: hasTranscript === null ? false : (reachedMeeting && !lead?.is_archived && !hasTranscript),
   }

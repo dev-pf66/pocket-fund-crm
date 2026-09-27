@@ -543,7 +543,11 @@ function LeadDetail() {
           it names what is missing and blocks nothing. transcripts is already
           loaded on this page, so the transcript check is real rather than
           guessed; passing null would make it claim nothing. */}
-      <LeadHealthFlag lead={lead} hasTranscript={transcripts.length > 0} />
+      <LeadHealthFlag
+        lead={lead}
+        hasTranscript={transcripts.length > 0}
+        onUpdated={(updated) => { setLead(updated); setEditedLead(updated) }}
+      />
 
       {/* Every call with this lead, summarised, at the top — Om's "that's all
           I'd need to jog my memory up". Pure read of ai_analysis, which is
