@@ -1,9 +1,9 @@
-import { Fragment, useState, useEffect, useMemo } from 'react'
+import { Fragment, useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, updateLead, promoteOutreachToLead, getLeadById } from '../lib/crm-api'
+import { getAllOutreachLogs, getOutreachStatsByPerson, updateOutreach, updateLead, promoteOutreachToLead, getLeadById, getOutreachQueue, bulkCreateLeads, markLeadReachedOut, deleteLead } from '../lib/crm-api'
 import { useApp } from '../App'
-import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2, Plus } from 'lucide-react'
-import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
+import { Target, ChevronDown, ChevronUp, Filter, Check, Flame, Trophy, TrendingUp, BarChart2, Plus, Inbox, Upload, ExternalLink, ChevronRight, X, Trash2 } from 'lucide-react'
+import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
@@ -12,6 +12,7 @@ import { useFieldOptions } from '../hooks/useFieldOptions'
 import LeadForm from './LeadForm'
 import { isAdminUser } from '../lib/admin'
 import { computeMetrics } from '../lib/outreachMetrics'
+import { isLinkedInUrl } from '../lib/linkedin'
 
 // 0 = no target. Targets were zeroed Aug 2026 when sales went low-volume /
 // high-targeting; goal rings, bars and nudges hide rather than divide by 0.
@@ -872,6 +873,14 @@ function OutreachAdmin() {
   const [chartRange, setChartRange] = useSessionState('oa:chartRange', 14)
   const [showChartDetails, setShowChartDetails] = useSessionState('oa:chartDetails', false)
 
+  // Outreach queue state
+  const [queueLeads, setQueueLeads] = useState([])
+  const [queueBatchStats, setQueueBatchStats] = useState({})
+  const [queueLoading, setQueueLoading] = useState(true)
+  const [queuePendingId, setQueuePendingId] = useState(null)
+  const [queueCollapsed, setQueueCollapsed] = useState({})
+  const [showBulkAddModal, setShowBulkAddModal] = useSessionState('oa:showBulkAdd', false)
+
   useEffect(() => {
     loadEntries()
   }, [filters, currentPerson?.id, viewing, isAdmin])
@@ -879,6 +888,10 @@ function OutreachAdmin() {
   useEffect(() => {
     loadStats()
   }, [currentPerson?.id, viewing, isAdmin])
+
+  useEffect(() => {
+    if (currentPerson?.id) loadQueue()
+  }, [currentPerson?.id])
 
   async function loadEntries() {
     if (!currentPerson?.id) return
@@ -911,6 +924,80 @@ function OutreachAdmin() {
     } finally {
       setStatsLoading(false)
     }
+  }
+
+  async function loadQueue() {
+    setQueueLoading(true)
+    try {
+      const { leads: data, batchStats: stats } = await getOutreachQueue(currentPerson.id)
+      setQueueLeads(data)
+      setQueueBatchStats(stats)
+    } catch (err) {
+      console.error('Failed to load queue:', err)
+    } finally {
+      setQueueLoading(false)
+    }
+  }
+
+  async function handleQueueMarkReachedOut(lead) {
+    setQueuePendingId(lead.id)
+    try {
+      await markLeadReachedOut(lead, currentPerson.id, currentPerson.name)
+      setQueueLeads(prev => prev.filter(l => l.id !== lead.id))
+      if (lead.import_batch_id) {
+        setQueueBatchStats(prev => {
+          const cur = prev[lead.import_batch_id]
+          if (!cur) return prev
+          return { ...prev, [lead.import_batch_id]: { ...cur, contacted: cur.contacted + 1 } }
+        })
+      }
+      toast.success(`Logged DM to ${lead.name}`)
+      // Refresh the log entries so the new outreach row appears immediately
+      await loadEntries()
+      await loadStats()
+    } catch (err) {
+      console.error('Failed to mark reached out:', err)
+      toast.error('Failed: ' + err.message)
+    } finally {
+      setQueuePendingId(null)
+    }
+  }
+
+  async function handleQueueDelete(lead) {
+    if (!confirm(`Remove "${lead.name}" from the queue? This deletes the lead entirely.`)) return
+    setQueuePendingId(lead.id)
+    try {
+      await deleteLead(lead.id)
+      setQueueLeads(prev => prev.filter(l => l.id !== lead.id))
+      if (lead.import_batch_id) {
+        setQueueBatchStats(prev => {
+          const cur = prev[lead.import_batch_id]
+          if (!cur) return prev
+          return { ...prev, [lead.import_batch_id]: { ...cur, total: Math.max(0, cur.total - 1) } }
+        })
+      }
+      toast.success(`Removed ${lead.name}`)
+    } catch (err) {
+      console.error('Failed to delete lead:', err)
+      toast.error('Failed to delete lead')
+    } finally {
+      setQueuePendingId(null)
+    }
+  }
+
+  async function handleQueueFirmUpdate(lead, firmName) {
+    if ((lead.firm_name || '') === firmName) return
+    try {
+      await updateLead(lead.id, { firm_name: firmName })
+      setQueueLeads(prev => prev.map(l => l.id === lead.id ? { ...l, firm_name: firmName } : l))
+    } catch (err) {
+      console.error('Failed to update firm:', err)
+      toast.error('Failed to save firm name')
+    }
+  }
+
+  function toggleQueueGroup(key) {
+    setQueueCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
   // Stats rows match the current viewing scope (one person, or everyone),
@@ -1077,6 +1164,39 @@ function OutreachAdmin() {
           onChartRangeChange={setChartRange}
           showChartDetails={showChartDetails}
           onToggleChartDetails={() => setShowChartDetails(v => !v)}
+        />
+      )}
+
+      {/* Outreach Queue */}
+      <OutreachQueueSection
+        leads={queueLeads}
+        batchStats={queueBatchStats}
+        loading={queueLoading}
+        pendingId={queuePendingId}
+        collapsed={queueCollapsed}
+        onToggleGroup={toggleQueueGroup}
+        onMark={handleQueueMarkReachedOut}
+        onDelete={handleQueueDelete}
+        onFirmUpdate={handleQueueFirmUpdate}
+        onOpenAddModal={() => setShowBulkAddModal(true)}
+      />
+
+      {showBulkAddModal && (
+        <BulkAddModal
+          personId={currentPerson?.id}
+          isAdmin={isAdmin}
+          people={people}
+          onClose={() => setShowBulkAddModal(false)}
+          onDone={async (result) => {
+            const { added, skipped } = result
+            if (added === 0 && skipped === 0) { toast.warn('No valid LinkedIn URLs found'); return }
+            if (added === 0) { toast.warn(`Nothing added — all ${skipped} URLs were duplicates`); return }
+            toast.success(skipped > 0
+              ? `Added ${added} · skipped ${skipped} duplicate${skipped === 1 ? '' : 's'}`
+              : `Added ${added} lead${added === 1 ? '' : 's'} to your queue`)
+            setShowBulkAddModal(false)
+            await loadQueue()
+          }}
         />
       )}
 
@@ -1491,6 +1611,342 @@ function OutreachAdmin() {
     </div>
   )
 }
+
+// ─── Outreach Queue ──────────────────────────────────────────────────────────
+
+const UNBATCHED_KEY = '__unbatched__'
+
+function extractLinkedInUrls(text) {
+  if (!text) return []
+  const matches = text.match(/https?:\/\/[^\s,;"'<>()]+/gi) || []
+  const out = []
+  const seen = new Set()
+  for (const raw of matches) {
+    if (!isLinkedInUrl(raw)) continue
+    const norm = raw.toLowerCase()
+    if (seen.has(norm)) continue
+    seen.add(norm)
+    out.push(raw)
+  }
+  return out
+}
+
+function defaultBatchLabel() {
+  const d = new Date()
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function OutreachQueueSection({ leads, batchStats, loading, pendingId, collapsed, onToggleGroup, onMark, onDelete, onFirmUpdate, onOpenAddModal }) {
+  const grouped = useMemo(() => {
+    const groups = new Map()
+    for (const lead of leads) {
+      const key = lead.import_batch_id || UNBATCHED_KEY
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          batchId: lead.import_batch_id || null,
+          label: lead.import_batch_label || null,
+          createdAt: lead.created_at,
+          leads: []
+        })
+      }
+      groups.get(key).leads.push(lead)
+      const existing = groups.get(key)
+      if (lead.created_at > existing.createdAt) existing.createdAt = lead.created_at
+    }
+    return [...groups.values()].sort((a, b) => {
+      if (a.key === UNBATCHED_KEY) return 1
+      if (b.key === UNBATCHED_KEY) return -1
+      return (b.createdAt || '').localeCompare(a.createdAt || '')
+    })
+  }, [leads])
+
+  return (
+    <div className="card" style={{ marginBottom: '20px', padding: 0, overflow: 'hidden' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 18px', borderBottom: grouped.length > 0 ? '1px solid #e5e7eb' : 'none',
+        background: '#f9fafb'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Inbox size={16} style={{ color: '#6b7280' }} />
+          <span style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>Outreach Queue</span>
+          {!loading && leads.length > 0 && (
+            <span style={{
+              fontSize: '11px', fontWeight: 600, color: '#1d4ed8',
+              background: '#eff6ff', borderRadius: '999px', padding: '2px 8px'
+            }}>
+              {leads.length} remaining
+            </span>
+          )}
+        </div>
+        <button className="btn btn-sm btn-primary" onClick={onOpenAddModal}>
+          <Plus size={14} /> Paste or upload list
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>
+          Loading queue…
+        </div>
+      ) : grouped.length === 0 ? (
+        <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+          Queue is empty — paste a list of LinkedIn URLs to get started.
+        </div>
+      ) : (
+        <div>
+          {grouped.map(group => (
+            <QueueBatchGroup
+              key={group.key}
+              group={group}
+              stats={group.batchId ? batchStats[group.batchId] : null}
+              collapsed={!!collapsed[group.key]}
+              onToggle={() => onToggleGroup(group.key)}
+              pendingId={pendingId}
+              onMark={onMark}
+              onDelete={onDelete}
+              onFirmUpdate={onFirmUpdate}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function QueueBatchGroup({ group, stats, collapsed, onToggle, pendingId, onMark, onDelete, onFirmUpdate }) {
+  const isUnbatched = group.key === UNBATCHED_KEY
+  const title = isUnbatched
+    ? 'Uncategorized'
+    : (group.label || `Batch from ${new Date(group.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)
+  const remaining = group.leads.length
+  const total = stats?.total ?? remaining
+  const contacted = stats?.contacted ?? 0
+  const pct = total > 0 ? Math.round((contacted / total) * 100) : 0
+
+  return (
+    <div style={{ borderBottom: '1px solid #f3f4f6' }}>
+      <button
+        onClick={onToggle}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '11px 18px', background: 'white', border: 'none',
+          cursor: 'pointer', textAlign: 'left'
+        }}
+      >
+        {collapsed ? <ChevronRight size={14} style={{ color: '#6b7280' }} /> : <ChevronDown size={14} style={{ color: '#6b7280' }} />}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontWeight: 500, color: '#374151', fontSize: '13px' }}>{title}</span>
+          {!isUnbatched && stats && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
+              <div style={{ width: '120px', height: '5px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden', display: 'inline-block', verticalAlign: 'middle' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: '#16a34a' }} />
+              </div>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>{contacted}/{total}</span>
+            </div>
+          )}
+        </div>
+        <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>{remaining} left</span>
+      </button>
+
+      {!collapsed && (
+        <div style={{ borderTop: '1px solid #f3f4f6' }}>
+          {group.leads.map(lead => (
+            <QueueLeadRow
+              key={lead.id}
+              lead={lead}
+              busy={pendingId === lead.id}
+              onMark={() => onMark(lead)}
+              onDelete={() => onDelete(lead)}
+              onFirmUpdate={onFirmUpdate}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function QueueLeadRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
+  const [firm, setFirm] = useState(lead.firm_name || '')
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '10px',
+      padding: '10px 18px', borderBottom: '1px solid #f9fafb',
+      opacity: busy ? 0.5 : 1, background: 'white'
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>{lead.name || 'Unknown'}</div>
+        {lead.linkedin_url && (
+          <a
+            href={lead.linkedin_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: '11px', color: '#2563eb', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}
+          >
+            <ExternalLink size={10} />
+            {lead.linkedin_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+          </a>
+        )}
+      </div>
+      <input
+        type="text"
+        value={firm}
+        onChange={e => setFirm(e.target.value)}
+        onBlur={() => onFirmUpdate(lead, firm.trim())}
+        placeholder="Firm…"
+        style={{ width: '160px', padding: '5px 8px', fontSize: '12px', border: '1px solid #e5e7eb', borderRadius: '4px' }}
+      />
+      <button
+        className="btn btn-sm btn-primary"
+        onClick={onMark}
+        disabled={busy}
+        title="Log LinkedIn outreach and move to Cold Outreach"
+      >
+        <Check size={13} /> Mark reached out
+      </button>
+      <button
+        className="btn btn-sm"
+        onClick={onDelete}
+        disabled={busy}
+        title="Remove from queue"
+        style={{ color: '#dc2626', padding: '5px 8px' }}
+      >
+        <Trash2 size={13} />
+      </button>
+    </div>
+  )
+}
+
+function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
+  const { toast } = useToast()
+  const [label, setLabel, clearLabel] = useSessionState('oa:modal:label', defaultBatchLabel())
+  const [text, setText, clearText] = useSessionState('oa:modal:text', '')
+  const [assigneeIds, setAssigneeIds] = useSessionState(
+    'oa:modal:assigneeIds',
+    personId ? [String(personId)] : []
+  )
+  const [submitting, setSubmitting] = useState(false)
+  const fileRef = useRef(null)
+
+  const urls = useMemo(() => extractLinkedInUrls(text), [text])
+
+  function toggleAssignee(id) {
+    const key = String(id)
+    setAssigneeIds(prev => prev.includes(key) ? prev.filter(p => p !== key) : [...prev, key])
+  }
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const content = await file.text()
+      setText(prev => prev ? (prev.replace(/\s+$/, '') + '\n' + content) : content)
+    } catch (err) {
+      toast.error('Failed to read file: ' + err.message)
+    }
+    e.target.value = ''
+  }
+
+  async function handleSubmit() {
+    if (urls.length === 0) return
+    if (isAdmin && assigneeIds.length === 0) {
+      toast.warn('Pick at least one analyst to receive the leads')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const ids = isAdmin ? assigneeIds.map(s => Number(s)) : [personId]
+      const result = await bulkCreateLeads(urls, label, personId, ids)
+      clearText()
+      clearLabel()
+      onDone(result)
+    } catch (err) {
+      toast.error('Failed to add leads: ' + err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-large" onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h2 style={{ margin: 0 }}>Add leads in bulk</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="form-group">
+          <label>Batch label (optional)</label>
+          <input type="text" value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Sep 28 — PE firms" />
+        </div>
+
+        {isAdmin && (people || []).length > 0 && (
+          <div className="form-group">
+            <label>Assign to {assigneeIds.length > 1 ? `(round-robin across ${assigneeIds.length})` : ''}</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {(people || []).map(p => {
+                const selected = assigneeIds.includes(String(p.id))
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => toggleAssignee(p.id)}
+                    style={{
+                      padding: '5px 12px', borderRadius: '999px',
+                      border: selected ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
+                      background: selected ? '#eff6ff' : 'white',
+                      color: selected ? '#1d4ed8' : '#374151',
+                      fontSize: '12px', fontWeight: selected ? 600 : 500, cursor: 'pointer'
+                    }}
+                  >
+                    {p.name}{p.id === personId ? ' (me)' : ''}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
+              {assigneeIds.length === 0 ? 'Pick at least one analyst.'
+                : assigneeIds.length === 1 ? "All leads will go to this analyst's queue."
+                : `Leads will be split evenly across ${assigneeIds.length} analysts.`}
+            </div>
+          </div>
+        )}
+
+        <div className="form-group">
+          <label>LinkedIn URLs</label>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder={'Paste one URL per line, or upload a CSV/TXT file.\n\nhttps://linkedin.com/in/john-smith\nhttps://linkedin.com/in/jane-doe\n…'}
+            rows={10}
+            style={{ fontFamily: 'monospace', fontSize: '13px' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()}>
+              <Upload size={14} /> Upload CSV / TXT
+            </button>
+            <input ref={fileRef} type="file" accept=".csv,.txt,text/csv,text/plain" onChange={handleFile} style={{ display: 'none' }} />
+            <span style={{ fontSize: '12px', color: urls.length > 0 ? '#16a34a' : '#6b7280' }}>
+              {urls.length > 0 ? `${urls.length} LinkedIn URL${urls.length === 1 ? '' : 's'} detected` : 'No LinkedIn URLs detected yet'}
+            </span>
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || urls.length === 0}>
+            {submitting ? 'Adding…' : `Add ${urls.length || ''}`.trim()}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function ViewPill({ active, onClick, children }) {
   return (
