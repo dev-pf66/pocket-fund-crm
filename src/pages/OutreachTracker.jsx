@@ -6,6 +6,7 @@ import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCir
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
+import { dailyTargetOf, hasTarget } from './Dashboard'
 import { istToday } from '../lib/dateUtils'
 import { parseCSVText, parseDateCell } from '../lib/csv'
 
@@ -387,15 +388,18 @@ function OutreachTracker() {
     other: <MessageSquare size={16} />
   }
 
-  const statusIcons = {
-    sent: <Clock size={14} />,
-    replied: <CheckCircle size={14} />,
-    no_response: <XCircle size={14} />,
-    bounced: <XCircle size={14} />
-  }
-
-  const goalPercentage = Math.min((todayCount / 10) * 100, 100)
-  const goalMet = todayCount >= 10
+  // Today's target comes from the person, not from a constant. The 10 that was
+  // hardcoded here is the old DEFAULT_DAILY_TARGET, which was deliberately set to
+  // 0 in Aug 2026 when sales moved to a low-volume, high-targeting motion — so
+  // this card was telling every analyst their goal was 10 sends a day and
+  // congratulating them for hitting a quota Dev had abandoned. Same bug as the
+  // Dashboard's "Today's Outreach" card, which was replaced by the scoreboard.
+  // Targets stay fluid: if someone HAS a target the meter means something, and if
+  // they don't there is simply no meter rather than a false one.
+  const myTarget = dailyTargetOf(currentPerson)
+  const hasGoal = hasTarget(myTarget)
+  const goalPercentage = hasGoal ? Math.min((todayCount / myTarget) * 100, 100) : 0
+  const goalMet = hasGoal && todayCount >= myTarget
 
   if (loading && outreaches.length === 0) {
     return <div className="loading">Loading outreach tracker...</div>
@@ -467,23 +471,30 @@ function OutreachTracker() {
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: goalMet ? 'var(--success)' : 'var(--primary)' }}>
             {todayCount}
-            <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/10</span>
+            {hasGoal && <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/{myTarget}</span>}
           </div>
-          <div style={{
-            width: '100%',
-            height: '8px',
-            background: 'var(--gray-200)',
-            borderRadius: '4px',
-            overflow: 'hidden',
-            marginTop: '12px'
-          }}>
+          {!hasGoal && (
+            <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '4px' }}>
+              touches logged today — no target set
+            </div>
+          )}
+          {hasGoal && (
             <div style={{
-              width: `${goalPercentage}%`,
-              height: '100%',
-              background: goalMet ? 'var(--success)' : 'var(--primary)',
-              transition: 'width 0.3s'
-            }} />
-          </div>
+              width: '100%',
+              height: '8px',
+              background: 'var(--gray-200)',
+              borderRadius: '4px',
+              overflow: 'hidden',
+              marginTop: '12px'
+            }}>
+              <div style={{
+                width: `${goalPercentage}%`,
+                height: '100%',
+                background: goalMet ? 'var(--success)' : 'var(--primary)',
+                transition: 'width 0.3s'
+              }} />
+            </div>
+          )}
           {goalMet && (
             <div style={{ marginTop: '8px', color: 'var(--success)', fontSize: '14px', fontWeight: '600' }}>
               🎉 Goal Met!
