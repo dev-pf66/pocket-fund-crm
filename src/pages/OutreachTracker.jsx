@@ -97,7 +97,7 @@ function OutreachTracker() {
     try {
       const [dashStats, leadsData, templateData] = await Promise.all([
         getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30 }),
-        getLeads({ stage: 'cold_outreach' }, currentPerson.id),
+        getLeads({}, currentPerson.id),
         getEmailTemplates().catch(() => [])
       ])
 
@@ -189,7 +189,23 @@ function OutreachTracker() {
     }
 
     try {
-      await logOutreach(newOutreach, currentPerson?.id, currentPerson?.name)
+      let outreachData = { ...newOutreach }
+
+      // Auto-create a lead record when the user typed a name manually
+      // (no lead_id from the dropdown). Without this, the outreach entry
+      // has a dangling lead_name string that never appears in the pipeline.
+      if (outreachData.lead_name && !outreachData.lead_id) {
+        const lead = await createLead({
+          name: outreachData.lead_name.trim(),
+          firm_name: outreachData.firm_name || null,
+          lead_source: outreachData.lead_source || null,
+          industry: outreachData.industry || null,
+          stage: 'cold_outreach'
+        }, currentPerson?.id)
+        outreachData = { ...outreachData, lead_id: lead.id }
+      }
+
+      await logOutreach(outreachData, currentPerson?.id, currentPerson?.name)
       clearNewOutreach()
       setShowForm(false)
       await loadData()
