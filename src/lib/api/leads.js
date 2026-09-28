@@ -890,3 +890,100 @@ export async function getAssignedLeads(personId) {
   if (error) throw error
   return data || []
 }
+
+
+// ============================================================================
+// DISPOSITION — answering the 30-day clock
+// ============================================================================
+//
+// Dev, 27 Sept 2026: "the whole point of the thirty day thing is that the person
+// who's responsible for the lead has to update it. After those thirty days they
+// have to update the lead, because otherwise — if the lead is dead we have to
+// mark it as dead, or if they've said get back to me after three months we need
+// a way for the person to be updated like that. So we know exactly what's
+// happening with each of our leads."
+//
+// Four outcomes, and exactly one of them is not an outcome: "log what happened"
+// records that the lead is still live and being worked. The other three take it
+// out of the working queue. Every one of them stamps disposed_at, which is what
+// the clock reads — so answering the question resets it, and only answering it
+// does.
+
+/** The dispositions an owner can pick. `dead` is the only one needing a reason. */
+export const DISPOSITIONS = ['dead', 'later', 'investor', 'partner', 'working']
+
+/**
+ * Record what is happening with a lead.
+ *
+ *   dead     → stage `passed`, with dead_reason (required) + optional note.
+ *   later     → stage `reach_out_later`, with the date they asked for. The date is
+ *               required: "get back to me in three months" with no date recorded
+ *               is the exact failure this replaces.
+ *   investor  → they are a better fit for the investor book. Stage `passed` for
+ *               the sales pipeline, reason recorded, and the lead is NOT deleted
+ *               so whoever adds them to crm_investors can still read the history.
+ *   partner   → same, for partners.
+ *   working   → nothing is wrong; the owner is on it. Stamps disposed_at and logs
+ *               a note, which is enough to answer the clock for another 30 days.
+ *
+ * Deliberately does NOT archive. Archiving is a separate, bulk, admin act; a
+ * passed lead stays visible in the pipeline's passed column where the team can
+ * see what was lost and why. Nothing here deletes anything.
+ *
+ * `disposition` and `reason` are validated rather than trusted: this writes a
+ * stage, and a typo'd disposition silently doing nothing is worse than an error.
+ */
+export async function disposeLead(leadId, { disposition, reason = null, note = null, followUpDate = null } = {}, currentPersonId = null) {
+  if (!DISPOSITIONS.includes(disposition)) {
+    throw new Error(`Unknown disposition "${disposition}" — expected one of ${DISPOSITIONS.join(', ')}`)
+  }
+  if (disposition === 'dead' && !String(reason || '').trim()) {
+    throw new Error('Marking a lead dead needs a reason — that is the whole point of recording it')
+  }
+  if (disposition === 'later' && !followUpDate) {
+    throw new Error('"Come back later" needs a date, or it is the same as forgetting')
+  }
+
+  const now = new Date().toISOString()
+  const updates = {
+    disposed_at: now,
+    disposed_by: currentPersonId,
+    last_activity_date: now,
+    last_activity_type: 'note',
+  }
+
+  if (disposition === 'dead' || disposition === 'investor' || disposition === 'partner') {
+    updates.stage = 'passed'
+    updates.dead_reason = disposition === 'investor' ? 'Better as an investor'
+      : disposition === 'partner' ? 'Better as a partner'
+      : reason
+    updates.dead_reason_note = note || null
+    // A dead lead never nags again.
+    updates.next_follow_up_date = null
+    updates.follow_up_cadence = null
+  } else if (disposition === 'later') {
+    updates.stage = 'reach_out_later'
+    updates.reach_out_later_date = followUpDate
+    updates.next_follow_up_date = followUpDate
+    updates.follow_up_note = note || 'Asked us to come back'
+  } else {
+    // working — no stage change, but the clock is answered.
+    if (followUpDate) updates.next_follow_up_date = followUpDate
+    if (note) updates.follow_up_note = note
+  }
+
+  const updated = await updateLead(leadId, updates, currentPersonId)
+
+  const LABEL = {
+    dead: 'Marked dead', later: 'Parked for later',
+    investor: 'Moved to the investor book', partner: 'Moved to partners',
+    working: 'Still working it',
+  }
+  const parts = [LABEL[disposition]]
+  if (updates.dead_reason) parts.push(updates.dead_reason)
+  if (followUpDate) parts.push(`come back ${followUpDate}`)
+  if (note) parts.push(note)
+  await logActivity(leadId, { activity_type: 'note', notes: `${parts.join(' — ')} (30-day update)` }, currentPersonId)
+
+  return updated
+}
