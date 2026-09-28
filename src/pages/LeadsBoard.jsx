@@ -325,7 +325,9 @@ function LeadsBoard() {
 
       // Analyst filter (specific person — admins use this to drill into a
       // teammate's book, separate from the My/Unassigned chips above).
-      if (analystFilter !== 'all') {
+      if (analystFilter === 'unassigned') {
+        if (ownerId != null) continue
+      } else if (analystFilter !== 'all') {
         if (String(ownerId ?? '') !== String(analystFilter)) continue
       }
 
@@ -730,6 +732,7 @@ function LeadsBoard() {
                       onChange={(e) => setAnalystFilter(e.target.value)}
                     >
                       <option value="all">Any analyst</option>
+                      <option value="unassigned">Unassigned</option>
                       {(people || []).map(p => (
                         <option key={p.id} value={String(p.id)}>{p.name}</option>
                       ))}
