@@ -1,31 +1,13 @@
 import { useState, useEffect } from 'react'
 import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead, getEmailTemplates } from '../lib/crm-api'
-import { isLinkedInUrl, nameFromLinkedInUrl, placeholderNameFromLinkedInUrl } from '../lib/linkedin'
+import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
-import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, TrendingUp, Upload, Download, Edit2, Zap } from 'lucide-react'
+import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useToast } from '../components/Toast'
-import { dailyTargetOf, hasTarget } from './Dashboard'
 import { useSessionState } from '../hooks/useSessionState'
 import { istToday } from '../lib/dateUtils'
-import { parseCSVText, parseDateCell, toCSV, downloadCSV } from '../lib/csv'
-
-// Columns for the "Export My Leads" download — the working set an analyst
-// needs to pick up their list outside the app, not every system column on
-// crm_leads (see api/README.md for the full schema).
-const LEAD_EXPORT_COLUMNS = [
-  { key: 'name', label: 'Name' },
-  { key: 'firm_name', label: 'Firm' },
-  { key: 'email', label: 'Email' },
-  { key: 'phone', label: 'Phone' },
-  { key: 'linkedin_url', label: 'LinkedIn' },
-  { key: 'lead_type', label: 'Type' },
-  { key: 'stage', label: 'Stage' },
-  { key: 'lead_source', label: 'Source' },
-  { key: 'lead_score', label: 'Score' },
-  { key: 'next_follow_up_date', label: 'Next Follow-up' },
-  { key: 'notes', label: 'Notes' },
-]
+import { parseCSVText, parseDateCell } from '../lib/csv'
 
 // Map free-text CSV values into the canonical dropdown keys the table uses.
 // Without this, a row that says "Cold Email" or "LinkedIn" would import as
@@ -54,7 +36,6 @@ const EMPTY_OUTREACH = {
   lead_id: null,
   lead_name: '',
   firm_name: '',
-  linkedin_url: '',
   outreach_type: 'cold_email',
   status: 'sent',
   notes: '',
@@ -98,7 +79,6 @@ function OutreachTracker() {
   const [savingEdits, setSavingEdits] = useState(false)
 
   const [quickLogging, setQuickLogging] = useState(false)
-  const [exporting, setExporting] = useState(false)
 
   const [filter, setFilter] = useState({
     view: 'today', // 'today', 'week', 'all'
@@ -116,8 +96,8 @@ function OutreachTracker() {
     setLoading(true)
     try {
       const [dashStats, leadsData, templateData] = await Promise.all([
-        getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30, dailyGoal: dailyTargetOf(currentPerson) }),
-        getLeads({ stage: 'outreach' }, currentPerson.id),
+        getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30 }),
+        getLeads({}, currentPerson.id),
         getEmailTemplates().catch(() => [])
       ])
 
@@ -172,14 +152,11 @@ function OutreachTracker() {
       let lead = await findLeadByLinkedInUrl(url)
       let leadCreated = false
       if (!lead) {
-        // nameFromLinkedInUrl returns '' for a run-together slug it can't
-        // split. Fall back to the handle rather than a fake-looking name:
-        // this path is the one that filed 126 leads as "Liroyhaddad".
-        const guessedName = nameFromLinkedInUrl(url) || placeholderNameFromLinkedInUrl(url) || 'Unknown'
+        const guessedName = nameFromLinkedInUrl(url) || 'Unknown'
         lead = await createLead({
           name: guessedName,
           linkedin_url: url,
-          stage: 'outreach',
+          stage: 'cold_outreach',
           lead_source: 'LinkedIn'
         }, currentPerson?.id)
         leadCreated = true
@@ -212,7 +189,23 @@ function OutreachTracker() {
     }
 
     try {
-      await logOutreach(newOutreach, currentPerson?.id, currentPerson?.name)
+      let outreachData = { ...newOutreach }
+
+      // Auto-create a lead record when the user typed a name manually
+      // (no lead_id from the dropdown). Without this, the outreach entry
+      // has a dangling lead_name string that never appears in the pipeline.
+      if (outreachData.lead_name && !outreachData.lead_id) {
+        const lead = await createLead({
+          name: outreachData.lead_name.trim(),
+          firm_name: outreachData.firm_name || null,
+          lead_source: outreachData.lead_source || null,
+          industry: outreachData.industry || null,
+          stage: 'cold_outreach'
+        }, currentPerson?.id)
+        outreachData = { ...outreachData, lead_id: lead.id }
+      }
+
+      await logOutreach(outreachData, currentPerson?.id, currentPerson?.name)
       clearNewOutreach()
       setShowForm(false)
       await loadData()
@@ -253,7 +246,6 @@ function OutreachTracker() {
           // specific headers (deal + size, lead + name) before generic ones.
           if (header.includes('lead') && header.includes('name')) outreach.lead_name = value
           else if (header.includes('firm') || header.includes('company')) outreach.firm_name = value
-          else if (header.includes('linkedin')) outreach.linkedin_url = value
           else if (header.includes('type') || header.includes('channel')) {
             const t = normalizeOutreachType(value)
             if (t) outreach.outreach_type = t
@@ -318,8 +310,7 @@ function OutreachTracker() {
 
   async function handleUpdateStatus(id, newStatus) {
     try {
-      await updateOutreach(id, { status: newStatus }, currentPerson?.id)
-      if (newStatus === 'replied') toast.success('Reply logged — lead moved to Responded in the pipeline')
+      await updateOutreach(id, { status: newStatus })
       await loadData()
     } catch (error) {
       console.error('Failed to update status:', error)
@@ -346,7 +337,7 @@ function OutreachTracker() {
         if (k === 'outreach_date' && !v) v = null
         updates[k] = v
       }
-      await updateOutreach(selectedOutreach.id, updates, currentPerson?.id)
+      await updateOutreach(selectedOutreach.id, updates)
       setOutreaches(prev => prev.map(o => o.id === selectedOutreach.id ? { ...o, ...updates } : o))
       toast.success('Outreach updated')
       setShowDetailsModal(false)
@@ -356,29 +347,6 @@ function OutreachTracker() {
       toast.error('Failed to update: ' + err.message)
     } finally {
       setSavingEdits(false)
-    }
-  }
-
-  // Every lead assigned to (or created by) the logged-in analyst, regardless
-  // of the Tracker's date/type/status filters above — this is their working
-  // list, not the current view.
-  async function handleExportLeads() {
-    if (!currentPerson?.id) return
-    setExporting(true)
-    try {
-      const myLeads = await getLeads({}, currentPerson.id)
-      if (myLeads.length === 0) {
-        toast.warn('No leads assigned to you yet')
-        return
-      }
-      const csv = toCSV(myLeads, LEAD_EXPORT_COLUMNS)
-      downloadCSV(`my-leads-${istToday()}.csv`, csv)
-      toast.success(`Exported ${myLeads.length} lead${myLeads.length === 1 ? '' : 's'}`)
-    } catch (error) {
-      console.error('Failed to export leads:', error)
-      toast.error('Export failed: ' + error.message)
-    } finally {
-      setExporting(false)
     }
   }
 
@@ -419,10 +387,15 @@ function OutreachTracker() {
     other: <MessageSquare size={16} />
   }
 
-  // 0 / unset = no target: show the count, hide the goal framing.
-  const dailyTarget = dailyTargetOf(currentPerson)
-  const goalPercentage = hasTarget(dailyTarget) ? Math.min((todayCount / dailyTarget) * 100, 100) : 0
-  const goalMet = hasTarget(dailyTarget) && todayCount >= dailyTarget
+  const statusIcons = {
+    sent: <Clock size={14} />,
+    replied: <CheckCircle size={14} />,
+    no_response: <XCircle size={14} />,
+    bounced: <XCircle size={14} />
+  }
+
+  const goalPercentage = Math.min((todayCount / 10) * 100, 100)
+  const goalMet = todayCount >= 10
 
   if (loading && outreaches.length === 0) {
     return <div className="loading">Loading outreach tracker...</div>
@@ -433,15 +406,6 @@ function OutreachTracker() {
       <div className="page-header">
         <h1>Tracker</h1>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={handleExportLeads}
-            disabled={exporting}
-            title="Export every lead assigned to you as a CSV"
-          >
-            <Download size={16} />
-            {exporting ? 'Exporting…' : 'Export My Leads'}
-          </button>
           <button
             className="btn btn-secondary"
             onClick={() => setShowCsvUpload(!showCsvUpload)}
@@ -503,7 +467,7 @@ function OutreachTracker() {
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: goalMet ? 'var(--success)' : 'var(--primary)' }}>
             {todayCount}
-            {hasTarget(dailyTarget) && <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/{dailyTarget}</span>}
+            <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/10</span>
           </div>
           <div style={{
             width: '100%',
@@ -538,9 +502,7 @@ function OutreachTracker() {
             <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}> days</span>
           </div>
           <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--gray-600)' }}>
-            {hasTarget(dailyTarget)
-              ? (streak > 0 ? `${streak} consecutive days with ${dailyTarget}+ outreaches` : `Hit ${dailyTarget} today to start a streak!`)
-              : (streak > 0 ? `${streak} consecutive days with outreach logged` : 'No daily target set')}
+            {streak > 0 ? `${streak} consecutive days with 10+ outreaches` : 'Hit 10 today to start a streak!'}
           </div>
         </div>
 
@@ -604,9 +566,9 @@ function OutreachTracker() {
           <details style={{ marginTop: '16px', padding: '12px', background: 'white', borderRadius: '8px' }}>
             <summary style={{ cursor: 'pointer', fontWeight: '600' }}>Example CSV Format</summary>
             <pre style={{ marginTop: '8px', fontSize: '12px', overflow: 'auto' }}>
-{`lead_name,firm_name,linkedin,type,status,fit_score,industry,message_content
-John Smith,Acme Capital,https://linkedin.com/in/johnsmith,cold_email,sent,5,SaaS,Sent intro email about our services
-Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahj,linkedin_message,replied,4,E-commerce,LinkedIn DM - she's interested!`}
+{`lead_name,firm_name,type,status,fit_score,industry,message_content
+John Smith,Acme Capital,cold_email,sent,5,SaaS,Sent intro email about our services
+Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM - she's interested!`}
             </pre>
           </details>
         </div>
@@ -1010,16 +972,6 @@ Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahj,linkedin_message,re
                       value={fv('firm_name')}
                       onChange={(e) => setField('firm_name', e.target.value)}
                       placeholder="Firm / company"
-                    />
-                  </div>
-
-                  <div className="info-item">
-                    <label>LinkedIn</label>
-                    <input
-                      type="url"
-                      value={fv('linkedin_url')}
-                      onChange={(e) => setField('linkedin_url', e.target.value)}
-                      placeholder="https://linkedin.com/in/..."
                     />
                   </div>
 
