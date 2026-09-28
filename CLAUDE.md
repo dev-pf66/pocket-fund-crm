@@ -71,7 +71,33 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - All stage automation is **forward-only** (`advanceLeadStage`) — never regresses a lead, never touches client/passed. It deliberately skips `runStageSideEffects` to avoid double-counting.
 - Reply↔pipeline sync is bidirectional: outreach marked 'replied' advances the lead to `responded`; lead dragged to responded+ flips its latest un-replied outreach entry to 'replied'.
 - Leaving `meeting_booked` forward (into `warm_active` or beyond) auto-logs a 'meeting' activity — that's what the Dashboard Funnel counts as meetings. It fires on the way OUT because `meeting_booked` now means "agreed to meet," not "met."
-- Per-user outreach targets: `people.daily_outreach_target` / `weekly_outreach_target` (migration 032), set in Admin → All Users → Targets; NULL falls back to 10/50. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
+- **Per-user outreach targets live in `src/lib/targets.js`** — pure and page-free, so they can be
+  tested without importing a page component. They used to be exported from `pages/Dashboard.jsx`,
+  which meant ColdCalls and OutreachTracker imported logic from a page and none of it was testable;
+  that is how three phantom quotas survived. `Dashboard.jsx` re-exports them for old import sites.
+  - `people.daily_outreach_target` / `weekly_outreach_target` (migration 032), set in Admin → All
+    Users → Targets. **The default is 0 and 0 means "no target"** — the old 10/50 fallbacks are
+    gone. Targets were deliberately zeroed Aug 2026 (low-volume, high-targeting motion) and stay
+    **fluid** (Dev, Sept 2026). **Never reintroduce a non-zero default** — that is a quota nobody
+    agreed to, and `test/no-phantom-quotas.test.js` fails if you do.
+  - `hasTarget` **takes a number, not a person**. `hasTarget(person)` gives `Number({...})` = NaN,
+    so it silently answers "no target" for everyone forever. ColdCalls did exactly that.
+  - **Three phantom quotas found Sept 2026, all surviving the zeroing the same way** — the number
+    was a literal in code rather than a read of the column, so setting the column to 0 never
+    touched it. Dashboard's "Today's Outreach" card read the column (so it broke *visibly*, "8 / 0",
+    and the scoreboard replaced it); OutreachTracker's "Today's Progress" hardcoded `/10`; and
+    `getPersonDashboardStats` defaulted `dailyGoal = 10`, which its only caller never overrode, so
+    the streak meant "consecutive days with 10+ touches" — a bar the team has never cleared (61
+    touches team-wide in the busiest recent week), and the `dailyGoal > 0` guard written for the
+    zeroed case was unreachable. If you add a meter, read the column and check `hasTarget` first.
+- **`crm_settings` is READ-ONLY from the app** and its one row was written 2026-02-05. There is no
+  write path and no Admin UI — `getCRMSettings` (`src/lib/api/misc.js`) is the only reference.
+  Live values: `cold_outreach_threshold` 5, `warm_lead_threshold` 7,
+  `active_conversation_threshold` 3. Those drive `calculateStaleness` / `getStaleLeads` and the
+  Today tab's marks, and measured 2026-09-29 they flag **68% of the live pipeline as stale** (92% of
+  `meeting_booked`). Not a bug — a judgement call Dev owns — but nobody can change it without direct
+  DB access, and a staleness colour that is red on two-thirds of the board carries no information.
+  `weekly_discovery_call_target` on that row has **zero references** anywhere in the codebase. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
 - **Cold calls (Sept 2026, `src/pages/ColdCalls.jsx`)** — they dial on CallHippo, ~20 dials
   per person per day, at buyers (`crm_leads`). Calls live in `crm_outreach_log`, **one row per
   DIAL**, `outreach_type='phone_call'` — so dials count toward the daily target, the streak and

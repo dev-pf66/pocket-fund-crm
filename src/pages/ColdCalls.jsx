@@ -13,7 +13,7 @@ import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { isAdminUser } from '../lib/admin'
 import { parseCallListText } from '../lib/callList'
-import { dailyTargetOf, hasTarget } from './Dashboard'
+import { dailyTargetOf, hasTarget } from '../lib/targets'
 import { fmtDate, istToday } from '../lib/dateUtils'
 import { useSessionState } from '../hooks/useSessionState'
 import {
@@ -405,7 +405,11 @@ function CallMode({ person, toast }) {
       {/* Today's numbers. Dials first because that's the goal, but pickups and
           conversations sit right next to it so volume never reads as success. */}
       <div className="stats-grid" style={{ marginBottom: '20px' }}>
-        <StatCard label="Dials today" value={todayCount} sub={hasTarget(person) ? `of ${target} target` : 'no target set'} />
+        {/* hasTarget(target), NOT hasTarget(person). hasTarget is (t) => Number(t) > 0,
+            so passing the person object gave Number({...}) = NaN and this read
+            "no target set" for everyone forever — invisible today because every
+            target is 0, and wrong the moment one is set. */}
+        <StatCard label="Dials today" value={todayCount} sub={hasTarget(target) ? `of ${target} target` : 'no target set'} />
         <StatCard label="Pickups" value={todaySummary.pickups} sub={fmtRate(rate(todaySummary.pickups, todayCount))} />
         <StatCard label="Conversations" value={todaySummary.convos} sub="reached the person" accent="#0ea5e9" />
         <StatCard label="Meetings booked" value={todaySummary.meetings} sub="today" accent="#15803d" />

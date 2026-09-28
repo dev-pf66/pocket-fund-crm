@@ -322,7 +322,13 @@ export async function deleteOutreach(id) {
  * with a single per-person query that computes the same three shapes
  * client-side.
  */
-export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGoal = 10, weekDays = 7 } = {}) {
+// dailyGoal defaults to 0 = NO TARGET, not 10. It was 10, and the only caller
+// never overrode it, so the streak silently meant "consecutive days with 10+
+// touches" — a quota deliberately zeroed in Aug 2026 that the team has never once
+// hit (61 touches team-wide in the busiest recent week). The `dailyGoal > 0` guard
+// below was written for the zeroed case and was unreachable because of this
+// default. Callers that want a real bar pass the person's own target.
+export async function getPersonDashboardStats(personId, { daysBack = 30, dailyGoal = 0, weekDays = 7 } = {}) {
   if (!personId) return { todayCount: 0, streak: 0, dailyStats: [] }
 
   const { data, error } = await supabase
