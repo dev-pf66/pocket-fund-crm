@@ -24,11 +24,46 @@
 --
 -- Run via the /migrate skill. Idempotent.
 
+-- ---------- clear the slate first ----------
+-- Dropping by name cannot close this hole, and that matters more than it looks.
+--
+-- Permissive RLS policies are OR-ed: ONE surviving policy that applies to PUBLIC
+-- re-opens the table no matter how correct the new policy is. And the names are
+-- not knowable from this repo — grepping every migration finds five policies on
+-- `people` that the original DROP list here missed
+-- (authenticated_users_can_view_people, allow_person_creation,
+-- users_can_update_own_record, admins_can_update_people,
+-- admins_can_delete_people), and NONE of them can explain the anon read that is
+-- still live in production, which means at least one more policy was created
+-- outside this ledger — almost certainly in the Supabase dashboard, the same way
+-- crm_leads got its archive columns.
+--
+-- So: drop EVERY policy on these three tables, then create exactly the intended
+-- set below. The end state is then determined by this file alone rather than by
+-- what happens to exist in production, which is the only version of this that
+-- can actually be verified.
+--
+-- Safe: this runs in one transaction, and with RLS enabled and no policy present
+-- the tables deny everything rather than allowing it. Nothing is lost that this
+-- file does not immediately recreate.
+DO $$
+DECLARE
+  pol RECORD;
+BEGIN
+  FOR pol IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN ('crm_partners', 'crm_investors', 'people')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I',
+                   pol.policyname, pol.schemaname, pol.tablename);
+    RAISE NOTICE 'dropped policy % on %', pol.policyname, pol.tablename;
+  END LOOP;
+END $$;
+
 -- ---------- crm_partners ----------
 ALTER TABLE crm_partners ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Allow all access to crm_partners" ON crm_partners;
-DROP POLICY IF EXISTS "team_all_access_partners"         ON crm_partners;
 CREATE POLICY "team_all_access_partners" ON crm_partners
   FOR ALL
   TO authenticated
@@ -38,8 +73,6 @@ CREATE POLICY "team_all_access_partners" ON crm_partners
 -- ---------- crm_investors ----------
 ALTER TABLE crm_investors ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Allow all access to crm_investors" ON crm_investors;
-DROP POLICY IF EXISTS "team_all_access_investors"         ON crm_investors;
 CREATE POLICY "team_all_access_investors" ON crm_investors
   FOR ALL
   TO authenticated
@@ -52,15 +85,11 @@ CREATE POLICY "team_all_access_investors" ON crm_investors
 -- (insert own email only), and Admin manages everyone else.
 ALTER TABLE people ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "team_can_view_people"   ON people;
-DROP POLICY IF EXISTS "Allow all access to people" ON people;
-DROP POLICY IF EXISTS "team_view_people"       ON people;
 CREATE POLICY "team_view_people" ON people
   FOR SELECT
   TO authenticated
   USING (true);
 
-DROP POLICY IF EXISTS "self_or_admin_insert_people" ON people;
 CREATE POLICY "self_or_admin_insert_people" ON people
   FOR INSERT
   TO authenticated
@@ -69,7 +98,6 @@ CREATE POLICY "self_or_admin_insert_people" ON people
     OR LOWER(email) = LOWER((SELECT auth.jwt() ->> 'email'))
   );
 
-DROP POLICY IF EXISTS "self_or_admin_update_people" ON people;
 CREATE POLICY "self_or_admin_update_people" ON people
   FOR UPDATE
   TO authenticated
@@ -78,14 +106,23 @@ CREATE POLICY "self_or_admin_update_people" ON people
     OR LOWER(email) = LOWER((SELECT auth.jwt() ->> 'email'))
   );
 
-DROP POLICY IF EXISTS "admin_delete_people" ON people;
 CREATE POLICY "admin_delete_people" ON people
   FOR DELETE
   TO authenticated
   USING (current_user_is_admin());
 
--- Verification — every row below must show roles={authenticated}, never {public}:
+-- Verification — every row below must show roles={authenticated}, never {public}.
+-- The sweep above is what makes this assertion meaningful: without it a leftover
+-- PUBLIC policy would still be listed here and would still grant anon access.
 --   SELECT tablename, policyname, cmd, roles
 --   FROM pg_policies
 --   WHERE tablename IN ('crm_partners','crm_investors','people')
 --   ORDER BY tablename, policyname;
+--
+-- And the only check that actually settles it — from outside, with the anon key
+-- that ships in the browser bundle. All three must return ZERO rows:
+--   curl -s "$VITE_SUPABASE_URL/rest/v1/crm_partners?select=id&limit=1"  -H "apikey: $VITE_SUPABASE_ANON_KEY"
+--   curl -s "$VITE_SUPABASE_URL/rest/v1/crm_investors?select=id&limit=1" -H "apikey: $VITE_SUPABASE_ANON_KEY"
+--   curl -s "$VITE_SUPABASE_URL/rest/v1/people?select=id&limit=1"        -H "apikey: $VITE_SUPABASE_ANON_KEY"
+-- Before this migration all three returned rows; `people` returned all 13,
+-- including name, email and is_admin.
