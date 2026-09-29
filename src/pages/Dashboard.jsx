@@ -6,6 +6,7 @@ import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 import { TrendingUp, AlertCircle, Calendar, Clock, FlaskConical, Target } from 'lucide-react'
 import { isAdminUser } from '../lib/admin'
 import { buildDailyCounts, computeMetrics, replyRateColor } from '../lib/outreachMetrics'
+import { dailyTargetOf } from '../lib/targets'
 import StageChip from '../components/StageChip'
 import Scoreboard from '../components/Scoreboard'
 
@@ -59,18 +60,10 @@ function RangePills({ options, value, onChange }) {
   )
 }
 
-// Per-user outreach targets are set by the admin (Admin → All Users).
-// Zero — or unset — means NO target, and every goal ring, progress bar and
-// "N to go" line hides rather than dividing by it. Sales moved to a
-// deliberately low-volume, high-targeting motion (Dev, Aug 2026), so holding
-// everyone to a daily send quota measured the wrong thing. The old 10/50
-// fallbacks are gone; `?? ` not `||` so an explicit 0 survives.
-export const DEFAULT_DAILY_TARGET = 0
-export const DEFAULT_WEEKLY_TARGET = 0
-export const dailyTargetOf = (person) => person?.daily_outreach_target ?? DEFAULT_DAILY_TARGET
-export const weeklyTargetOf = (person) => person?.weekly_outreach_target ?? DEFAULT_WEEKLY_TARGET
-/** True when this person has a real quota to be measured against. */
-export const hasTarget = (t) => Number(t) > 0
+// Target helpers moved to src/lib/targets.js — pure, so they can be tested
+// without importing a page (which drags in App → Layout → everything). Re-exported
+// here because other pages historically imported them from this module.
+export { DEFAULT_DAILY_TARGET, DEFAULT_WEEKLY_TARGET, dailyTargetOf, weeklyTargetOf, hasTarget } from '../lib/targets'
 
 const PIPELINE_SEGMENTS = [
   { key: 'outreach',       label: 'Outreach', color: '#60a5fa' },

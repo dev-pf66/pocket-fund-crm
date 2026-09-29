@@ -6,7 +6,7 @@ import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCir
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
-import { dailyTargetOf, hasTarget } from './Dashboard'
+import { dailyTargetOf, hasTarget } from '../lib/targets'
 import { istToday } from '../lib/dateUtils'
 import { parseCSVText, parseDateCell } from '../lib/csv'
 
@@ -97,7 +97,7 @@ function OutreachTracker() {
     setLoading(true)
     try {
       const [dashStats, leadsData, templateData] = await Promise.all([
-        getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30 }),
+        getPersonDashboardStats(currentPerson.id, { weekDays: 7, daysBack: 30, dailyGoal: dailyTargetOf(currentPerson) }),
         getLeads({}, currentPerson.id),
         getEmailTemplates().catch(() => [])
       ])
@@ -512,8 +512,14 @@ function OutreachTracker() {
             {streak}
             <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}> days</span>
           </div>
+          {/* The bar is the person's own target, or "any outreach" when they have
+              none. This copy used to hardcode 10 — so it told every analyst to hit
+              a quota that was zeroed in Aug 2026 and that nobody has ever reached,
+              which meant it permanently read "Hit 10 today to start a streak!". */}
           <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--gray-600)' }}>
-            {streak > 0 ? `${streak} consecutive days with 10+ outreaches` : 'Hit 10 today to start a streak!'}
+            {streak > 0
+              ? `${streak} consecutive days ${hasGoal ? `hitting ${myTarget}` : 'with outreach'}`
+              : hasGoal ? `Hit ${myTarget} today to start a streak` : 'Log outreach today to start a streak'}
           </div>
         </div>
 
