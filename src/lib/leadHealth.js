@@ -80,6 +80,18 @@ const rank = (stage) => STAGE_SEQUENCE.indexOf(stage)
  * scoreboard's count.
  */
 export const REQUIRED_LEAD_FIELDS = [
+  // A WAY TO REACH THEM, first, because it is the one that stops work dead.
+  // Measured 2026-09-29: of 56 leads at `responded` — people who had already
+  // replied to us — 10 had no email, no phone and no LinkedIn URL. Zero of the 56
+  // had an email at all. One of the 12 leads with a booked meeting was
+  // unreachable. Qualification data is useful; a contact method is the difference
+  // between a lead and a name.
+  //
+  // `anyOf` rather than three separate requirements: one channel is enough, and
+  // demanding an email from someone we only ever spoke to on LinkedIn would be a
+  // flag nobody can clear.
+  { key: 'contact', label: 'A way to reach them (email, phone or LinkedIn)',
+    anyOf: ['email', 'phone', 'linkedin_url'], fromStage: 'responded' },
   { key: 'lead_channel',      label: 'How they found us',        fromStage: 'responded' },
   { key: 'lead_type',         label: 'Buyer type',               fromStage: 'responded' },
   { key: 'buying_timeline',   label: 'How soon they want to buy', fromStage: 'meeting_booked' },
@@ -104,6 +116,17 @@ function filled(value) {
   return true
 }
 
+/**
+ * Is this requirement satisfied on this lead?
+ *
+ * A spec with `anyOf` is satisfied by ANY one of those columns being filled —
+ * that is how "a way to reach them" works without insisting on a specific one.
+ */
+function satisfied(lead, spec) {
+  if (spec.anyOf) return spec.anyOf.some(k => filled(lead?.[k]))
+  return filled(lead?.[spec.key])
+}
+
 /** Does the required info apply to this lead yet? */
 export function infoRequiredFor(lead) {
   if (!lead || lead.is_archived) return false
@@ -121,7 +144,17 @@ export function missingRequiredFields(lead) {
   const at = rank(lead.stage)
   return REQUIRED_LEAD_FIELDS
     .filter(f => at >= rank(f.fromStage))
-    .filter(f => !filled(lead[f.key]))
+    .filter(f => !satisfied(lead, f))
+}
+
+/**
+ * True when we have no way at all to contact this lead. Exported because
+ * "unreachable" is a different kind of problem from "unqualified" — it is not a
+ * data-tidiness issue, it is a lead you cannot work.
+ */
+export function isUnreachable(lead) {
+  if (!lead) return true
+  return !['email', 'phone', 'linkedin_url'].some(k => filled(lead[k]))
 }
 
 /** Every field this lead is expected to carry at its current stage. */

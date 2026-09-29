@@ -185,6 +185,34 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - `lead_channel` is its own column, NOT more values in `lead_source`: Dev wants a countable
     inbound-vs-outbound split ("in sales we put in 30 hours, in SEO 10"), which needs a closed
     vocabulary. Options are admin-editable via `crm_field_options` (`useFieldOptions` hook).
+  - **A contact method is required from `responded` (Sept 2026)** — the `contact` entry in
+    `REQUIRED_LEAD_FIELDS` uses `anyOf: ['email','phone','linkedin_url']`, satisfied by any one of
+    them. Measured 2026-09-29: of 56 leads at `responded` — people who had already replied —
+    **10 were reachable by nothing at all and ZERO had an email**; 1 of 12 `meeting_booked` and
+    **9 of 9 clients** were unreachable too. 30 of 118 engaged leads in total. Qualification data
+    is useful; a contact method is the difference between a lead and a name, which is why it is
+    listed first. `isUnreachable(lead)` is exported separately — "unreachable" is a different kind
+    of problem from "unqualified".
+- **Tags are lists (Sept 2026).** `crm_tags` / `crm_lead_tags` have existed since migration 003 and
+  the app could read, assign and unassign tags — but there was **no create path anywhere** and
+  nothing could filter by one. So the vocabulary was frozen at the 8 rows migration 003 seeded
+  (which is why "Met at Conference" exists as a generic label and no actual conference name ever
+  could), and 8 lead-tag links existed across 596 leads. Three-quarters built, therefore unused.
+  Dev: "more tags like the conference I met them at or if they came through linkedin, so we can
+  create lists."
+  - `createTag` matches names **case-insensitively** against existing tags and returns the existing
+    one rather than erroring — `crm_tags.name` is UNIQUE, so "SaaS Connect"/"saas connect" would be
+    two tags that render identically. Same casing bug that duplicated `people` rows.
+  - `addTagToLeads` upserts on `(lead_id, tag_id)` — that pair is the PK, so a plain insert would
+    raise 23505 when re-tagging a lead already in the list. Chunked at 200.
+  - `getTagsByLead` is paged and totally sorted; it backs the Pipeline board's **Tag** filter, which
+    is what makes a tag a list. Bulk-tag lives on the board's selection bar (`+ New tag…` creates
+    inline). Management is Admin → Tags: create, rename, usage counts.
+  - **Rename, never delete.** `crm_lead_tags` points at the id, so a rename carries every lead;
+    deleting a tag would silently strip it from all of them. There is deliberately no delete.
+  - **TAGS ARE NOT `lead_channel`.** Channel is a closed vocabulary for one countable question
+    (is inbound or outbound working). Tags are open-ended and arbitrary. Don't collapse either into
+    the other. Guardrail: `test/tags.test.js`.
 - **The 30-day disposition (migration 053, `disposeLead`, `DispositionModal`).** Dev: "the whole
   point of the thirty day thing is that the person who's responsible for the lead has to update
   it... if the lead is dead we have to mark it as dead, or if they've said get back to me after
