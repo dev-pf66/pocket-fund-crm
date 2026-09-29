@@ -90,14 +90,28 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     the streak meant "consecutive days with 10+ touches" — a bar the team has never cleared (61
     touches team-wide in the busiest recent week), and the `dailyGoal > 0` guard written for the
     zeroed case was unreachable. If you add a meter, read the column and check `hasTarget` first.
-- **`crm_settings` is READ-ONLY from the app** and its one row was written 2026-02-05. There is no
-  write path and no Admin UI — `getCRMSettings` (`src/lib/api/misc.js`) is the only reference.
-  Live values: `cold_outreach_threshold` 5, `warm_lead_threshold` 7,
-  `active_conversation_threshold` 3. Those drive `calculateStaleness` / `getStaleLeads` and the
-  Today tab's marks, and measured 2026-09-29 they flag **68% of the live pipeline as stale** (92% of
-  `meeting_booked`). Not a bug — a judgement call Dev owns — but nobody can change it without direct
-  DB access, and a staleness colour that is red on two-thirds of the board carries no information.
-  `weekly_discovery_call_target` on that row has **zero references** anywhere in the codebase. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
+- **`crm_settings` thresholds are editable in Admin (Sept 2026)** — `updateCRMSettings` +
+  `STALENESS_SETTINGS` in `src/lib/api/misc.js`, UI in `src/components/StalenessSettings.jsx`.
+  Until then the one row had been written 2026-02-05 and had **no write path and no UI at all**,
+  while driving `calculateStaleness` / `getStaleLeads` and the Today tab's marks. At those values
+  (`cold_outreach_threshold` 5, `warm_lead_threshold` 7, `active_conversation_threshold` 3) it
+  flagged **68% of the live pipeline as stale** on 2026-09-29 — 92% of `meeting_booked`. A staleness
+  colour red on two-thirds of the board carries no information.
+  - **The live-impact column is the point**, not the inputs. Each threshold shows "flags N of M
+    (x%)" against the real pipeline and updates as you type, and warns past 60%. The gap was never
+    the ability to edit — it was having no way to see what a value does.
+  - Writes are restricted to the three threshold keys and clamped to **1..365**. The same row holds
+    `email_alerts`, `slack_alerts` and a dead `weekly_discovery_call_target`, so a permissive writer
+    would let the UI stomp them; a 0 would make every aged lead instantly stale, which is the
+    failure the editor exists to fix. `getCRMSettings` memoises 60s, so the writer busts the cache —
+    without that the board keeps colouring against the old numbers and the save looks like it
+    failed. Guardrail: `test/crm-settings-write.test.js`.
+  - RLS allows it: `team_can_update_settings` is `FOR UPDATE USING (auth.uid() IS NOT NULL)`
+    (migration 010), so any signed-in user could write it — the gate is that Admin is admin-only at
+    the route. No `updated_by` column exists, so the row records *when* it changed but not *who*
+    changed it; worth a migration, same lesson as `archived_by`.
+  - `weekly_discovery_call_target` on that row still has **zero references** anywhere. Left in
+    place, not dropped. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
 - **Cold calls (Sept 2026, `src/pages/ColdCalls.jsx`)** — they dial on CallHippo, ~20 dials
   per person per day, at buyers (`crm_leads`). Calls live in `crm_outreach_log`, **one row per
   DIAL**, `outreach_type='phone_call'` — so dials count toward the daily target, the streak and
