@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, moveLead, updateLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus, bulkMarkTouched, leadOwnerId } from '../lib/crm-api'
+import { getLeads, moveLead, updateLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus, bulkMarkTouched, leadOwnerId, getTags, getTagsByLead, addTagToLeads, createTag } from '../lib/crm-api'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import LeadCard from '../components/LeadCard'
@@ -128,6 +128,7 @@ function LeadsBoard() {
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkAssignee, setBulkAssignee] = useState('')
+  const [bulkTag, setBulkTag] = useState('')
   const [bulkStage, setBulkStage] = useState('')
 
   // Filter state — persisted to sessionStorage so navigating away and back
@@ -151,6 +152,14 @@ function LeadsBoard() {
   // Archived leads are out of the board by default. The toggle is the answer
   // to "where did they go" — archiving hides a lead, it never loses one.
   const [showArchived, setShowArchived] = useSessionState('lb:showArchived', false)
+  // Tags as lists. crm_tags has existed since migration 003 and the app could read
+  // and assign tags but never CREATE one, and nothing anywhere could filter by
+  // one — so the vocabulary was frozen at 8 seeded rows and a tag could not become
+  // a list. Dev, Sept 2026: "more tags like the conference I met them at or if
+  // they came through linkedin, so we can create lists."
+  const [tags, setTags] = useState([])
+  const [tagsByLead, setTagsByLead] = useState(new Map())
+  const [tagFilter, setTagFilter] = useSessionState('lb:tagFilter', 'all')
 
   // Saved searches state
   const [savedSearches, setSavedSearches] = useState(() => loadSavedSearches())
@@ -167,11 +176,15 @@ function LeadsBoard() {
     if (!currentPerson?.id) return
     try {
       // Admins pull everything (leadScopeId null); non-admins pull their own.
-      const [data, demoIds, statusMap] = await Promise.all([
+      const [data, demoIds, statusMap, tagList, tagMap] = await Promise.all([
         getLeads({ includeArchived: showArchived }, leadScopeId),
         getDemoLeadIds(leadScopeId).catch(() => new Set()),
-        getLeadLatestOutreachStatus(leadScopeId).catch(() => new Map())
+        getLeadLatestOutreachStatus(leadScopeId).catch(() => new Map()),
+        getTags().catch(() => []),
+        getTagsByLead().catch(() => new Map())
       ])
+      setTags(tagList)
+      setTagsByLead(tagMap)
       setLeads(data)
       setDemoLeadIds(demoIds)
       setResponseStatusByLead(statusMap)
@@ -331,6 +344,14 @@ function LeadsBoard() {
         if (String(ownerId ?? '') !== String(analystFilter)) continue
       }
 
+      // Tag filter — this is what turns a tag into a list.
+      if (tagFilter !== 'all') {
+        const own = tagsByLead.get(lead.id) || []
+        if (tagFilter === 'untagged') {
+          if (own.length > 0) continue
+        } else if (!own.some(t => String(t.id) === String(tagFilter))) continue
+      }
+
       // Latest outreach response. 'never_contacted' = no entry in the map.
       if (responseFilter !== 'all') {
         const latest = responseStatusByLead.get(lead.id)
@@ -431,7 +452,7 @@ function LeadsBoard() {
     }
 
     return result
-  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead])
+  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead, tagFilter, tagsByLead])
 
   const filteredLeadCount = useMemo(
     () => Object.values(leadsByStage).reduce((sum, list) => sum + list.length, 0),
@@ -485,6 +506,37 @@ function LeadsBoard() {
     } catch (error) {
       console.error('Bulk reassign failed:', error)
       toast.error('Bulk reassign failed: ' + error.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  /**
+   * Tag everything selected. `__new` prompts for a name and creates the tag —
+   * without a create path the vocabulary stays frozen at whatever migration 003
+   * seeded, which is why no actual conference name could ever be a tag.
+   * createTag returns an existing tag on a case-insensitive name match, so typing
+   * a name that already exists reuses it rather than erroring.
+   */
+  async function handleBulkTag() {
+    if (!selectedIds.size || !bulkTag) return
+    setBulkBusy(true)
+    try {
+      let tagId = bulkTag
+      if (bulkTag === '__new') {
+        const name = prompt('New tag name (e.g. "SaaS Connect 2026", "Inbound — YouTube"):')
+        if (!name?.trim()) { setBulkBusy(false); return }
+        const created = await createTag(name)
+        tagId = created.id
+      }
+      const n = await addTagToLeads([...selectedIds], parseInt(tagId, 10))
+      toast.success(`Tagged ${n || selectedIds.size} lead${selectedIds.size === 1 ? '' : 's'}`)
+      setSelectedIds(new Set())
+      setBulkTag('')
+      await loadLeads()
+    } catch (error) {
+      console.error('Bulk tag failed:', error)
+      toast.error(error.message)
     } finally {
       setBulkBusy(false)
     }
@@ -736,6 +788,25 @@ function LeadsBoard() {
                       {(people || []).map(p => (
                         <option key={p.id} value={String(p.id)}>{p.name}</option>
                       ))}
+                    </select>
+                  </div>
+
+                  {/* Tag filter — picking a tag here IS the list. Counts are shown
+                      so an empty list is obviously empty rather than looking broken. */}
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Tag</label>
+                    <select
+                      className="advanced-filter-select"
+                      value={tagFilter}
+                      onChange={(e) => setTagFilter(e.target.value)}
+                    >
+                      <option value="all">Any tag</option>
+                      <option value="untagged">Untagged</option>
+                      {tags.map(t => {
+                        let n = 0
+                        for (const list of tagsByLead.values()) if (list.some(x => x.id === t.id)) n++
+                        return <option key={t.id} value={String(t.id)}>{t.name} ({n})</option>
+                      })}
                     </select>
                   </div>
                 </div>
@@ -1005,6 +1076,14 @@ function LeadsBoard() {
               {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
             <button className="btn btn-sm btn-primary" onClick={handleBulkStageMove} disabled={bulkBusy || !bulkStage}>
+              Apply
+            </button>
+            <select value={bulkTag} onChange={(e) => setBulkTag(e.target.value)} className="form-select" disabled={bulkBusy}>
+              <option value="">Add tag…</option>
+              {tags.map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
+              <option value="__new">+ New tag…</option>
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkTag} disabled={bulkBusy || !bulkTag}>
               Apply
             </button>
             <button className="btn btn-sm btn-secondary" onClick={handleBulkTouch} disabled={bulkBusy}>

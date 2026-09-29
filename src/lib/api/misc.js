@@ -5,7 +5,7 @@
  */
 
 import { supabase } from '../supabase'
-import { cacheGet, cacheSet, cacheClear } from './core'
+import { cacheGet, cacheSet, cacheClear, fetchAllRows } from './core'
 import { updateLead } from './leads'
 
 // ============================================================================
@@ -311,6 +311,127 @@ export async function removeTagFromLead(leadId, tagId) {
     .eq('tag_id', tagId)
 
   if (error) throw error
+}
+
+/**
+ * Palette for new tags. Cycled by tag count so a list of tags stays visually
+ * distinguishable without asking anyone to pick a hex code.
+ */
+const TAG_COLORS = [
+  '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4',
+  '#84cc16', '#6366f1', '#ec4899', '#0ea5e9', '#f97316',
+]
+
+/**
+ * Create a tag.
+ *
+ * WHY THIS DID NOT EXIST: `crm_tags` has been there since migration 003 with
+ * eight seeded rows, and the app could read them, assign them and unassign
+ * them — but never MAKE one. So the vocabulary was frozen at whatever the
+ * migration happened to seed, which is why "Met at Conference" exists as a
+ * generic label and no actual conference name ever could. Dev, Sept 2026: "more
+ * tags like the conference I met them at or if they came through linkedin, so we
+ * can create lists."
+ *
+ * Names are trimmed and matched case-insensitively against what exists, because
+ * `crm_tags.name` is UNIQUE and "SaaS Connect" / "saas connect" would otherwise
+ * be two tags that look like one — the same casing bug that duplicated people
+ * rows. An existing tag is returned rather than erroring: the caller wanted a tag
+ * with this name and there is one.
+ */
+export async function createTag(name, color = null) {
+  const clean = (name || '').trim()
+  if (!clean) throw new Error('A tag needs a name')
+  if (clean.length > 100) throw new Error('Tag name is too long (100 characters max)')
+
+  const existing = await getTags()
+  const hit = existing.find(t => t.name.trim().toLowerCase() === clean.toLowerCase())
+  if (hit) return hit
+
+  const { data, error } = await supabase
+    .from('crm_tags')
+    .insert([{ name: clean, color: color || TAG_COLORS[existing.length % TAG_COLORS.length] }])
+    .select()
+    .single()
+  if (error) throw error
+  cacheClear('tags')
+  return data
+}
+
+/**
+ * Every lead↔tag link, as a Map of leadId -> [tag]. One read for the whole
+ * board, so the Pipeline can filter by tag without a query per card.
+ *
+ * Paged: this is a join table over 596 leads and grows with every tag applied,
+ * and a truncated page would silently drop tags off the end of the board.
+ */
+export async function getTagsByLead() {
+  const rows = await fetchAllRows(() => supabase
+    .from('crm_lead_tags')
+    .select('lead_id, tag:crm_tags(id, name, color)')
+    .order('lead_id'))
+  const byLead = new Map()
+  for (const r of rows) {
+    if (!r.tag) continue
+    if (!byLead.has(r.lead_id)) byLead.set(r.lead_id, [])
+    byLead.get(r.lead_id).push(r.tag)
+  }
+  return byLead
+}
+
+/**
+ * Tag counts, so the tag manager can say how many leads carry each one before
+ * anyone renames or removes it.
+ */
+export async function getTagUsage() {
+  const rows = await fetchAllRows(() => supabase
+    .from('crm_lead_tags')
+    .select('tag_id')
+    .order('tag_id'))
+  const counts = new Map()
+  for (const r of rows) counts.set(r.tag_id, (counts.get(r.tag_id) || 0) + 1)
+  return counts
+}
+
+/**
+ * Rename a tag. The links in crm_lead_tags point at the id, so every lead
+ * carrying it follows the rename — which is the point: "SaaS Connect 2026"
+ * typed wrong once should be fixable without re-tagging anyone.
+ */
+export async function renameTag(tagId, name) {
+  const clean = (name || '').trim()
+  if (!clean) throw new Error('A tag needs a name')
+  const { data, error } = await supabase
+    .from('crm_tags')
+    .update({ name: clean })
+    .eq('id', tagId)
+    .select()
+    .single()
+  if (error) throw error
+  cacheClear('tags')
+  return data
+}
+
+/**
+ * Bulk-apply a tag to many leads at once — the other half of making lists
+ * useful. Chunked at 200 like every other bulk write here, and idempotent:
+ * re-tagging a lead that already carries the tag is a no-op rather than a
+ * primary-key error, because (lead_id, tag_id) is the PK.
+ */
+export async function addTagToLeads(leadIds, tagId) {
+  const ids = [...new Set((leadIds || []).filter(Boolean))]
+  if (!ids.length || !tagId) return 0
+  let applied = 0
+  for (let i = 0; i < ids.length; i += 200) {
+    const rows = ids.slice(i, i + 200).map(lead_id => ({ lead_id, tag_id: tagId }))
+    const { data, error } = await supabase
+      .from('crm_lead_tags')
+      .upsert(rows, { onConflict: 'lead_id,tag_id', ignoreDuplicates: true })
+      .select('lead_id')
+    if (error) throw error
+    applied += (data || []).length
+  }
+  return applied
 }
 
 // ============================================================================

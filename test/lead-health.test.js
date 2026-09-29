@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest'
 import {
   REQUIRED_LEAD_FIELDS, STALE_BREACH_DAYS, INFO_REQUIRED_FROM_STAGE,
   infoRequiredFor, missingRequiredFields, requiredFieldsFor, isMissingInfo,
-  daysSinceTouch, isStaleBreach, leadBreaches, hasAnyBreach
+  isUnreachable, daysSinceTouch, isStaleBreach, leadBreaches, hasAnyBreach
 } from '../src/lib/leadHealth.js'
 
 const NOW = new Date('2026-09-27T12:00:00+05:30')
@@ -35,6 +35,8 @@ const complete = (over = {}) => ({
   is_archived: false,
   last_activity_date: daysAgo(1),
   next_follow_up_date: null,
+  // A contact method is required from `responded` — see the "reachable" block.
+  linkedin_url: 'https://linkedin.com/in/someone',
   lead_type: 'PE Firm',
   buying_timeline: 'Buying in 0-3 months',
   lead_channel: 'Inbound — YouTube',
@@ -105,9 +107,9 @@ describe('the required-info flag', () => {
 // question needs; the other four wait for the meeting.
 
 describe('the two tiers', () => {
-  it('asks a replied lead for only the two answerable-from-a-reply fields', () => {
+  it('asks a replied lead for a contact method plus the two answerable-from-a-reply fields', () => {
     const fields = requiredFieldsFor({ stage: 'responded', is_archived: false })
-    expect(fields.map(f => f.key).sort()).toEqual(['lead_channel', 'lead_type'])
+    expect(fields.map(f => f.key).sort()).toEqual(['contact', 'lead_channel', 'lead_type'])
   })
 
   it('asks for all six once the meeting is booked, and at every stage after', () => {
@@ -120,9 +122,10 @@ describe('the two tiers', () => {
     expect(requiredFieldsFor({ stage: 'outreach', is_archived: false })).toEqual([])
   })
 
-  it('leaves a replied lead clean when it has channel and type but no thesis yet', () => {
+  it('leaves a replied lead clean when it is reachable and has channel and type', () => {
     const replied = {
       stage: 'responded', is_archived: false,
+      email: 'them@firm.com',
       lead_channel: 'Inbound — YouTube', lead_type: 'PE Firm',
       investment_thesis: null, buying_timeline: null,
       prior_acquisitions: null, engagement_model: null
@@ -133,6 +136,7 @@ describe('the two tiers', () => {
   it('flags that same lead the moment it reaches meeting_booked', () => {
     const booked = {
       stage: 'meeting_booked', is_archived: false,
+      email: 'them@firm.com',
       lead_channel: 'Inbound — YouTube', lead_type: 'PE Firm',
       investment_thesis: null, buying_timeline: null,
       prior_acquisitions: null, engagement_model: null
@@ -143,9 +147,53 @@ describe('the two tiers', () => {
   })
 
   it('flags a replied lead that never recorded how it found us', () => {
-    // 115 of 562 live leads are in exactly this state — lead_channel has never
-    // been filled for anyone, which is the gap the channel question exists for.
-    expect(isMissingInfo({ stage: 'responded', is_archived: false, lead_type: 'PE Firm' })).toBe(true)
+    // lead_channel has never been filled for anyone, which is the gap the channel
+    // question exists for.
+    expect(isMissingInfo({
+      stage: 'responded', is_archived: false, lead_type: 'PE Firm', email: 'a@b.com'
+    })).toBe(true)
+  })
+})
+
+// ============================================================================
+// REACHABLE AT ALL
+// ============================================================================
+//
+// Measured 2026-09-29 against production: of 56 leads at `responded` — people who
+// had ALREADY REPLIED to us — 10 had no email, no phone and no LinkedIn URL, and
+// ZERO of the 56 had an email. One of the 12 leads with a booked meeting was
+// unreachable too. Qualification data is nice; a contact method is the difference
+// between a lead and a name, which is why it is required first.
+
+describe('a way to reach them', () => {
+  it.each([
+    ['email', { email: 'them@firm.com' }],
+    ['phone', { phone: '+91 98765 43210' }],
+    ['linkedin', { linkedin_url: 'https://linkedin.com/in/them' }],
+  ])('is satisfied by %s alone — we do not insist on a particular one', (_label, over) => {
+    const lead = { stage: 'responded', is_archived: false, lead_type: 'X', lead_channel: 'Y', ...over }
+    expect(missingRequiredFields(lead).map(f => f.key)).not.toContain('contact')
+    expect(isUnreachable(lead)).toBe(false)
+  })
+
+  it('flags a replied lead with no contact method at all', () => {
+    const lead = { stage: 'responded', is_archived: false, lead_type: 'X', lead_channel: 'Y' }
+    expect(missingRequiredFields(lead).map(f => f.key)).toContain('contact')
+    expect(isUnreachable(lead)).toBe(true)
+  })
+
+  it('treats a whitespace-only contact as no contact', () => {
+    expect(isUnreachable({ email: '  ', phone: '', linkedin_url: null })).toBe(true)
+  })
+
+  it('does not ask a cold lead for a contact method', () => {
+    // 446 leads sit at `outreach`; demanding contact details there would flag most
+    // of the book and mean nothing.
+    expect(requiredFieldsFor({ stage: 'outreach', is_archived: false })).toEqual([])
+  })
+
+  it('is the first thing asked for, because it is the one that stops work dead', () => {
+    expect(REQUIRED_LEAD_FIELDS[0].key).toBe('contact')
   })
 })
 

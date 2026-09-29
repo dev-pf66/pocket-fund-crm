@@ -5,6 +5,7 @@ import { getPeople, setUserAdmin, deleteUser, adminSetUserPassword, generateTemp
 import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption, previewArchiveSweep, runArchiveSweep, undoArchiveSweep } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
 import StalenessSettings from '../components/StalenessSettings'
+import TagManager from '../components/TagManager'
 import { Shield, Users as UsersIcon, Trash2, ShieldCheck, ShieldOff, Tag, Plus, List, KeyRound, Archive, ArchiveRestore, Target } from 'lucide-react'
 import { isAdminUser } from '../lib/admin'
 
@@ -601,6 +602,8 @@ function Admin() {
           all until Sept 2026 — see src/components/StalenessSettings.jsx. Placed
           above the sweep because the sweep's own defensible threshold depends on
           what the board is already calling stale. */}
+      <TagManager />
+
       <StalenessSettings />
 
       <ArchiveSweepSection />
