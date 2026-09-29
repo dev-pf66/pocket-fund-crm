@@ -8,6 +8,7 @@ import LeadForm from './LeadForm'
 import QuickAddCard from '../components/QuickAddCard'
 import { Plus, Search, Filter, Upload, Save, ChevronDown, X, Bookmark, XCircle, Check } from 'lucide-react'
 import { useSessionState } from '../hooks/useSessionState'
+import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useLeadTypes } from '../hooks/useLeadTypes'
 import { isAdminUser } from '../lib/admin'
 import { runBulk } from '../lib/bulkActions'
@@ -129,6 +130,7 @@ function LeadsBoard() {
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkAssignee, setBulkAssignee] = useState('')
   const [bulkTag, setBulkTag] = useState('')
+  const [bulkChannel, setBulkChannel] = useState('')
   const [bulkStage, setBulkStage] = useState('')
 
   // Filter state — persisted to sessionStorage so navigating away and back
@@ -160,6 +162,8 @@ function LeadsBoard() {
   const [tags, setTags] = useState([])
   const [tagsByLead, setTagsByLead] = useState(new Map())
   const [tagFilter, setTagFilter] = useSessionState('lb:tagFilter', 'all')
+  // Admin-editable vocabulary, same source as the lead page's dropdown.
+  const channelOptions = useFieldOptions('lead_channel', 'Set channel…')
 
   // Saved searches state
   const [savedSearches, setSavedSearches] = useState(() => loadSavedSearches())
@@ -536,6 +540,36 @@ function LeadsBoard() {
       await loadLeads()
     } catch (error) {
       console.error('Bulk tag failed:', error)
+      toast.error(error.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  /**
+   * Set "how they found us" on everything selected.
+   *
+   * Migration 058 derived this for the 152 leads that came through a bulk LinkedIn
+   * import, where it is a fact. The other 476 are not derivable from anything in
+   * the database — an inbound lead we later messaged on LinkedIn is
+   * indistinguishable from an outbound one — so they need a person who knows. This
+   * exists so that is a handful of passes over a filtered board rather than 476
+   * separate dropdowns, which is the difference between it happening and not.
+   */
+  async function handleBulkChannel() {
+    if (!selectedIds.size || !bulkChannel) return
+    setBulkBusy(true)
+    try {
+      const ids = [...selectedIds]
+      const { succeeded, failed } = await runBulk(ids, id =>
+        updateLead(id, { lead_channel: bulkChannel }, currentPerson?.id))
+      toast[failed ? 'error' : 'success'](
+        `Channel set on ${succeeded} lead${succeeded === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}`)
+      setSelectedIds(new Set())
+      setBulkChannel('')
+      await loadLeads()
+    } catch (error) {
+      console.error('Bulk channel failed:', error)
       toast.error(error.message)
     } finally {
       setBulkBusy(false)
@@ -1076,6 +1110,12 @@ function LeadsBoard() {
               {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
             <button className="btn btn-sm btn-primary" onClick={handleBulkStageMove} disabled={bulkBusy || !bulkStage}>
+              Apply
+            </button>
+            <select value={bulkChannel} onChange={(e) => setBulkChannel(e.target.value)} className="form-select" disabled={bulkBusy}>
+              {channelOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={handleBulkChannel} disabled={bulkBusy || !bulkChannel}>
               Apply
             </button>
             <select value={bulkTag} onChange={(e) => setBulkTag(e.target.value)} className="form-select" disabled={bulkBusy}>
