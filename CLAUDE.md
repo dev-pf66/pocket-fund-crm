@@ -12,7 +12,8 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 - Vercel deploys from origin/main; live at https://pocket-fund-crm.vercel.app.
 - Never claim a fix is live without verifying the deployed site (global `/ship-verify` skill). A push is not a deploy; a deploy is not a verified fix.
-- Vercel crons (`vercel.json`): `weekly-digest` only (Mon 03:30 UTC = 9:00 IST → posts per-analyst rollup as a due-dated Sage task, idempotent via `crm_tt_mappings`). The digest covers **every non-archived person, zeros included** (Dev's call, July 2026) — don't filter it back down to active-only.
+- Vercel crons (`vercel.json`): `weekly-digest` (Mon 03:30 UTC = 9:00 IST → posts per-analyst rollup as a due-dated Sage task, idempotent via `crm_tt_mappings`). The digest covers **every non-archived person, zeros included** (Dev's call, July 2026) — don't filter it back down to active-only. The second cron is
+  `callhippo-sync`, daily at 02:00 UTC = 7:30 IST — see the cold-calls section.
 - `TASK_TRACKER_API_URL`/`TASK_TRACKER_API_KEY` + `CRON_SECRET` live in Vercel prod env — they were missing until July 2026, which silently disabled ALL task-tracker automation. If TT automation looks dead, check these first.
 - **Fail-loud config (Aug 2026):** every `api/*` handler opens with `requireEnv(res, [...])` from `api/_env.js` — missing env is now a 500 naming the vars, never a silent degrade. `GET /api/health` (auth: `Bearer $CRON_SECRET`) reports missing env + the digest's last run. Adding a handler? Add its `requireEnv` line and its vars to `REQUIRED` in `api/health.js`.
 - **Every Sage task needs a project (Sept 2026).** `POST /tasks` on the tracker rejects a create that names no `deal_id`/`internal_project_id` — 400 `"deal_id or internal_project_id is required"`. Nothing in this repo sent one, so from mid-August every lead_reply/lead_followup/lead_kickoff/manual_task **and** the weekly digest silently 400'd; three weeks of digests were lost because `alertFailure()` reports a broken digest *by filing a task* and died of the same cause. `tt.createTask` (`src/lib/integrations/task-tracker.js`) now injects the **"PF sales"** internal project (`22f6f543-…`, override with `TASK_TRACKER_PROJECT_ID`) plus `source: 'crm'`, so no call site has to remember. A caller passing its own `deal_id` or `internal_project_id` keeps it.
@@ -129,8 +130,30 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     `responded`, and the caller moves it to `passed` from there.
   - `do_not_call` is a real column on `crm_leads`, filtered in SQL — the call queue must never
     load someone who asked not to be called.
-  - Recordings are a pasted CallHippo URL on the call row (`recording_url`). A CallHippo webhook
-    that auto-logs dials is the obvious next step and is why `provider_call_id` (unique) exists.
+  - Recordings are a pasted CallHippo URL on the call row (`recording_url`).
+  - **The auto-import SHIPPED** (`api/callhippo-sync.js`, daily cron 02:00 UTC) — it is a poll of
+    their activity feed, not the webhook this file used to call the obvious next step, and
+    `provider_call_id` (unique) is what makes it idempotent. Three facts its header proves against
+    their API and that constrain anything built on it:
+    - **Call logs older than one month are refused on this plan.** There is no backfill; a dial
+      not imported within 30 days is gone. That is why it runs daily and why the raw record is
+      kept in `provider_payload` forever.
+    - **Every call is logged under one shared seat**, so their API cannot say who dialled.
+      Imported rows arrive **UNCLAIMED** — `logged_by` NULL — and a person claims their own on
+      the ColdCalls **Claim** tab (badged with the count). Guessing an owner would put invented
+      numbers on somebody's scorecard.
+    - **Their data carries no outcome** — `callStatus` says the line connected, not that you
+      reached a decision maker — so `call_outcome` stays NULL for a human tap, and the funnel
+      counts an unclassified dial as a dial and nothing more.
+    - Matching to a lead is `phoneKey` (last 10 digits) against `crm_leads.phone`; exact string
+      matching linked 6 of 51 real calls, last-10 linked 35.
+    - The sync writes its own `crm_cron_runs` heartbeat and `GET /api/health` reports it as
+      `callhippo_sync` (stale/critical flags included).
+    - **Live state 2026-09-29: 62 of the 74 `phone_call` rows came from the sync, 35 of them
+      linked to a lead, and ZERO are claimed or classified.** An unclaimed dial is real work
+      sitting outside every per-person count — the scoreboard reports it as unattributed
+      outreach and never folds it into a person's row. `matched_to_lead: 0` in a run summary
+      means nothing was newly inserted that run; it is not a matching failure.
 - **Notifications are derived, not typed in (Sept 2026).** The bell used to watch one
   column — `crm_leads.next_follow_up_date`, scoped to `assigned_to` — so it nagged the whole
   team about ~10 rows while 158 leads that had *replied* sat untouched for over a week and 158
