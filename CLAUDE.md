@@ -194,6 +194,17 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
       later messaged looks identical), the 430 with no evidence, and `lead_source = 'LinkedIn'`
       alone, which is ambiguous in exactly the direction that matters. Those need a human, which is
       what the Pipeline board's bulk **Set channel** action is for.
+    - **Finding them is the board's "Needs Attention" filter** (`src/lib/leadFilters.js`, Sept
+      2026) — the bridge from a scoreboard breach *count* to the actual rows, which did not exist
+      before: 476 of 629 live leads had no channel and the only way to find one was to read cards
+      across five stage columns. Options are No channel set · Missing required info · No way to
+      reach them · Past the 30-day clock (this month) · Stale backlog, each with a live count, and
+      every predicate but the first **delegates to `leadHealth.js`** so the dropdown can never
+      disagree with the lead-page flag. `missing_channel` deliberately checks the column directly
+      and is **NOT stage-gated** — the policy only requires a channel from `responded`, but 379 of
+      the 476 sit at `outreach` and a known-LinkedIn import is answerable today. Needs update and
+      Backlog stay two options for the same reason the scoreboard keeps two columns. Guardrail:
+      `test/lead-filters.test.js`.
   - **A contact method is required from `responded` (Sept 2026)** — the `contact` entry in
     `REQUIRED_LEAD_FIELDS` uses `anyOf: ['email','phone','linkedin_url']`, satisfied by any one of
     them. Measured 2026-09-29: of 56 leads at `responded` — people who had already replied —

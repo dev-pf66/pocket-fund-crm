@@ -12,6 +12,7 @@ import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useLeadTypes } from '../hooks/useLeadTypes'
 import { isAdminUser } from '../lib/admin'
 import { runBulk } from '../lib/bulkActions'
+import { HEALTH_FILTERS, matchesHealthFilter, healthFilterCounts } from '../lib/leadFilters'
 
 const STAGES = [
   { key: 'outreach', label: 'New Leads (Outreach)', color: '#60a5fa' },
@@ -71,7 +72,8 @@ function getDefaultFilters() {
     responseFilter: 'all',
     createdFilter: 'all',
     hasEmail: 'all',
-    hasPhone: 'all'
+    hasPhone: 'all',
+    healthFilter: 'all'
   }
 }
 
@@ -102,6 +104,7 @@ function countActiveAdvancedFilters(filters) {
   if (filters.createdFilter && filters.createdFilter !== 'all') count++
   if (filters.hasEmail && filters.hasEmail !== 'all') count++
   if (filters.hasPhone && filters.hasPhone !== 'all') count++
+  if (filters.healthFilter && filters.healthFilter !== 'all') count++
   return count
 }
 
@@ -162,6 +165,12 @@ function LeadsBoard() {
   const [tags, setTags] = useState([])
   const [tagsByLead, setTagsByLead] = useState(new Map())
   const [tagFilter, setTagFilter] = useSessionState('lb:tagFilter', 'all')
+
+  // "Needs attention" — the bridge from a scoreboard breach count to the rows
+  // themselves. Predicates live in src/lib/leadFilters.js and delegate to
+  // leadHealth, so this dropdown can never disagree with the flag on the lead
+  // page or the number on the scoreboard.
+  const [healthFilter, setHealthFilter] = useSessionState('lb:healthFilter', 'all')
   // Admin-editable vocabulary, same source as the lead page's dropdown.
   const channelOptions = useFieldOptions('lead_channel', 'Set channel…')
 
@@ -243,6 +252,7 @@ function LeadsBoard() {
     setCreatedFilter(defaults.createdFilter)
     setHasEmail(defaults.hasEmail)
     setHasPhone(defaults.hasPhone)
+    setHealthFilter(defaults.healthFilter)
   }
 
   function getCurrentFilters() {
@@ -260,7 +270,8 @@ function LeadsBoard() {
       responseFilter,
       createdFilter,
       hasEmail,
-      hasPhone
+      hasPhone,
+      healthFilter
     }
   }
 
@@ -279,6 +290,7 @@ function LeadsBoard() {
     setCreatedFilter(filters.createdFilter || 'all')
     setHasEmail(filters.hasEmail || 'all')
     setHasPhone(filters.hasPhone || 'all')
+    setHealthFilter(filters.healthFilter || 'all')
     setShowFilters(true)
   }
 
@@ -355,6 +367,10 @@ function LeadsBoard() {
           if (own.length > 0) continue
         } else if (!own.some(t => String(t.id) === String(tagFilter))) continue
       }
+
+      // Needs attention. `now` is passed through so every lead in one render
+      // is judged against the same instant.
+      if (!matchesHealthFilter(lead, healthFilter, { now })) continue
 
       // Latest outreach response. 'never_contacted' = no entry in the map.
       if (responseFilter !== 'all') {
@@ -456,7 +472,15 @@ function LeadsBoard() {
     }
 
     return result
-  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead, tagFilter, tagsByLead])
+  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead, tagFilter, tagsByLead, healthFilter])
+
+  // Counts for the "needs attention" dropdown, over the leads this board can
+  // actually render. Counting stages the board never shows (passed,
+  // reach_out_later) would promise rows that never appear when you pick one.
+  const healthCounts = useMemo(() => {
+    const stageKeys = new Set(STAGES.map(s => s.key))
+    return healthFilterCounts(leads.filter(l => stageKeys.has(l.stage)), { now: new Date() })
+  }, [leads])
 
   const filteredLeadCount = useMemo(
     () => Object.values(leadsByStage).reduce((sum, list) => sum + list.length, 0),
@@ -931,6 +955,26 @@ function LeadsBoard() {
                       <option value="all">All Sources</option>
                       {LEAD_SOURCES.map(src => (
                         <option key={src} value={src}>{src}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Needs attention — the way from a breach count to the rows.
+                      "No channel set" is the live backlog: nothing can derive
+                      how a lead found us beyond the bulk LinkedIn imports
+                      (migration 058), so the rest is filter → select → Set
+                      channel on the selection bar. */}
+                  <div className="advanced-filter-group">
+                    <label className="advanced-filter-label">Needs Attention</label>
+                    <select
+                      className="advanced-filter-select"
+                      value={healthFilter}
+                      onChange={(e) => setHealthFilter(e.target.value)}
+                    >
+                      {HEALTH_FILTERS.map(f => (
+                        <option key={f.value} value={f.value}>
+                          {f.value === 'all' ? f.label : `${f.label} (${healthCounts[f.value] ?? 0})`}
+                        </option>
                       ))}
                     </select>
                   </div>
