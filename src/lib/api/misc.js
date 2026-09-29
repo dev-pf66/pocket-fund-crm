@@ -108,6 +108,77 @@ export async function getCRMSettings() {
   return data
 }
 
+/** The thresholds an admin may change, and what each one actually drives. */
+export const STALENESS_SETTINGS = [
+  {
+    key: 'cold_outreach_threshold',
+    label: 'Cold outreach goes stale after',
+    stages: ['outreach'],
+    hint: 'A lead you have contacted once and heard nothing back from.',
+  },
+  {
+    key: 'warm_lead_threshold',
+    label: 'A reply goes stale after',
+    stages: ['responded'],
+    hint: 'They answered. This is the clock on getting back to them.',
+  },
+  {
+    key: 'active_conversation_threshold',
+    label: 'An active conversation goes stale after',
+    stages: ['meeting_booked', 'warm_active'],
+    hint: 'Applies to booked meetings too — a meeting agreed and then ignored.',
+  },
+]
+
+/**
+ * Update the staleness thresholds.
+ *
+ * WHY THIS EXISTS: crm_settings had exactly one row, written 2026-02-05, and no
+ * write path anywhere in the app — `getCRMSettings` was its only reference. Those
+ * three numbers drive `calculateStaleness`, `getStaleLeads` and the Today tab's
+ * marks, and measured 2026-09-29 they flagged 68% of the live pipeline as stale
+ * (92% of meeting_booked). A staleness colour that is red on two thirds of the
+ * board carries no information, and nobody could change it without direct
+ * database access.
+ *
+ * Values are clamped to 1..365: a 0 would make every lead instantly stale, and a
+ * negative would make the comparison nonsense. Only the three keys in
+ * STALENESS_SETTINGS are writable — this is not a general settings PATCH.
+ *
+ * Records `updated_at` but NOT who changed it — crm_settings has no updated_by
+ * column and adding one is a migration this did not want to carry. Worth doing:
+ * this is a single row that changes what "stale" means for the whole team, which
+ * is exactly the shape of thing that turned out to need `archived_by`.
+ */
+export async function updateCRMSettings(updates) {
+  const allowed = STALENESS_SETTINGS.map(s => s.key)
+  const clean = {}
+  for (const key of allowed) {
+    if (updates?.[key] === undefined) continue
+    const n = Math.round(Number(updates[key]))
+    if (!Number.isFinite(n)) throw new Error(`${key} must be a number`)
+    if (n < 1 || n > 365) throw new Error(`${key} must be between 1 and 365 days`)
+    clean[key] = n
+  }
+  if (Object.keys(clean).length === 0) throw new Error('Nothing to update')
+
+  const { data, error } = await supabase
+    .from('crm_settings')
+    .update({ ...clean, updated_at: new Date().toISOString() })
+    .eq('id', 1)
+    .select()
+    .single()
+  if (error) throw error
+
+  // getCRMSettings memoises for 60s; without this the board keeps colouring
+  // against the old thresholds after a save and the change looks like it failed.
+  _settingsCache = data
+  _settingsCacheTime = Date.now()
+  cacheClear('leads')
+  cacheClear('dashboard')
+  return data
+}
+
 // ============================================================================
 // Email Templates
 // ============================================================================
