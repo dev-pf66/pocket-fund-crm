@@ -39,26 +39,40 @@ dial**), `crm_lead_activities` (calls, meetings, notes), `people` (the team).
 
 ## The daily surfaces
 
-| Page | The question it answers |
+The menu structure is data, in `src/lib/nav.js`, and its shape is pinned by a test — "how many
+tabs does an analyst see" is exactly the rule that regresses one item at a time.
+
+| Menu entry | The question it answers |
 |---|---|
-| **Today** | What is my work, today? Don't turn this into another pipeline view. |
-| **Notifications** | What have I promised, what has slipped, what is about to? Derived from real state — see `CLAUDE.md`. |
-| **Dashboard** | Am I hitting my number? (analyst) / How is the funnel? (admin) |
-| **Tracker / Queue / Log** | Log a touch, work an imported list, audit what was logged. Three pages on purpose — standing decision, July 2026. |
-| **Cold Calls** | The dial list, outcomes, and the call funnel. A gatekeeper is a pickup, **not** a conversation. |
-| **Pipeline / Sellers / Investors / Partners / PE OS** | The five contact books above. |
+| **Today** | Everything about *today*, in three sub-tabs: **Today** (my work, ranked), **Notifications** (what I promised, what slipped, what's coming), **Dashboard** (am I keeping up / how is the funnel). Consolidated September 2026 — they were three answers to one question. |
+| **Tracker** | Log a touch. |
+| **Cold Calls** | The dial list, outcomes, and the call funnel — with its own Queue sub-tab. |
+| **Log** *(admin)* | Audit what the team logged. |
+| **Pipeline · PE OS · Indian Sellers · Investors · Partners** | The five contact books above. |
 | **Analytics** | Conversion and source quality. |
-| **Admin** | Users, targets, field options, and the lead archive sweep. |
+| **Admin** | Users, targets, staleness thresholds, tags, field options, and the lead archive sweep. |
 
-## Two rules worth knowing before you change anything
+> The September consolidation took an analyst's menu from 14 items to 10 and **deleted nothing** —
+> the Queue and Dashboard routes still exist, so deep links, bookmarks and ⌘K all still work.
+> The July 2026 decision that Tracker/Queue/Log stay three separate *pages* is intact; what
+> changed is which of them get top-level billing.
 
+## Three rules worth knowing before you change anything
+
+- **Every lead gets an answer within 30 days.** Not "gets worked" — *gets an answer*. The person
+  responsible has to say what is happening: still working it, come back on this date, dead for
+  this reason, or it's really an investor/partner. `dead` requires a reason and `later` requires a
+  date, because "get back to me in three months" with no date is indistinguishable from
+  forgetting. That accountability loop is the point of the tool; the pipeline board is just where
+  it's displayed.
 - **Dials count, conversations are what we manage on.** Every cold-call dial is a row in
   `crm_outreach_log`, so it counts toward the daily target for free — but the outcome vocabulary
   (`src/lib/callOutcomes.js`) keeps pickups, conversations and meetings strictly separate.
   Folding them together flatters the funnel by exactly the amount that matters.
-- **Nothing is ever deleted.** Leads leave the working surfaces by being *archived*
-  (`is_archived`), never removed — the row, its activities and its calls all stay, and archived
-  leads still block duplicate imports.
+- **Nothing is ever deleted.** A dead lead stays in the `passed` column so the team can see what
+  was lost and why. Leads leave the working surfaces only by being *archived* (`is_archived`) —
+  a separate, reversible, admin-only bulk act. The row, its activities and its calls all stay, and
+  archived leads still block duplicate imports.
 
 ## Running it
 

@@ -25,7 +25,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Project ref: `lzydgdzjrgvqglxmyfjk` (https://lzydgdzjrgvqglxmyfjk.supabase.co).
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 049). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 058 — 62 files, because 034/046/049 were each used twice by parallel branches; the number is a label, not a key). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
 - **Applying a migration (Sept 2026) — the Supabase CLI can do it, no dashboard paste needed.**
   The CLI is linked to `lzydgdzjrgvqglxmyfjk` ("pf sales CRM") and the DB credential is
   cached in the macOS keychain, so `supabase db push` connects on its own. There is no
@@ -43,7 +43,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - `"Remote migration versions not found in local migrations directory"` just means another
     worktree pushed them. Write a placeholder file per missing version. Do NOT
     `migration repair --status reverted` and do NOT `db pull`.
-  - **The repo's own `schema_migrations` table is abandoned** — 5 rows out of 49 as of Sept 2026.
+  - **The repo's own `schema_migrations` table is abandoned** — 5 rows against 62 migration files as of 2026-09-29.
     `migrations/README.md` used to tell you to trust it; it no longer does. Verify with a real
     query against the new column, never against a tracking table.
   - `supabase db dump` / `db diff` need Docker Desktop and will fail without it. `db push`
