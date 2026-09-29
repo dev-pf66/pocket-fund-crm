@@ -14,7 +14,15 @@ async function authenticate(req) {
   const anon = createClient(supabaseUrl, supabaseAnon)
   const { data, error } = await anon.auth.getUser(token)
   if (error || !data?.user?.email) return null
-  const { data: person } = await admin.from('people').select('id, name, email').eq('email', data.user.email).maybeSingle()
+  // Normalised exact match, and the error is checked: maybeSingle() errors on
+  // duplicate rows, and discarding that silently turned a real user into "no
+  // such person" — which drops the event on the floor.
+  const { data: personRows, error: personErr } = await admin
+    .from('people').select('id, name, email')
+    .eq('email', String(data.user.email).toLowerCase())
+    .order('id').limit(1)
+  if (personErr) throw personErr
+  const person = personRows?.[0]
   return person || { id: null, email: data.user.email }
 }
 
