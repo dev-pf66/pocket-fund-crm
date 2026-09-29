@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Clock, Save } from 'lucide-react'
 import { getCRMSettings, updateCRMSettings, STALENESS_SETTINGS, getLeads } from '../lib/crm-api'
+import { useApp } from '../App'
 import { useToast } from './Toast'
 
 /**
@@ -19,6 +20,7 @@ import { useToast } from './Toast'
  */
 
 function StalenessSettings() {
+  const { currentPerson, people } = useApp()
   const { toast } = useToast()
   const [saved, setSaved] = useState(null)      // what's in the DB
   const [draft, setDraft] = useState({})        // what's in the inputs
@@ -60,7 +62,7 @@ function StalenessSettings() {
   async function handleSave() {
     setSaving(true)
     try {
-      const updated = await updateCRMSettings(draft)
+      const updated = await updateCRMSettings(draft, currentPerson?.id)
       setSaved(updated)
       toast.success('Staleness thresholds updated')
     } catch (error) {
@@ -128,8 +130,13 @@ function StalenessSettings() {
           <Save size={14} /> {saving ? 'Saving…' : 'Save thresholds'}
         </button>
         {dirty && <span style={{ fontSize: '12px', color: '#92400e' }}>Unsaved changes</span>}
+        {/* Who, not just when (migration 057) — this row changes the colouring for
+            the whole team, so "why is everything red this morning" needs an answer. */}
         <span style={{ fontSize: '12px', color: '#9ca3af', marginLeft: 'auto' }}>
           Last changed {saved.updated_at ? new Date(saved.updated_at).toLocaleDateString() : 'never'}
+          {saved.updated_by
+            ? ` by ${(people || []).find(p => p.id === saved.updated_by)?.name || `person ${saved.updated_by}`}`
+            : ' (before this was recorded)'}
         </span>
       </div>
     </div>

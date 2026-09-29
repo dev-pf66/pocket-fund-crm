@@ -77,6 +77,18 @@ describe('updateCRMSettings', () => {
     expect(payload().updated_at).toBeTruthy()
   })
 
+  it('records WHO changed it, not just when (migration 057)', async () => {
+    // One row, and it changes the staleness colouring for the whole team on every
+    // board. RLS lets any signed-in user write it, so the attribution matters.
+    await updateCRMSettings({ warm_lead_threshold: 12 }, 7)
+    expect(payload().updated_by).toBe(7)
+  })
+
+  it('stores null rather than inventing an actor when none was passed', async () => {
+    await updateCRMSettings({ warm_lead_threshold: 12 })
+    expect(payload().updated_by).toBeNull()
+  })
+
   it('ignores every key that is not a staleness threshold', async () => {
     await updateCRMSettings({
       cold_outreach_threshold: 14,

@@ -108,8 +108,8 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     failed. Guardrail: `test/crm-settings-write.test.js`.
   - RLS allows it: `team_can_update_settings` is `FOR UPDATE USING (auth.uid() IS NOT NULL)`
     (migration 010), so any signed-in user could write it — the gate is that Admin is admin-only at
-    the route. No `updated_by` column exists, so the row records *when* it changed but not *who*
-    changed it; worth a migration, same lesson as `archived_by`.
+    the route. **Migration 057 adds `updated_by`** and the panel shows who last changed it: one row
+    changing the colouring for the whole team needed a name on it, same lesson as `archived_by`.
   - `weekly_discovery_call_target` on that row still has **zero references** anywhere. Left in
     place, not dropped. The old Goals page is removed and the unused `crm_goals`/`crm_goal_*` tables were dropped (Dev's call, July 2026) — don't recreate them.
 - **Cold calls (Sept 2026, `src/pages/ColdCalls.jsx`)** — they dial on CallHippo, ~20 dials
@@ -185,6 +185,15 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - `lead_channel` is its own column, NOT more values in `lead_source`: Dev wants a countable
     inbound-vs-outbound split ("in sales we put in 30 hours, in SEO 10"), which needs a closed
     vocabulary. Options are admin-editable via `crm_field_options` (`useFieldOptions` hook).
+    - **Migration 058 derived it for the 152 leads with an `import_batch_id`** → `Outbound —
+      LinkedIn`. That is a fact, not a guess: `bulkCreateLeads` accepts nothing but LinkedIn
+      profile URLs (it filters through `normalizeLinkedInUrl`), so those rows are profiles WE
+      collected. NULL-only, so a hand-set value is never overwritten.
+    - **Deliberately NOT derived:** the 47 leads with outreach rows but no import batch
+      (`outreach_type` says how we *contacted* them, not how they *found* us — an inbound lead we
+      later messaged looks identical), the 430 with no evidence, and `lead_source = 'LinkedIn'`
+      alone, which is ambiguous in exactly the direction that matters. Those need a human, which is
+      what the Pipeline board's bulk **Set channel** action is for.
   - **A contact method is required from `responded` (Sept 2026)** — the `contact` entry in
     `REQUIRED_LEAD_FIELDS` uses `anyOf: ['email','phone','linkedin_url']`, satisfied by any one of
     them. Measured 2026-09-29: of 56 leads at `responded` — people who had already replied —
@@ -253,12 +262,16 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - Two stale columns, not one: **Needs update** (`staleThisMonth`, crossed the clock in the last
     30 days — this week's work) and **Backlog** (`staleBreaches`, everything past it). Collapsing
     them loses Dev's distinction between work and debt.
-  - **Archiving a person does not reassign their records.** `setUserArchived` flips
-    `people.is_archived` and leaves every `assigned_to` pointing at them, so their leads go
-    invisible-but-owned. Pravar (id 17, archived) still held 1 lead and 2 sellers months later;
-    reassigned to Siddhant on 2026-09-28 (Dev's call). `created_by`/`logged_by`/`changed_by` were
-    deliberately left — that is history, and rewriting it would falsify past weeks' attribution.
-    Worth wiring a reassign prompt into the archive action.
+  - **Archiving a person prompts to hand over their book (Sept 2026).** `setUserArchived` only
+    flips `people.is_archived`; every per-person surface filters on `assigned_to`, so an archived
+    owner's records went **invisible-but-owned** — worse than unassigned, because the unassigned
+    banner could not see them either. Pravar (id 17) was archived and still held 1 lead and 2
+    sellers months later. Admin → archive now calls `countOwnedRecords`, says what they hold, and
+    offers `reassignOwnedRecords`.
+    - It moves **`assigned_to` only** (plus `assigned_by`/`assigned_date` so the metadata stays
+      coherent). `created_by`/`logged_by`/`changed_by` are **history** — rewriting them would
+      falsify past weeks' attribution in the digest and the scoreboard. The person who left keeps
+      the credit for the work they did. Guardrail: `test/reassign-on-archive.test.js`.
 - **"Meetings" means one thing, defined in `src/lib/meetingCounts.js`** (Sept 2026, Dev: "Sage and
   CRM should not at all disagree with meetings"). They did — three numbers were in play:
   - The Monday Sage digest counted `activity_type IN ('call','meeting')` and printed the total as

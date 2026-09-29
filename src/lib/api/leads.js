@@ -987,3 +987,61 @@ export async function disposeLead(leadId, { disposition, reason = null, note = n
 
   return updated
 }
+
+
+/**
+ * Move every lead and seller actively assigned to one person over to another.
+ *
+ * WHY: `setUserArchived` flips `people.is_archived` and touches nothing else, so
+ * an archived teammate keeps owning their whole book — and every per-person
+ * surface filters on `assigned_to`, which means those records go
+ * invisible-but-owned rather than unassigned. Pravar (id 17) was archived and
+ * still held 1 lead and 2 sellers months later; nobody saw them because nobody
+ * owned them in any way the UI could show.
+ *
+ * `assigned_to` only. `created_by` / `logged_by` / `changed_by` are history — who
+ * added this lead, who sent that outreach — and rewriting them would falsify past
+ * weeks' attribution in the digest and the scoreboard. The person who left did
+ * that work.
+ *
+ * Returns per-table counts so the caller can say what actually moved rather than
+ * claiming success.
+ */
+export async function reassignOwnedRecords(fromPersonId, toPersonId) {
+  if (!fromPersonId || !toPersonId) throw new Error('Both a from- and a to-person are required')
+  if (String(fromPersonId) === String(toPersonId)) throw new Error('Cannot reassign someone to themselves')
+
+  const now = new Date().toISOString()
+  const out = {}
+
+  const { data: leads, error: leadErr } = await supabase
+    .from('crm_leads')
+    .update({ assigned_to: toPersonId, assigned_by: toPersonId, assigned_date: now })
+    .eq('assigned_to', fromPersonId)
+    .select('id')
+  if (leadErr) throw leadErr
+  out.leads = (leads || []).length
+
+  // crm_sellers has assigned_to but no assigned_by/assigned_date.
+  const { data: sellers, error: sellerErr } = await supabase
+    .from('crm_sellers')
+    .update({ assigned_to: toPersonId })
+    .eq('assigned_to', fromPersonId)
+    .select('id')
+  if (sellerErr) throw sellerErr
+  out.sellers = (sellers || []).length
+
+  cacheClear('leads')
+  cacheClear('dashboard')
+  return out
+}
+
+/** How much a person still actively owns — for the prompt before archiving them. */
+export async function countOwnedRecords(personId) {
+  if (!personId) return { leads: 0, sellers: 0 }
+  const [{ count: leads }, { count: sellers }] = await Promise.all([
+    supabase.from('crm_leads').select('id', { count: 'exact', head: true }).eq('assigned_to', personId),
+    supabase.from('crm_sellers').select('id', { count: 'exact', head: true }).eq('assigned_to', personId),
+  ])
+  return { leads: leads || 0, sellers: sellers || 0 }
+}

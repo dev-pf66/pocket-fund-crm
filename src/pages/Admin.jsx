@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
 import { getPeople, setUserAdmin, deleteUser, adminSetUserPassword, generateTempPassword, setUserArchived, setUserTargets } from '../lib/supabase'
-import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption, previewArchiveSweep, runArchiveSweep, undoArchiveSweep } from '../lib/crm-api'
+import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption, previewArchiveSweep, runArchiveSweep, undoArchiveSweep, countOwnedRecords, reassignOwnedRecords } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
 import StalenessSettings from '../components/StalenessSettings'
 import TagManager from '../components/TagManager'
@@ -361,13 +361,51 @@ function Admin() {
   async function handleToggleArchive(user) {
     const nextValue = !user.is_archived
     const label = user.name || user.email
-    const msg = nextValue
-      ? `Archive ${label}? Their data is kept, but they'll be removed from leaderboards and can't sign in until you unarchive them.`
-      : `Unarchive ${label}? They'll be able to sign in and appear on leaderboards again.`
-    if (!confirm(msg)) return
+
+    // Archiving someone does NOT unassign their book, and every per-person
+    // surface filters on assigned_to — so their leads go invisible-but-owned
+    // rather than unassigned. Pravar was archived and still held 1 lead and 2
+    // sellers months later; nobody saw them because nobody owned them in any way
+    // the UI could show. So: say what they hold, and offer to hand it over.
+    let handOverTo = null
+    if (nextValue) {
+      let owned = { leads: 0, sellers: 0 }
+      try {
+        owned = await countOwnedRecords(user.id)
+      } catch (err) {
+        console.error('Could not count owned records:', err)
+      }
+      const total = owned.leads + owned.sellers
+      const owns = total
+        ? `\n\nThey still own ${owned.leads} lead${owned.leads === 1 ? '' : 's'} and ${owned.sellers} seller${owned.sellers === 1 ? '' : 's'}. Archiving does not unassign those — they stay owned by an archived person, which means nobody sees them.`
+        : ''
+      if (!confirm(`Archive ${label}? Their data is kept, but they'll be removed from leaderboards and can't sign in until you unarchive them.${owns}`)) return
+
+      if (total) {
+        const others = users.filter(u => u.id !== user.id && !u.is_archived)
+        const pick = prompt(
+          `Hand their ${total} record${total === 1 ? '' : 's'} to whom? Enter a name or id, or leave blank to leave them owned by ${label}.\n\n` +
+          others.map(u => `${u.id} — ${u.name || u.email}`).join('\n')
+        )
+        if (pick?.trim()) {
+          const q = pick.trim().toLowerCase()
+          const match = others.find(u => String(u.id) === q)
+            || others.find(u => (u.name || '').toLowerCase() === q)
+            || others.find(u => (u.name || '').toLowerCase().includes(q))
+          if (!match) { toast.error(`No unarchived teammate matches "${pick.trim()}" — nothing was changed`); return }
+          handOverTo = match
+        }
+      }
+    } else {
+      if (!confirm(`Unarchive ${label}? They'll be able to sign in and appear on leaderboards again.`)) return
+    }
 
     setActingId(user.id)
     try {
+      if (handOverTo) {
+        const moved = await reassignOwnedRecords(user.id, handOverTo.id)
+        toast.success(`Moved ${moved.leads} lead${moved.leads === 1 ? '' : 's'} and ${moved.sellers} seller${moved.sellers === 1 ? '' : 's'} to ${handOverTo.name || handOverTo.email}`)
+      }
       const updated = await setUserArchived(user.id, nextValue)
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, ...updated } : u))
       toast.success(`${label} ${nextValue ? 'archived' : 'unarchived'}`)

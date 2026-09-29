@@ -145,12 +145,12 @@ export const STALENESS_SETTINGS = [
  * negative would make the comparison nonsense. Only the three keys in
  * STALENESS_SETTINGS are writable — this is not a general settings PATCH.
  *
- * Records `updated_at` but NOT who changed it — crm_settings has no updated_by
- * column and adding one is a migration this did not want to carry. Worth doing:
- * this is a single row that changes what "stale" means for the whole team, which
- * is exactly the shape of thing that turned out to need `archived_by`.
+ * Records who changed it as well as when (migration 057). This is a SINGLE ROW
+ * that changes the staleness colouring for the whole team on every board, and RLS
+ * lets any signed-in user write it — the only gate is that Admin is admin-only at
+ * the route. "Why is everything red this morning" needs an answer.
  */
-export async function updateCRMSettings(updates) {
+export async function updateCRMSettings(updates, currentPersonId = null) {
   const allowed = STALENESS_SETTINGS.map(s => s.key)
   const clean = {}
   for (const key of allowed) {
@@ -164,7 +164,7 @@ export async function updateCRMSettings(updates) {
 
   const { data, error } = await supabase
     .from('crm_settings')
-    .update({ ...clean, updated_at: new Date().toISOString() })
+    .update({ ...clean, updated_at: new Date().toISOString(), updated_by: currentPersonId })
     .eq('id', 1)
     .select()
     .single()
