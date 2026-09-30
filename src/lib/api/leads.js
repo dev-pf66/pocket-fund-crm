@@ -8,6 +8,7 @@ import { supabase } from '../supabase'
 import { normalizeLinkedInUrl, linkedInProfileSlug } from '../linkedin'
 import { cacheGet, cacheSet, cacheClear, fireTTEvent, istDateStr, getDaysBetween, fetchAllRows } from './core'
 import { getCRMSettings } from './misc'
+import { AWAITING_STATUSES } from '../outreachStatus'
 
 // ============================================================================
 // LEADS API
@@ -155,7 +156,7 @@ async function runStageSideEffects(lead, oldStage, newStage, currentPersonId = n
         .from('crm_outreach_log')
         .select('id, status')
         .eq('lead_id', lead.id)
-        .in('status', ['sent', 'no_response'])
+        .in('status', AWAITING_STATUSES)
         .order('outreach_date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(1)

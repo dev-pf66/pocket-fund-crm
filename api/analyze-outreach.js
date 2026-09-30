@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { isAuthorized } from './_auth.js'
 import { requireEnv } from './_env.js'
+import { isReply } from '../src/lib/outreachStatus.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -34,8 +35,8 @@ export default async function handler(req, res) {
     })
   }
 
-  const replied = withText.filter(e => e.status === 'replied')
-  const notReplied = withText.filter(e => e.status !== 'replied')
+  const replied = withText.filter(e => isReply(e.status))
+  const notReplied = withText.filter(e => !isReply(e.status))
 
   const formatMessages = (arr, max = 15) =>
     arr.slice(0, max).map((m, i) => `[${i + 1}] "${String(m.message_content).trim()}"`).join('\n\n')

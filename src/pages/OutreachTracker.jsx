@@ -9,6 +9,7 @@ import { useSessionState } from '../hooks/useSessionState'
 import { dailyTargetOf, hasTarget } from '../lib/targets'
 import { istToday } from '../lib/dateUtils'
 import { parseCSVText, parseDateCell } from '../lib/csv'
+import { OUTREACH_STATUSES, normalizeOutreachStatus } from '../lib/outreachStatus'
 
 // Map free-text CSV values into the canonical dropdown keys the table uses.
 // Without this, a row that says "Cold Email" or "LinkedIn" would import as
@@ -21,16 +22,6 @@ function normalizeOutreachType(raw) {
   if (v.includes('email') || v === 'mail' || v === 'cold') return 'cold_email'
   if (v.includes('phone') || v.includes('call')) return 'phone_call'
   return 'other'
-}
-
-function normalizeOutreachStatus(raw) {
-  const v = String(raw || '').toLowerCase().trim()
-  if (!v) return null
-  if (['sent', 'replied', 'no_response', 'bounced'].includes(v)) return v
-  if (v.includes('repli') || v.includes('respond') || v === 'yes' || v === 'got reply') return 'replied'
-  if (v.includes('bounce')) return 'bounced'
-  if (v.includes('no response') || v === 'no') return 'no_response'
-  return 'sent'
 }
 
 const EMPTY_OUTREACH = {
@@ -647,10 +638,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                 value={newOutreach.status}
                 onChange={(e) => setNewOutreach({ ...newOutreach, status: e.target.value })}
               >
-                <option value="sent">Sent</option>
-                <option value="replied">Replied</option>
-                <option value="no_response">No Response</option>
-                <option value="bounced">Bounced</option>
+                {OUTREACH_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
 
@@ -795,10 +783,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
               style={{ padding: '8px 12px' }}
             >
               <option value="all">All Status</option>
-              <option value="sent">Sent</option>
-              <option value="replied">Replied</option>
-              <option value="no_response">No Response</option>
-              <option value="bounced">Bounced</option>
+              {OUTREACH_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
 
@@ -892,10 +877,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                           background: 'white'
                         }}
                       >
-                        <option value="sent">Sent</option>
-                        <option value="replied">Replied</option>
-                        <option value="no_response">No Response</option>
-                        <option value="bounced">Bounced</option>
+                        {OUTREACH_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                       </select>
                     </td>
                     <td style={{ padding: '12px 8px' }}>
@@ -1092,10 +1074,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                       value={fv('status') || 'sent'}
                       onChange={(e) => setField('status', e.target.value)}
                     >
-                      <option value="sent">Sent</option>
-                      <option value="replied">Replied</option>
-                      <option value="no_response">No Response</option>
-                      <option value="bounced">Bounced</option>
+                      {OUTREACH_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                     </select>
                   </div>
 

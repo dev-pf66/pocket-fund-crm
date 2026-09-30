@@ -13,6 +13,7 @@ import LeadForm from './LeadForm'
 import { isAdminUser } from '../lib/admin'
 import { computeMetrics } from '../lib/outreachMetrics'
 import { isLinkedInUrl } from '../lib/linkedin'
+import { isReply } from '../lib/outreachStatus'
 
 // 0 = no target. Targets were zeroed Aug 2026 when sales went low-volume /
 // high-targeting; goal rings, bars and nudges hide rather than divide by 0.
@@ -93,7 +94,7 @@ function DailyChart({ rows, days, goal = DAILY_GOAL, showDetails }) {
       if (!m.has(r.outreach_date)) m.set(r.outreach_date, { total: 0, replied: 0, types: {} })
       const s = m.get(r.outreach_date)
       s.total += 1
-      if (r.status === 'replied') s.replied += 1
+      if (isReply(r.status)) s.replied += 1
       const t = r.outreach_type || 'other'
       s.types[t] = (s.types[t] || 0) + 1
     }
@@ -545,16 +546,16 @@ function MobileEntryCard({
             disabled={toggling}
             style={{
               background: 'none',
-              border: entry.status === 'replied' ? '1px solid #bbf7d0' : '1px dashed #e5e7eb',
+              border: isReply(entry.status) ? '1px solid #bbf7d0' : '1px dashed #e5e7eb',
               borderRadius: '999px',
               padding: '4px 10px',
               fontSize: '11px',
-              fontWeight: entry.status === 'replied' ? 600 : 400,
-              color: entry.status === 'replied' ? '#15803d' : '#9ca3af',
+              fontWeight: isReply(entry.status) ? 600 : 400,
+              color: isReply(entry.status) ? '#15803d' : '#9ca3af',
               cursor: toggling ? 'wait' : 'pointer'
             }}
           >
-            {entry.status === 'replied' ? <><Check size={11} /> Responded</> : 'Mark responded'}
+            {isReply(entry.status) ? <><Check size={11} /> Responded</> : 'Mark responded'}
           </button>
           {expanded ? <ChevronUp size={16} color="#6b7280" /> : <ChevronDown size={16} color="#6b7280" />}
         </div>
@@ -1041,7 +1042,7 @@ function OutreachAdmin() {
 
   const visibleEntries = entries
   const totalCount = visibleEntries.length
-  const withResponse = visibleEntries.filter(e => e.status === 'replied').length
+  const withResponse = visibleEntries.filter(e => isReply(e.status)).length
 
   async function openContact(entry, e) {
     e.stopPropagation()
@@ -1071,7 +1072,7 @@ function OutreachAdmin() {
 
   async function toggleResponded(entry, e) {
     e.stopPropagation()
-    const next = entry.status === 'replied' ? 'sent' : 'replied'
+    const next = isReply(entry.status) ? 'sent' : 'replied'
     setTogglingId(entry.id)
     try {
       await updateOutreach(entry.id, { status: next }, currentPerson?.id)
@@ -1470,19 +1471,19 @@ function OutreachAdmin() {
                       <button
                         onClick={(ev) => toggleResponded(entry, ev)}
                         disabled={togglingId === entry.id}
-                        title={entry.status === 'replied' ? 'Click to mark as no response' : 'Click to mark as responded'}
+                        title={isReply(entry.status) ? 'Click to mark as no response' : 'Click to mark as responded'}
                         style={{
                           background: 'none',
-                          border: entry.status === 'replied' ? '1px solid #bbf7d0' : '1px dashed #e5e7eb',
+                          border: isReply(entry.status) ? '1px solid #bbf7d0' : '1px dashed #e5e7eb',
                           borderRadius: '999px',
                           padding: '3px 10px',
                           fontSize: '12px',
-                          fontWeight: entry.status === 'replied' ? 600 : 400,
-                          color: entry.status === 'replied' ? '#15803d' : '#9ca3af',
+                          fontWeight: isReply(entry.status) ? 600 : 400,
+                          color: isReply(entry.status) ? '#15803d' : '#9ca3af',
                           cursor: togglingId === entry.id ? 'wait' : 'pointer'
                         }}
                       >
-                        {entry.status === 'replied' ? <><Check size={12} /> Responded</> : 'Mark responded'}
+                        {isReply(entry.status) ? <><Check size={12} /> Responded</> : 'Mark responded'}
                       </button>
                     </td>
                     <td style={tdStyle}>

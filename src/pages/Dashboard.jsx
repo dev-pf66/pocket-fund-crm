@@ -9,6 +9,7 @@ import { buildDailyCounts, computeMetrics, replyRateColor } from '../lib/outreac
 import { dailyTargetOf } from '../lib/targets'
 import StageChip from '../components/StageChip'
 import Scoreboard from '../components/Scoreboard'
+import { isReply } from '../lib/outreachStatus'
 
 const FUNNEL_WEEK_OPTIONS = [4, 8, 12]
 
@@ -166,7 +167,7 @@ function Dashboard() {
       }
       const s = map.get(r.logged_by)
       s.count += 1
-      if (r.status === 'replied') s.replies += 1
+      if (isReply(r.status)) s.replies += 1
     }
     return map
   }, [outreachRows, rangeStart, rangeEnd])

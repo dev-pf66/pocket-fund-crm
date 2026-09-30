@@ -9,6 +9,7 @@ import { istAddDays, istWeekStart } from '../dateUtils'
 import { cacheClear, fireTTEvent, istDateStr, fetchAllRows } from './core'
 import { advanceLeadStage, createLead, findLeadByEmailOrNameFirm } from './leads'
 import { logActivityManual } from './misc'
+import { isReply, REPLY_STATUSES } from '../outreachStatus'
 
 // Explicit ceiling for the two "give me the whole log" readers below. Both
 // feed a scrollable table that Analytics also re-aggregates, so they want a
@@ -76,7 +77,7 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
       outreach_date: outreachData.outreach_date || istDateStr(),
       // Logged as already-replied means the reply just came in. Without the
       // stamp it never counts toward "replies this week".
-      ...(outreachData.status === 'replied' && !outreachData.replied_at
+      ...(isReply(outreachData.status) && !outreachData.replied_at
         ? { replied_at: new Date().toISOString() }
         : {})
     }])
@@ -117,7 +118,7 @@ export async function logOutreach(outreachData, currentPersonId, currentPersonNa
   fireTTEvent('outreach_logged', data)
 
   // An entry logged as already-replied belongs in the pipeline too.
-  if (data.status === 'replied') {
+  if (isReply(data.status)) {
     await syncReplyToPipeline(data, currentPersonId)
   }
 
@@ -183,7 +184,7 @@ export async function logOutreachBatch(rows, currentPersonId) {
   // reply. Sequential on purpose — each may create a lead and dedup checks
   // must see the previous row's creation.
   for (const row of data || []) {
-    if (row.status === 'replied') {
+    if (isReply(row.status)) {
       await syncReplyToPipeline(row, currentPersonId)
     }
   }
@@ -202,7 +203,7 @@ export async function updateOutreach(id, updates, currentPersonId = null) {
   // Stamp when the reply actually arrived. outreach_date is the SEND date, so
   // without this the reply metrics bucket a reply into the week the message
   // went out — which in a targeted motion is routinely weeks earlier.
-  const patch = updates.status === 'replied' && updates.replied_at === undefined
+  const patch = isReply(updates.status) && updates.replied_at === undefined
     ? { ...updates, replied_at: new Date().toISOString() }
     : updates
   const { data, error } = await supabase
@@ -214,7 +215,7 @@ export async function updateOutreach(id, updates, currentPersonId = null) {
 
   if (error) throw error
 
-  if (updates.status === 'replied') {
+  if (isReply(updates.status)) {
     await syncReplyToPipeline(data, currentPersonId)
   }
   return data
@@ -402,9 +403,9 @@ export async function getAllOutreachLogs(filters = {}) {
     }
 
     if (filters.has_response === true) {
-      query = query.eq('status', 'replied')
+      query = query.in('status', REPLY_STATUSES)
     } else if (filters.has_response === false) {
-      query = query.neq('status', 'replied')
+      query = query.not('status', 'in', `(${REPLY_STATUSES.join(',')})`)
     }
 
     if (filters.days_back) {
@@ -490,7 +491,7 @@ export async function getWeeklyFunnel(weeksBack = 8, personId = null) {
     const w = bucket(r.outreach_date)
     if (!w) continue
     w.outreach += 1
-    if (r.status === 'replied') w.replies += 1
+    if (isReply(r.status)) w.replies += 1
   }
   for (const r of meetings) {
     const w = bucket(r.activity_date)

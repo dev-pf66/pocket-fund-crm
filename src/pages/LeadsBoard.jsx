@@ -907,6 +907,9 @@ function LeadsBoard() {
                       <option value="all">Any</option>
                       <option value="replied">Replied</option>
                       <option value="sent">Sent (no reply yet)</option>
+                      <option value="follow_up_1">Follow up 1</option>
+                      <option value="follow_up_2">Follow up 2</option>
+                      <option value="rejected">Rejected</option>
                       <option value="no_response">No response</option>
                       <option value="bounced">Bounced</option>
                       <option value="never_contacted">Never contacted</option>

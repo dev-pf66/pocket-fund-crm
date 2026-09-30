@@ -14,6 +14,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { tt } from '../src/lib/integrations/task-tracker.js'
 import { MEETING_HELD_ACTIVITY_TYPES } from '../src/lib/meetingCounts.js'
+import { isReply } from '../src/lib/outreachStatus.js'
 import { requireEnv } from './_env.js'
 import { fetchAllRows } from './_db.js'
 
@@ -80,10 +81,10 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
     const s = statsFor(r.logged_by)
     if (inLast(r.outreach_date)) {
       s.outreach += 1
-      if (r.status === 'replied') s.replies += 1
+      if (isReply(r.status)) s.replies += 1
     } else if (inPrev(r.outreach_date)) {
       s.prevOutreach += 1
-      if (r.status === 'replied') s.prevReplies += 1
+      if (isReply(r.status)) s.prevReplies += 1
     }
   }
   for (const r of meetingsRes.data || []) {

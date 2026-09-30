@@ -22,6 +22,7 @@ import { supabase } from '../supabase'
 import { istToday, istAddDays, istWeekStart, IST_OFFSET_MS } from '../dateUtils'
 import { fetchAllRows } from './core'
 import { isForwardMove } from './leads'
+import { REPLY_STATUSES } from '../outreachStatus'
 
 const LIVE_STAGES = ['meeting_booked', 'warm_active']
 
@@ -74,7 +75,7 @@ export async function getMovementStats(personId = null, { since, until, includeS
     let q = supabase
       .from('crm_outreach_log')
       .select('id, logged_by, replied_at, status')
-      .eq('status', 'replied')
+      .in('status', REPLY_STATUSES)
       .gte('replied_at', fromTs)
       .lt('replied_at', toTs)
       .order('id')
@@ -173,7 +174,7 @@ export async function getTeamMovementThisWeek() {
     fetchAllRows(() => supabase
       .from('crm_outreach_log')
       .select('logged_by')
-      .eq('status', 'replied')
+      .in('status', REPLY_STATUSES)
       .gte('replied_at', `${since}T00:00:00+05:30`)
       .lt('replied_at', `${istAddDays(today, 1)}T00:00:00+05:30`)
       .order('id')),

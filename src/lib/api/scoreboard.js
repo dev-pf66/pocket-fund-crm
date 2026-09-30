@@ -32,6 +32,7 @@ import { istDateStr, fetchAllRows } from './core'
 import { istWeekStart } from '../dateUtils'
 import { isStaleBreach, shouldSurfaceBreach, isMissingInfo, STALE_BREACH_DAYS } from '../leadHealth'
 import { isMeetingBooked, isMeetingHeld } from '../meetingCounts'
+import { isReply } from '../outreachStatus'
 
 // The retired-stage map and both meeting definitions live in
 // src/lib/meetingCounts.js, shared with api/weekly-digest.js. Dev, 27 Sept:
@@ -132,7 +133,7 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
     if (!b) { unattributedOutreach++; continue }
     b.outreachDone++
     if (r.outreach_type === 'phone_call') b.dials++
-    if (r.status === 'replied') b.replies++
+    if (isReply(r.status)) b.replies++
   }
 
   for (const e of stageEvents || []) {

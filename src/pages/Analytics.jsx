@@ -5,6 +5,7 @@ import { Send, MessageSquare, Calendar, TrendingUp, Sparkles, Tag, Zap } from 'l
 import { istToday, istAddDays, istWeekStart, fmtDate } from '../lib/dateUtils'
 import { isAdminUser } from '../lib/admin'
 import { replyRateColor } from '../lib/outreachMetrics'
+import { isReply } from '../lib/outreachStatus'
 
 // fromOffset = days back for range start, toOffset = days back for range end.
 // e.g. Yesterday: from=1,to=1 — Today: from=0,to=0 — 7d: from=6,to=0
@@ -110,7 +111,7 @@ function Analytics() {
       const pid = row.logged_by
       if (!map[pid]) map[pid] = { total: 0, replies: 0, byDate: {} }
       map[pid].total += 1
-      if (row.status === 'replied') map[pid].replies += 1
+      if (isReply(row.status)) map[pid].replies += 1
       map[pid].byDate[row.outreach_date] = (map[pid].byDate[row.outreach_date] || 0) + 1
     }
     return map
@@ -164,7 +165,7 @@ function Analytics() {
       if (!map.has(src)) map.set(src, { source: src, total: 0, replies: 0 })
       const s = map.get(src)
       s.total += 1
-      if (r.status === 'replied') s.replies += 1
+      if (isReply(r.status)) s.replies += 1
     }
     return [...map.values()].sort((a, b) => b.total - a.total)
   }, [filteredRows])
