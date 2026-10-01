@@ -6,14 +6,14 @@ import { isAdminUser } from '../lib/admin'
 import CommandPalette from './CommandPalette'
 import { useNotificationCount } from '../hooks/useNotificationCount'
 import { buildNavGroups } from '../lib/nav'
-import { Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Handshake, Presentation, Store, Sun, Search, PhoneCall } from 'lucide-react'
+import { Users, Mail, FileText, BarChart3, Target, HelpCircle, ClipboardList, Menu, X, Briefcase, Shield, Handshake, Presentation, Store, Sun, Search, PhoneCall, Globe } from 'lucide-react'
 
 // Icon names live in src/lib/nav.js so that module stays pure and testable
 // (there is no component-test setup here, and the node-environment suite cannot
 // import JSX). This map is the only place they become elements.
 const ICONS = {
   Sun, Target, PhoneCall, ClipboardList, Users, Presentation, Store, Briefcase,
-  Handshake, BarChart3, Mail, FileText, Shield, HelpCircle
+  Handshake, BarChart3, Mail, FileText, Shield, HelpCircle, Globe
 }
 
 function Layout() {

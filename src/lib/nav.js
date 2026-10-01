@@ -36,6 +36,11 @@
  *
  * The five contact tables (leads, sellers, investors, partners, demos) are
  * untouched — that July decision still stands.
+ *
+ * OCT 2026: Italy Pipeline added (crm_italy_pipeline) — a sixth, separate
+ * buyside table alongside Indian Sellers, holding sellers/buyers/brokers/
+ * other ecosystem contacts for Italy in one board with a Type field, rather
+ * than one new table per contact type.
  */
 
 /**
@@ -69,6 +74,7 @@ export function buildNavGroups({ isAdmin = false, notifications = {} } = {}) {
         { to: '/pipeline', label: 'Pipeline', icon: 'Users' },
         { to: '/pe-os', label: 'PE OS', icon: 'Presentation' },
         { to: '/sellers', label: 'Indian Sellers', icon: 'Store' },
+        { to: '/italy', label: 'Italy Pipeline', icon: 'Globe' },
         { to: '/investors', label: 'Investors', icon: 'Briefcase' },
         { to: '/partners', label: 'Partners', icon: 'Handshake' },
       ],

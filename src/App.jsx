@@ -58,6 +58,7 @@ const ChatTerminal = lazyWithRetry(() => import('./components/ChatTerminal'))
 const PartnersBoard = lazyWithRetry(() => import('./pages/PartnersBoard'))
 const PEOSBoard = lazyWithRetry(() => import('./pages/PEOSBoard'))
 const SellersBoard = lazyWithRetry(() => import('./pages/SellersBoard'))
+const ItalyBoard = lazyWithRetry(() => import('./pages/ItalyBoard'))
 const Notifications = lazyWithRetry(() => import('./pages/Notifications'))
 
 export const AppContext = createContext()
@@ -194,6 +195,7 @@ function AppContent() {
               <Route path="outreach-admin" element={<OutreachAdmin />} />
               <Route path="pe-os" element={<PEOSBoard />} />
               <Route path="sellers" element={<SellersBoard />} />
+              <Route path="italy" element={<ItalyBoard />} />
               <Route path="admin" element={<Admin />} />
               <Route path="import" element={<ImportLeads />} />
               {/* Analytics is open to everyone — non-admins see only

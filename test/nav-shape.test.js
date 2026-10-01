@@ -30,8 +30,8 @@ const appJsx = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8
 const routeExists = (path) => appJsx.includes(`path="${path}"`)
 
 describe('the menu is short', () => {
-  it('gives an analyst 10 items, not 14', () => {
-    expect(navRoutes(analyst)).toHaveLength(10)
+  it('gives an analyst 11 items, not 14', () => {
+    expect(navRoutes(analyst)).toHaveLength(11)
   })
 
   it('gives the daily group 3 items for an analyst, 4 for an admin', () => {
@@ -104,12 +104,12 @@ describe('what stays', () => {
     expect(navRoutes(analyst)).toContain('/cold-calls')
   })
 
-  it('keeps all five contact tables — Dev\'s standing July 2026 decision', () => {
+  it('keeps all five contact tables — Dev\'s standing July 2026 decision — plus Italy Pipeline (Oct 2026)', () => {
     const pipelines = buildNavGroups(analyst).find(g => g.label === 'Pipelines').items.map(i => i.to)
     expect(pipelines).toEqual(
-      expect.arrayContaining(['/pipeline', '/pe-os', '/sellers', '/investors', '/partners'])
+      expect.arrayContaining(['/pipeline', '/pe-os', '/sellers', '/investors', '/partners', '/italy'])
     )
-    expect(pipelines).toHaveLength(5)
+    expect(pipelines).toHaveLength(6)
   })
 
   it('keeps Setup admin-gated apart from Help', () => {
