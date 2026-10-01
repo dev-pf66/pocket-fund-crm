@@ -25,7 +25,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Project ref: `lzydgdzjrgvqglxmyfjk` (https://lzydgdzjrgvqglxmyfjk.supabase.co).
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 058 — 62 files, because 034/046/049 were each used twice by parallel branches; the number is a label, not a key). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 059 — 63 files, because 034/046/049 were each used twice by parallel branches; the number is a label, not a key). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
 - **Applying a migration (Sept 2026) — the Supabase CLI can do it, no dashboard paste needed.**
   The CLI is linked to `lzydgdzjrgvqglxmyfjk` ("pf sales CRM") and the DB credential is
   cached in the macOS keychain, so `supabase db push` connects on its own. There is no
@@ -356,7 +356,13 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     never means losing a page here — deep links, bookmarks and the command palette keep working,
     and restoring a tab is one line in `nav.js`. There's a guardrail test on this.
 - Dev's standing product decisions: all five contact tables stay (leads, sellers, investors,
-  partners, demos) — July 2026, unchanged. Tracker/Queue/Log remain three separate **pages**
+  partners, demos) — July 2026, unchanged. **A sixth landed Oct 2026: `crm_italy_pipeline`**
+  (migration 059, `/italy`, `src/lib/api/italy-pipeline.js`, `ItalyBoard.jsx`) — the Italy effort,
+  deliberately MIXED (sellers, buyers, brokers, ecosystem contacts in one board, told apart by
+  `contact_type`: seller | buyer | broker | other). Kept out of `crm_leads` for the same reason
+  `crm_sellers` is: buyside ecosystem contacts must not enter the sales funnel's conversion maths,
+  the outreach tracker or the dashboard. Stages: sourced → contacted → engaged → active →
+  closed/passed. Tracker/Queue/Log remain three separate **pages**
   (July 2026), but **Sept 2026 (Dev's call) removed Queue's top-level tab and made Log
   admin-only**: `getOutreachQueue` ("my leads at stage outreach with no outreach_log row at all",
   grouped by import batch) is a subset of Today's queue and Cold Calls has its own Queue sub-tab;
@@ -368,6 +374,21 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 - Stack: Vite 7 + React 19 + react-router 7 + supabase-js; serverless functions in `api/` (plain JS, Vercel style).
 - Checks: `npm run lint` (0 errors, warnings remain), `npm test` (vitest), `npm run build`. All three run on every PR to main via `.github/workflows/ci.yml` — Vercel deploys from origin/main with no gate of its own, so CI is the gate.
+- **A red `Vercel` check on a PR is not necessarily a broken build (Oct 2026).** This account is on
+  a plan with a daily deploy cap, and every push costs two deployments — one Preview, one
+  Production. A burst of merges hits it: 19 deployments across 2026-09-29/30 produced
+  `Deployment rate limited — retry in 24 hours`, with the GitHub check reported simply as `fail`.
+  **Read the check's detail before concluding anything is broken**, and verify production itself
+  (`curl` the page and `/api/health`) rather than inferring from the check.
+  - The `build` job in `ci.yml` is the real gate and is unaffected by the cap. A docs-only PR whose
+    `build` passes is safe to merge over a rate-limited Vercel check — there is nothing to deploy.
+  - A **code** change merged while rate-limited lands on `main` WITHOUT deploying, so `main` and
+    production silently diverge until the cap resets. `/ship-verify`'s bundle-hash check is what
+    catches this; do not claim a code fix is live during a rate-limit window.
+  - Checked 2026-10-01: there is **one** `pocket-fund-crm` project, in one team
+    (`devs-projects-4104f3bb`), deploying 1 Preview + 1 Production per push — no twin doubling
+    anything in this account. Any "a duplicate Vercel project double-builds this repo" warning is
+    stale as far as this account can see; it is not in any repo file.
 - The test suite (`test/`) is **guardrails, not coverage** (Aug 2026). It pins the trap-prone machinery that keeps getting broken: forward-only `advanceLeadStage`, the reply↔pipeline sync and meeting auto-log in `moveLead`, the digest's "everyone, zeros included" + TEAM-sums-only-listed-rows rules, and `fetchAllRows` paging. Don't chase coverage; do add a guardrail when you fix a silent-failure bug. `test/helpers/fake-supabase.js` is a recording mock, not a query engine — it records operations, it does not filter or sort.
 - Run: `npm install && npm run dev`. Build: `npm run build`. Lint: `npm run lint`.
 - `.env` is gitignored — fresh worktrees need the two `VITE_` values (unquoted). `.env.local` comes from `vercel env pull`.
