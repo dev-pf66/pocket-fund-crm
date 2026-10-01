@@ -21,10 +21,13 @@ Two jobs sit on top of that loop, and every screen in the app serves one of them
 It is deliberately **not** a general database, and deliberately **not** in the wiki. The wiki holds
 thinking; this holds people and what we owe them.
 
-## The five contact books
+## The six contact books
 
-Five separate tables on purpose — they are different relationships with different pipelines, and
-merging them would destroy the funnel maths. (Standing product decision, July 2026: all five stay.)
+Separate tables on purpose — they are different relationships with different pipelines, and
+merging them would destroy the funnel maths. (Standing product decision, July 2026: the original
+five all stay. Italy was added Oct 2026 as a sixth rather than folded into `crm_sellers`, for the
+same reason `crm_sellers` is not part of `crm_leads`: buyside ecosystem contacts must stay out of
+the sales funnel's conversion maths.)
 
 | Table | Who's in it | Pipeline |
 |---|---|---|
@@ -33,6 +36,7 @@ merging them would destroy the funnel maths. (Standing product decision, July 20
 | `crm_investors` | LPs and the shared contact book | — (open to the whole team by design) |
 | `crm_partners` | Creators, communities, funds, podcasts, media | potential → reached_out → in_conversation → active_partner/passed |
 | `crm_demos` | PE OS product demos, each linked to a lead | scheduled → done → signed_up/passed |
+| `crm_italy_pipeline` | The Italy effort — **deliberately mixed**: sellers, buyers, brokers and ecosystem contacts (lawyers, advisors, intros) in one board, told apart by `contact_type` | sourced → contacted → engaged → active → closed/passed |
 
 Supporting tables: `crm_outreach_log` (one row per touch — LinkedIn, email **and every cold-call
 dial**), `crm_lead_activities` (calls, meetings, notes), `people` (the team).
@@ -48,7 +52,7 @@ tabs does an analyst see" is exactly the rule that regresses one item at a time.
 | **Tracker** | Log a touch. |
 | **Cold Calls** | The dial list, outcomes, and the call funnel — with its own Queue sub-tab. |
 | **Log** *(admin)* | Audit what the team logged. |
-| **Pipeline · PE OS · Indian Sellers · Investors · Partners** | The five contact books above. |
+| **Pipeline · PE OS · Indian Sellers · Investors · Partners · Italy Pipeline** | The six contact books above. |
 | **Analytics** | Conversion and source quality. |
 | **Admin** | Users, targets, staleness thresholds, tags, field options, and the lead archive sweep. |
 

@@ -1,7 +1,7 @@
 # Migrations
 
 Every schema change for the Pocket Fund Sales CRM lives here, numbered in creation order
-(`NNN_name.sql`, currently through **058** — 62 files in total, because parallel branches each
+(`NNN_name.sql`, currently through **059** — 63 files in total, because parallel branches each
 reused 034, 046 and 049. The number is a human label, not a key; the CLI orders by its own
 timestamp, so a collision here is untidy rather than dangerous). Write idempotent SQL — `CREATE TABLE IF NOT EXISTS`,
 `ADD COLUMN IF NOT EXISTS`, `DROP POLICY IF EXISTS` before `CREATE POLICY` — so a re-run is always
@@ -74,9 +74,9 @@ This directory used to document a hand-maintained `schema_migrations` table, wit
 "anything not in that query's output has not been applied."
 
 **That is now actively wrong and will mislead you.** As of 2026-09-29 the table holds **5 rows**
-(032, 033, 034, 046, 047) against 62 migration files. The one-time backfill it described was never run,
+(032, 033, 034, 046, 047) against 63 migration files. The one-time backfill it described was never run,
 and almost nothing since has been recorded. Reading it would tell you that 001–031 and most of
-035–058 are unapplied; every one of them is live.
+035–059 are unapplied; every one of them is live.
 
 There are now two tracking mechanisms and neither is complete:
 

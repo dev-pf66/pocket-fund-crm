@@ -25,7 +25,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Project ref: `lzydgdzjrgvqglxmyfjk` (https://lzydgdzjrgvqglxmyfjk.supabase.co).
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 058 — 62 files, because 034/046/049 were each used twice by parallel branches; the number is a label, not a key). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 059 — 63 files, because 034/046/049 were each used twice by parallel branches; the number is a label, not a key). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
 - **Applying a migration (Sept 2026) — the Supabase CLI can do it, no dashboard paste needed.**
   The CLI is linked to `lzydgdzjrgvqglxmyfjk` ("pf sales CRM") and the DB credential is
   cached in the macOS keychain, so `supabase db push` connects on its own. There is no
@@ -356,7 +356,13 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     never means losing a page here — deep links, bookmarks and the command palette keep working,
     and restoring a tab is one line in `nav.js`. There's a guardrail test on this.
 - Dev's standing product decisions: all five contact tables stay (leads, sellers, investors,
-  partners, demos) — July 2026, unchanged. Tracker/Queue/Log remain three separate **pages**
+  partners, demos) — July 2026, unchanged. **A sixth landed Oct 2026: `crm_italy_pipeline`**
+  (migration 059, `/italy`, `src/lib/api/italy-pipeline.js`, `ItalyBoard.jsx`) — the Italy effort,
+  deliberately MIXED (sellers, buyers, brokers, ecosystem contacts in one board, told apart by
+  `contact_type`: seller | buyer | broker | other). Kept out of `crm_leads` for the same reason
+  `crm_sellers` is: buyside ecosystem contacts must not enter the sales funnel's conversion maths,
+  the outreach tracker or the dashboard. Stages: sourced → contacted → engaged → active →
+  closed/passed. Tracker/Queue/Log remain three separate **pages**
   (July 2026), but **Sept 2026 (Dev's call) removed Queue's top-level tab and made Log
   admin-only**: `getOutreachQueue` ("my leads at stage outreach with no outreach_log row at all",
   grouped by import batch) is a subset of Today's queue and Cold Calls has its own Queue sub-tab;
