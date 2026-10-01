@@ -374,6 +374,21 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 
 - Stack: Vite 7 + React 19 + react-router 7 + supabase-js; serverless functions in `api/` (plain JS, Vercel style).
 - Checks: `npm run lint` (0 errors, warnings remain), `npm test` (vitest), `npm run build`. All three run on every PR to main via `.github/workflows/ci.yml` — Vercel deploys from origin/main with no gate of its own, so CI is the gate.
+- **A red `Vercel` check on a PR is not necessarily a broken build (Oct 2026).** This account is on
+  a plan with a daily deploy cap, and every push costs two deployments — one Preview, one
+  Production. A burst of merges hits it: 19 deployments across 2026-09-29/30 produced
+  `Deployment rate limited — retry in 24 hours`, with the GitHub check reported simply as `fail`.
+  **Read the check's detail before concluding anything is broken**, and verify production itself
+  (`curl` the page and `/api/health`) rather than inferring from the check.
+  - The `build` job in `ci.yml` is the real gate and is unaffected by the cap. A docs-only PR whose
+    `build` passes is safe to merge over a rate-limited Vercel check — there is nothing to deploy.
+  - A **code** change merged while rate-limited lands on `main` WITHOUT deploying, so `main` and
+    production silently diverge until the cap resets. `/ship-verify`'s bundle-hash check is what
+    catches this; do not claim a code fix is live during a rate-limit window.
+  - Checked 2026-10-01: there is **one** `pocket-fund-crm` project, in one team
+    (`devs-projects-4104f3bb`), deploying 1 Preview + 1 Production per push — no twin doubling
+    anything in this account. Any "a duplicate Vercel project double-builds this repo" warning is
+    stale as far as this account can see; it is not in any repo file.
 - The test suite (`test/`) is **guardrails, not coverage** (Aug 2026). It pins the trap-prone machinery that keeps getting broken: forward-only `advanceLeadStage`, the reply↔pipeline sync and meeting auto-log in `moveLead`, the digest's "everyone, zeros included" + TEAM-sums-only-listed-rows rules, and `fetchAllRows` paging. Don't chase coverage; do add a guardrail when you fix a silent-failure bug. `test/helpers/fake-supabase.js` is a recording mock, not a query engine — it records operations, it does not filter or sort.
 - Run: `npm install && npm run dev`. Build: `npm run build`. Lint: `npm run lint`.
 - `.env` is gitignored — fresh worktrees need the two `VITE_` values (unquoted). `.env.local` comes from `vercel env pull`.
