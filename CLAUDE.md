@@ -25,7 +25,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Project ref: `lzydgdzjrgvqglxmyfjk` (https://lzydgdzjrgvqglxmyfjk.supabase.co).
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 045). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 058 — 62 files, because 034/046/049 were each used twice by parallel branches; the number is a label, not a key). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
 - **Applying a migration (Sept 2026) — the Supabase CLI can do it, no dashboard paste needed.**
   The CLI is linked to `lzydgdzjrgvqglxmyfjk` ("pf sales CRM") and the DB credential is
   cached in the macOS keychain, so `supabase db push` connects on its own. There is no
@@ -35,6 +35,17 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     `migrations/NNN_*.sql`. Copy the numbered file across, `--dry-run` first to confirm it
     lists only your migration, then push. `supabase/` is gitignored — the numbered file in
     `migrations/` stays the committed source of truth.
+  - **Stamp it `$(date +%Y%m%d%H%M%S)`, never midnight.** A `YYYYMMDD000000` stamp can collide
+    with a version already in the remote history; when it does, `db push --dry-run` reports
+    "Remote database is up to date" and applies NOTHING. Silent no-op that reads as success —
+    hit on 2026-09-26, caught only by querying for the column. There is still an unexplained
+    `20260926000000` in the remote history with no source file in this repo.
+  - `"Remote migration versions not found in local migrations directory"` just means another
+    worktree pushed them. Write a placeholder file per missing version. Do NOT
+    `migration repair --status reverted` and do NOT `db pull`.
+  - **The repo's own `schema_migrations` table is abandoned** — 5 rows against 62 migration files as of 2026-09-29.
+    `migrations/README.md` used to tell you to trust it; it no longer does. Verify with a real
+    query against the new column, never against a tracking table.
   - `supabase db dump` / `db diff` need Docker Desktop and will fail without it. `db push`
     does not — it connects directly.
   - Verify with real queries afterwards (select the new column; prove a CHECK rejects what
