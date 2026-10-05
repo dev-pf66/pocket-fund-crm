@@ -97,6 +97,7 @@ export default async function handler(req, res) {
 }
 
 async function handleGet(req, res) {
+  if (req.query.view === 'stage_events') return handleStageEvents(req, res)
   try {
     const { id, stage, lead_type, limit = 100, include_archived } = req.query
 
@@ -148,6 +149,50 @@ async function handleGet(req, res) {
       count: data.length,
       data
     })
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message })
+  }
+}
+
+// GET /api/leads?view=stage_events[&to_stage=][&from_stage=][&since=YYYY-MM-DD][&limit=]
+//
+// The stage history, read-only. crm_leads.stage is overwritten in place, so this
+// log is the only answer to "who BECAME a client this month". The tracker's goals
+// dashboard counted client rows by updated_at instead, which counts any edit to an
+// old client as a new one. Rides this function rather than a new file: the
+// dashboard reads it with the same key as /leads.
+//
+// Each row carries the lead's CURRENT stage and archive flag, so a caller can drop
+// moves that were later undone — six leads went to client and back within days on
+// 2026-08-29..09-03. Newest first.
+async function handleStageEvents(req, res) {
+  try {
+    const { to_stage, from_stage, since, limit = 100 } = req.query
+    if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+      return res.status(400).json({ success: false, error: 'since must be YYYY-MM-DD' })
+    }
+
+    let query = supabase
+      .from('crm_lead_stage_events')
+      .select('id, lead_id, from_stage, to_stage, changed_by, changed_at, crm_leads(name, stage, is_archived)')
+      .order('changed_at', { ascending: false })
+      .limit(parseInt(limit))
+
+    if (to_stage) query = query.eq('to_stage', to_stage)
+    if (from_stage) query = query.eq('from_stage', from_stage)
+    if (since) query = query.gte('changed_at', since)
+
+    const { data, error } = await query
+    if (error) throw error
+
+    const rows = (data || []).map(({ crm_leads: lead, ...event }) => ({
+      ...event,
+      lead_name: lead?.name ?? null,
+      current_stage: lead?.stage ?? null,
+      lead_is_archived: lead?.is_archived ?? null
+    }))
+
+    return res.status(200).json({ success: true, count: rows.length, data: rows })
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message })
   }
