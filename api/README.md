@@ -42,11 +42,11 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `GET` | [`/api/investors`](#get-apiinvestors) | API key | List investors (filterable + searchable) |
 | `GET` | [`/api/investors?id=`](#get-apiinvestorsid123) | API key | Get single investor by ID |
 | `POST` | [`/api/investors`](#post-apiinvestors) | API key | Create a new investor |
-| `GET` | [`/api/tags`](#get-apitags) | API key | List tags (all, one lead's, or with usage counts) |
-| `POST` | [`/api/tags`](#post-apitags) | API key | Create a tag (or return existing on name match) |
-| `POST` | [`/api/tags?action=assign`](#post-apitagsactionassign) | API key | Bulk-apply a tag to leads |
-| `PATCH` | [`/api/tags?id=`](#patch-apitagsid123) | API key | Rename a tag |
-| `DELETE` | [`/api/tags?lead_id=&tag_id=`](#delete-apitagslead_id123tag_id11) | API key | Unassign a tag from one lead |
+| `GET` | [`/api/leads?resource=tags`](#get-apileadsresourcetags) | API key | List tags (all, one lead's, or with usage counts) |
+| `POST` | [`/api/leads?resource=tags`](#post-apileadsresourcetags) | API key | Create a tag (or return existing on name match) |
+| `POST` | [`/api/leads?resource=tags&action=assign`](#post-apileadsresourcetagsactionassign) | API key | Bulk-apply a tag to leads |
+| `PATCH` | [`/api/leads?resource=tags&id=`](#patch-apileadsresourcetagsid123) | API key | Rename a tag |
+| `DELETE` | [`/api/leads?resource=tags&lead_id=&tag_id=`](#delete-apileadsresourcetagslead_id123tag_id11) | API key | Unassign a tag from one lead |
 | `POST` | [`/api/events/fire`](#post-apieventsfire) | Supabase JWT | Fire an internal app event (Task Tracker integration) |
 | `GET`/`POST` | [`/api/weekly-digest`](#cron-jobs-internal) | Cron secret | Per-analyst rollup posted to Sage (Mon 03:30 UTC) |
 | `POST` | [`/api/callhippo-sync`](#cron-jobs-internal) | Cron secret | Import CallHippo dials into `crm_outreach_log` (daily) |
@@ -764,17 +764,26 @@ curl -X POST \
 ## Tags
 
 `crm_tags` / `crm_lead_tags` back the Pipeline board's tag filter (see CLAUDE.md,
-"Tags are lists"). This endpoint is the HTTP equivalent of `createTag` /
-`addTagToLeads` / `getTagsByLead` in `src/lib/api/misc.js` — added Oct 2026
-because those only ran against the browser's Supabase session; an API-key
-caller had no way to create or assign a tag, and direct table reads are
-blocked (no public RLS grant for an unauthenticated key).
+"Tags are lists"). This is the HTTP equivalent of `createTag` / `addTagToLeads` /
+`getTagsByLead` in `src/lib/api/misc.js` — added Oct 2026 because those only ran
+against the browser's Supabase session; an API-key caller had no way to create
+or assign a tag, and direct table reads are blocked (no public RLS grant for an
+unauthenticated key).
+
+**It is served from `/api/leads?resource=tags`, not its own `/api/tags` route.**
+A standalone `api/tags.js` built and tested clean but failed every production
+deploy: the project is on Vercel's Hobby plan, which caps a deployment at 12
+Serverless Functions, `api/` was already at exactly 12, and a 13th file broke
+`vercel.json`-triggered deploys at the "Deploying outputs" step with no
+code-level error — `npm run build`/`lint`/`test` all stayed green throughout.
+See `api/_tags.js`. Every tag request below needs `resource=tags` in the query
+string alongside whatever else it's documented with.
 
 **There is deliberately no DELETE for a tag itself** — only for one lead↔tag
 link. `crm_lead_tags` points at the tag's id, so deleting a tag would silently
 strip it off every lead carrying it; rename instead.
 
-### GET /api/tags
+### GET /api/leads?resource=tags
 
 List every tag, one lead's tags, or tags with usage counts.
 
@@ -785,9 +794,9 @@ List every tag, one lead's tags, or tags with usage counts.
 
 **Example:**
 ```bash
-curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/tags"
-curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/tags?lead_id=123"
-curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/tags?with_usage=true"
+curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/leads?resource=tags"
+curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/leads?resource=tags&lead_id=123"
+curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/leads?resource=tags&with_usage=true"
 ```
 
 **200 Response:**
@@ -798,7 +807,7 @@ curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/tags?with_
 ] }
 ```
 
-### POST /api/tags
+### POST /api/leads?resource=tags
 
 Create a tag, or return the existing one on a case-insensitive name match
 (`crm_tags.name` is UNIQUE — "SaaS Connect" and "saas connect" would otherwise
@@ -813,13 +822,13 @@ render as two tags that look like one).
 ```bash
 curl -X POST -H "x-api-key: YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"name": "London / Rollup Europe - London"}' \
-  "https://pocket-fund-crm.vercel.app/api/tags"
+  "https://pocket-fund-crm.vercel.app/api/leads?resource=tags"
 ```
 
 **201 Response** (new tag): `{ "success": true, "created": true, "data": { "id": 11, "name": "...", "color": "#..." } }`
 **200 Response** (name already existed): `{ "success": true, "created": false, "data": { ... } }`
 
-### POST /api/tags?action=assign
+### POST /api/leads?resource=tags&action=assign
 
 Bulk-apply one tag to many leads. Idempotent — `(lead_id, tag_id)` is the
 primary key, so re-tagging a lead that already carries the tag is a no-op,
@@ -834,12 +843,12 @@ not an error. Chunked internally at 200 rows per write.
 ```bash
 curl -X POST -H "x-api-key: YOUR_KEY" -H "Content-Type: application/json" \
   -d '{"tag_id": 11, "lead_ids": [201, 202, 203, 204]}' \
-  "https://pocket-fund-crm.vercel.app/api/tags?action=assign"
+  "https://pocket-fund-crm.vercel.app/api/leads?resource=tags&action=assign"
 ```
 
 **200 Response:** `{ "success": true, "requested": 4, "applied": 4 }`
 
-### PATCH /api/tags?id=123
+### PATCH /api/leads?resource=tags&id=123
 
 Rename a tag in place. Every lead carrying it keeps it, since the link
 points at the id, not the name.
@@ -848,7 +857,7 @@ points at the id, not the name.
 
 **200 Response:** `{ "success": true, "data": { "id": 11, "name": "New Name", "color": "#..." } }`
 
-### DELETE /api/tags?lead_id=123&tag_id=11
+### DELETE /api/leads?resource=tags&lead_id=123&tag_id=11
 
 Remove a tag from one lead. Does **not** delete the tag itself.
 
