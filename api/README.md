@@ -42,6 +42,11 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `GET` | [`/api/investors`](#get-apiinvestors) | API key | List investors (filterable + searchable) |
 | `GET` | [`/api/investors?id=`](#get-apiinvestorsid123) | API key | Get single investor by ID |
 | `POST` | [`/api/investors`](#post-apiinvestors) | API key | Create a new investor |
+| `GET` | [`/api/tags`](#get-apitags) | API key | List tags (all, one lead's, or with usage counts) |
+| `POST` | [`/api/tags`](#post-apitags) | API key | Create a tag (or return existing on name match) |
+| `POST` | [`/api/tags?action=assign`](#post-apitagsactionassign) | API key | Bulk-apply a tag to leads |
+| `PATCH` | [`/api/tags?id=`](#patch-apitagsid123) | API key | Rename a tag |
+| `DELETE` | [`/api/tags?lead_id=&tag_id=`](#delete-apitagslead_id123tag_id11) | API key | Unassign a tag from one lead |
 | `POST` | [`/api/events/fire`](#post-apieventsfire) | Supabase JWT | Fire an internal app event (Task Tracker integration) |
 | `GET`/`POST` | [`/api/weekly-digest`](#cron-jobs-internal) | Cron secret | Per-analyst rollup posted to Sage (Mon 03:30 UTC) |
 | `POST` | [`/api/callhippo-sync`](#cron-jobs-internal) | Cron secret | Import CallHippo dials into `crm_outreach_log` (daily) |
@@ -753,6 +758,101 @@ curl -X POST \
 ```json
 { "success": false, "error": "Invalid investor_type. Must be one of: Individual LP, Family Office, Fund of Funds, Institutional, HNW Individual, Strategic, Other" }
 ```
+
+---
+
+## Tags
+
+`crm_tags` / `crm_lead_tags` back the Pipeline board's tag filter (see CLAUDE.md,
+"Tags are lists"). This endpoint is the HTTP equivalent of `createTag` /
+`addTagToLeads` / `getTagsByLead` in `src/lib/api/misc.js` — added Oct 2026
+because those only ran against the browser's Supabase session; an API-key
+caller had no way to create or assign a tag, and direct table reads are
+blocked (no public RLS grant for an unauthenticated key).
+
+**There is deliberately no DELETE for a tag itself** — only for one lead↔tag
+link. `crm_lead_tags` points at the tag's id, so deleting a tag would silently
+strip it off every lead carrying it; rename instead.
+
+### GET /api/tags
+
+List every tag, one lead's tags, or tags with usage counts.
+
+| Query Param | Description |
+|-------------|--------------|
+| `lead_id` | Return only the tags on this lead |
+| `with_usage=true` | Include `usage_count` (how many leads carry each tag) |
+
+**Example:**
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/tags"
+curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/tags?lead_id=123"
+curl -H "x-api-key: YOUR_KEY" "https://pocket-fund-crm.vercel.app/api/tags?with_usage=true"
+```
+
+**200 Response:**
+```json
+{ "success": true, "count": 2, "data": [
+  { "id": 1, "name": "Met at Conference", "color": "#10b981" },
+  { "id": 2, "name": "Warm Intro", "color": "#f59e0b" }
+] }
+```
+
+### POST /api/tags
+
+Create a tag, or return the existing one on a case-insensitive name match
+(`crm_tags.name` is UNIQUE — "SaaS Connect" and "saas connect" would otherwise
+render as two tags that look like one).
+
+| Field | Type | Required |
+|-------|------|----------|
+| `name` | string | **Yes** (max 100 chars) |
+| `color` | string | No — auto-assigned from a fixed palette if omitted |
+
+**Example:**
+```bash
+curl -X POST -H "x-api-key: YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"name": "London / Rollup Europe - London"}' \
+  "https://pocket-fund-crm.vercel.app/api/tags"
+```
+
+**201 Response** (new tag): `{ "success": true, "created": true, "data": { "id": 11, "name": "...", "color": "#..." } }`
+**200 Response** (name already existed): `{ "success": true, "created": false, "data": { ... } }`
+
+### POST /api/tags?action=assign
+
+Bulk-apply one tag to many leads. Idempotent — `(lead_id, tag_id)` is the
+primary key, so re-tagging a lead that already carries the tag is a no-op,
+not an error. Chunked internally at 200 rows per write.
+
+| Field | Type | Required |
+|-------|------|----------|
+| `tag_id` | integer | **Yes** |
+| `lead_ids` | integer[] | **Yes**, non-empty |
+
+**Example:**
+```bash
+curl -X POST -H "x-api-key: YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"tag_id": 11, "lead_ids": [201, 202, 203, 204]}' \
+  "https://pocket-fund-crm.vercel.app/api/tags?action=assign"
+```
+
+**200 Response:** `{ "success": true, "requested": 4, "applied": 4 }`
+
+### PATCH /api/tags?id=123
+
+Rename a tag in place. Every lead carrying it keeps it, since the link
+points at the id, not the name.
+
+**Request Body:** `{ "name": "New Name" }`
+
+**200 Response:** `{ "success": true, "data": { "id": 11, "name": "New Name", "color": "#..." } }`
+
+### DELETE /api/tags?lead_id=123&tag_id=11
+
+Remove a tag from one lead. Does **not** delete the tag itself.
+
+**200 Response:** `{ "success": true }`
 
 ---
 

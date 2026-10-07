@@ -264,6 +264,12 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     inline). Management is Admin → Tags: create, rename, usage counts.
   - **Rename, never delete.** `crm_lead_tags` points at the id, so a rename carries every lead;
     deleting a tag would silently strip it from all of them. There is deliberately no delete.
+  - **`api/tags.js` (Oct 2026)** gives the HTTP API the same four verbs: list/read, create
+    (case-insensitive dedupe), bulk-assign (`?action=assign`, idempotent on `(lead_id, tag_id)`),
+    and rename — plus unassign-one-link via `DELETE`. Before this, tagging was reachable only from
+    the browser's Supabase session (`src/lib/api/misc.js`); an API-key caller had no path to tag
+    anything, and direct table reads are blocked for the same reason the CRM API is the preferred
+    access path generally. See `api/README.md` → Tags.
   - **TAGS ARE NOT `lead_channel`.** Channel is a closed vocabulary for one countable question
     (is inbound or outbound working). Tags are open-ended and arbitrary. Don't collapse either into
     the other. Guardrail: `test/tags.test.js`.
