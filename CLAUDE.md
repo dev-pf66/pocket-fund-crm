@@ -19,6 +19,18 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - **Every Sage task needs a project (Sept 2026).** `POST /tasks` on the tracker rejects a create that names no `deal_id`/`internal_project_id` — 400 `"deal_id or internal_project_id is required"`. Nothing in this repo sent one, so from mid-August every lead_reply/lead_followup/lead_kickoff/manual_task **and** the weekly digest silently 400'd; three weeks of digests were lost because `alertFailure()` reports a broken digest *by filing a task* and died of the same cause. `tt.createTask` (`src/lib/integrations/task-tracker.js`) now injects the **"PF sales"** internal project (`22f6f543-…`, override with `TASK_TRACKER_PROJECT_ID`) plus `source: 'crm'`, so no call site has to remember. A caller passing its own `deal_id` or `internal_project_id` keeps it.
 - **Cron heartbeat (Aug 2026):** every digest run writes a row to `crm_cron_runs` (ok/failed/skipped), and a FAILED run files its own high-priority Sage task, idempotent per week via `crm_tt_mappings` entity_type `weekly_digest_failure`. Remaining gap by design: if the cron never fires at all, nothing alerts — the digest task's absence on a Monday IS the signal.
 - The `daily-leads-v2` cron was **removed August 2026** (Dev's call). It had never once worked: it inserted columns that don't exist on `crm_leads` (`company`/`source`/`score`/`tags`), and `APIFY_API_TOKEN` was never set in prod, so the scraper returned nothing anyway. Recover from git history if it's ever wanted; it needs an Apify token to do anything.
+- **The project is on Vercel's Hobby plan: 12 Serverless Functions per deployment, hard cap (Oct
+  2026).** `api/` sits at exactly 12 route files today (count with `find api -name "*.js" ! -name
+  "_*" | wc -l` — underscore-prefixed helpers like `_auth.js`/`_db.js`/`_env.js`/`_tags.js` are
+  shared modules, not routes, and Vercel doesn't count them). A 13th file (`api/tags.js`, added
+  then removed the same day) built clean, passed `npm run lint`/`test`/`build`, and passed CI —
+  then failed **every** production deploy at Vercel's "Deploying outputs" step with
+  `errorCode: "exceeded_serverless_functions_per_deployment"`. Nothing in the Vercel PR check or
+  `vercel inspect --logs` names this directly; it only shows up via the Deployments API
+  (`GET /v6/deployments`) on the failed deployment's `errorMessage`. The fix without paying for Pro:
+  add new HTTP surface by dispatching from an **existing** route file (see `?resource=tags` on
+  `api/leads.js`, logic in `api/_tags.js`), not a new top-level file. The fix with Pro: the cap goes
+  away entirely — ask Dev before upgrading, it's a billing decision.
 
 ## Supabase
 
@@ -264,12 +276,14 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     inline). Management is Admin → Tags: create, rename, usage counts.
   - **Rename, never delete.** `crm_lead_tags` points at the id, so a rename carries every lead;
     deleting a tag would silently strip it from all of them. There is deliberately no delete.
-  - **`api/tags.js` (Oct 2026)** gives the HTTP API the same four verbs: list/read, create
-    (case-insensitive dedupe), bulk-assign (`?action=assign`, idempotent on `(lead_id, tag_id)`),
-    and rename — plus unassign-one-link via `DELETE`. Before this, tagging was reachable only from
-    the browser's Supabase session (`src/lib/api/misc.js`); an API-key caller had no path to tag
-    anything, and direct table reads are blocked for the same reason the CRM API is the preferred
-    access path generally. See `api/README.md` → Tags.
+  - **`GET/POST/PATCH/DELETE /api/leads?resource=tags` (Oct 2026)** gives the HTTP API the same
+    four verbs: list/read, create (case-insensitive dedupe), bulk-assign (`?action=assign`,
+    idempotent on `(lead_id, tag_id)`), and rename — plus unassign-one-link via `DELETE`. Before
+    this, tagging was reachable only from the browser's Supabase session (`src/lib/api/misc.js`);
+    an API-key caller had no path to tag anything, and direct table reads are blocked for the same
+    reason the CRM API is the preferred access path generally. See `api/README.md` → Tags.
+    **It is not its own `api/tags.js` file** — see the Hobby-plan function cap below; the logic
+    lives in `api/_tags.js` and is dispatched from `api/leads.js`.
   - **TAGS ARE NOT `lead_channel`.** Channel is a closed vocabulary for one countable question
     (is inbound or outbound working). Tags are open-ended and arbitrary. Don't collapse either into
     the other. Guardrail: `test/tags.test.js`.

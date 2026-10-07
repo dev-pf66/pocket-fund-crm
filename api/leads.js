@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { requireEnv } from './_env.js'
+import { handleTags } from './_tags.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -72,7 +73,7 @@ const PATCH_FIELDS = [
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key')
 
   if (req.method === 'OPTIONS') {
@@ -83,6 +84,15 @@ export default async function handler(req, res) {
 
   if (!authenticate(req)) {
     return res.status(401).json({ error: 'Unauthorized. Provide valid x-api-key header.' })
+  }
+
+  // Tags live on crm_tags/crm_lead_tags, not crm_leads, but are dispatched
+  // from here rather than their own api/tags.js file — see api/_tags.js for
+  // why (the Hobby plan's 12-Serverless-Function cap). Checked before the
+  // method switch below so it also catches DELETE, which /api/leads itself
+  // does not support.
+  if (req.query.resource === 'tags') {
+    return handleTags(req, res)
   }
 
   if (req.method === 'GET') {

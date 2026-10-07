@@ -7,6 +7,12 @@
 // survive on the browser side apply here too: case-insensitive dedupe on
 // create, idempotent bulk-assign, and no delete for a tag itself (only an
 // unassign).
+//
+// This lives at GET/POST/PATCH/DELETE /api/leads?resource=tags, not its own
+// api/tags.js file. A standalone file built and tested clean but failed every
+// Vercel deploy (Oct 2026): the project's Hobby plan caps a deployment at 12
+// Serverless Functions, api/ was already at exactly 12, and a 13th file broke
+// production deploys with no code-level error to point at. See api/_tags.js.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fakeSupabase } from './helpers/fake-supabase.js'
@@ -26,7 +32,7 @@ process.env.VITE_SUPABASE_URL = 'http://localhost'
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service'
 process.env.CRM_API_KEY = 'test-key'
 
-const { default: handler } = await import('../api/tags.js')
+const { default: handler } = await import('../api/leads.js')
 
 const EXISTING = [
   { id: 1, name: 'Met at Conference', color: '#10b981' },
@@ -65,9 +71,17 @@ function res() {
 }
 
 const AUTH = { 'x-api-key': 'test-key' }
-const req = (overrides) => ({ headers: AUTH, query: {}, body: {}, ...overrides })
 
-describe('/api/tags auth', () => {
+// Every call goes through /api/leads with ?resource=tags — query is merged on
+// top of that marker so callers only need to supply the params they care about.
+const req = (overrides = {}) => ({
+  headers: AUTH,
+  body: {},
+  ...overrides,
+  query: { resource: 'tags', ...(overrides.query || {}) }
+})
+
+describe('/api/leads?resource=tags auth', () => {
   it('rejects a missing or wrong key', async () => {
     const r = res()
     await handler(req({ method: 'GET', headers: {} }), r)
@@ -75,7 +89,7 @@ describe('/api/tags auth', () => {
   })
 })
 
-describe('GET /api/tags', () => {
+describe('GET /api/leads?resource=tags', () => {
   it('lists every tag', async () => {
     const r = res()
     await handler(req({ method: 'GET' }), r)
@@ -104,7 +118,7 @@ describe('GET /api/tags', () => {
   })
 })
 
-describe('POST /api/tags — create', () => {
+describe('POST /api/leads?resource=tags — create', () => {
   it('creates a tag with a trimmed name and an auto colour', async () => {
     const r = res()
     await handler(req({ method: 'POST', body: { name: '  London / Rollup Europe - London  ' } }), r)
@@ -130,7 +144,7 @@ describe('POST /api/tags — create', () => {
   })
 })
 
-describe('POST /api/tags?action=assign — bulk assign', () => {
+describe('POST /api/leads?resource=tags&action=assign — bulk assign', () => {
   it('applies one tag to many leads', async () => {
     const r = res()
     await handler(req({ method: 'POST', query: { action: 'assign' }, body: { tag_id: 1, lead_ids: [10, 11, 12] } }), r)
@@ -158,7 +172,7 @@ describe('POST /api/tags?action=assign — bulk assign', () => {
   })
 })
 
-describe('PATCH /api/tags?id= — rename', () => {
+describe('PATCH /api/leads?resource=tags&id= — rename', () => {
   it('renames in place', async () => {
     const r = res()
     await handler(req({ method: 'PATCH', query: { id: '1' }, body: { name: '  Conference 2026 ' } }), r)
@@ -177,7 +191,7 @@ describe('PATCH /api/tags?id= — rename', () => {
   })
 })
 
-describe('DELETE /api/tags — unassign only', () => {
+describe('DELETE /api/leads?resource=tags — unassign only', () => {
   it('removes the lead/tag link', async () => {
     const r = res()
     await handler(req({ method: 'DELETE', query: { lead_id: '10', tag_id: '1' } }), r)
@@ -190,5 +204,18 @@ describe('DELETE /api/tags — unassign only', () => {
     const r = res()
     await handler(req({ method: 'DELETE', query: { lead_id: '10' } }), r)
     expect(r.statusCode).toBe(400)
+  })
+})
+
+describe('resource=tags does not leak into plain /api/leads requests', () => {
+  it('a GET without the resource flag still lists leads, not tags', async () => {
+    h.db = fakeSupabase((op) => {
+      if (op.table === 'crm_leads') return { data: [{ id: 1, name: 'Acme' }] }
+      return { data: [] }
+    })
+    const r = res()
+    await handler({ method: 'GET', headers: AUTH, query: {}, body: {} }, r)
+    expect(r.statusCode).toBe(200)
+    expect(r.body.data).toEqual([{ id: 1, name: 'Acme' }])
   })
 })

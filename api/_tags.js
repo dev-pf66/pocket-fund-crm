@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import { requireEnv } from './_env.js'
 import { fetchAllRows } from './_db.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
@@ -14,40 +13,20 @@ const TAG_COLORS = [
   '#84cc16', '#6366f1', '#ec4899', '#0ea5e9', '#f97316',
 ]
 
-function authenticate(req) {
-  // Header only — a key in the query string leaks into access logs, browser
-  // history and Referer headers. See api/_auth.js.
-  const apiKey = req.headers['x-api-key']
-  const validKey = process.env.CRM_API_KEY
-  return Boolean(validKey) && apiKey === validKey
-}
-
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
-
-  if (!requireEnv(res, ['VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CRM_API_KEY'])) return
-
-  if (!authenticate(req)) {
-    return res.status(401).json({ error: 'Unauthorized. Provide valid x-api-key header.' })
-  }
-
-  if (req.method === 'GET') {
-    return handleGet(req, res)
-  } else if (req.method === 'POST') {
-    return handlePost(req, res)
-  } else if (req.method === 'PATCH') {
-    return handlePatch(req, res)
-  } else if (req.method === 'DELETE') {
-    return handleDelete(req, res)
-  } else {
-    return res.status(405).json({ error: 'Method not allowed. Use GET, POST, PATCH or DELETE.' })
-  }
+// Underscore-prefixed (like _auth.js/_db.js/_env.js) so Vercel does NOT count
+// this as its own Serverless Function — api/leads.js dispatches into it at
+// ?resource=tags. See api/leads.js's handler for why: the project's Hobby
+// plan caps a deployment at 12 functions, api/ was already at exactly 12, and
+// a standalone api/tags.js was the 13th — it built clean locally and in CI
+// but failed Vercel's "Deploying outputs" step on every push (Oct 2026).
+// CORS/env/auth are handled once by the caller (api/leads.js) before this
+// dispatcher ever runs; it does not repeat them.
+export async function handleTags(req, res) {
+  if (req.method === 'GET') return handleGet(req, res)
+  if (req.method === 'POST') return handlePost(req, res)
+  if (req.method === 'PATCH') return handlePatch(req, res)
+  if (req.method === 'DELETE') return handleDelete(req, res)
+  return res.status(405).json({ error: 'Method not allowed. Use GET, POST, PATCH or DELETE.' })
 }
 
 async function getAllTags() {
@@ -59,9 +38,9 @@ async function getAllTags() {
   return data || []
 }
 
-// GET /api/tags                 -> every tag
-// GET /api/tags?with_usage=true -> every tag + how many leads carry it
-// GET /api/tags?lead_id=123     -> the tags on one lead
+// GET /api/leads?resource=tags                 -> every tag
+// GET /api/leads?resource=tags&with_usage=true -> every tag + how many leads carry it
+// GET /api/leads?resource=tags&lead_id=123     -> the tags on one lead
 async function handleGet(req, res) {
   try {
     const { lead_id, with_usage } = req.query
@@ -102,8 +81,8 @@ async function handleGet(req, res) {
   }
 }
 
-// POST /api/tags                  { name, color? }         -> create (or reuse) a tag
-// POST /api/tags?action=assign    { tag_id, lead_ids: [] } -> bulk-apply a tag to leads
+// POST /api/leads?resource=tags                  { name, color? }         -> create (or reuse) a tag
+// POST /api/leads?resource=tags&action=assign    { tag_id, lead_ids: [] } -> bulk-apply a tag to leads
 async function handlePost(req, res) {
   if (req.query.action === 'assign') {
     return handleAssign(req, res)
@@ -176,7 +155,7 @@ async function handleAssign(req, res) {
   }
 }
 
-// PATCH /api/tags?id=5  { name } -- rename in place. crm_lead_tags points at
+// PATCH /api/leads?resource=tags&id=5  { name } -- rename in place. crm_lead_tags points at
 // the id, so every lead carrying the tag follows the rename. There is
 // deliberately no delete for a tag itself (see CLAUDE.md, "Tags are lists") —
 // only DELETE below, which unassigns a tag from one lead.
@@ -206,7 +185,7 @@ async function handlePatch(req, res) {
   }
 }
 
-// DELETE /api/tags?lead_id=42&tag_id=5 -- unassign a tag from one lead. This
+// DELETE /api/leads?resource=tags&lead_id=42&tag_id=5 -- unassign a tag from one lead. This
 // never deletes the tag row itself.
 async function handleDelete(req, res) {
   try {
