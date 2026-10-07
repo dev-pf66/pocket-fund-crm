@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function handleGet(req, res) {
+export async function handleGet(req, res) {
   try {
     const { lead_id, activity_type, limit = 50 } = req.query
 
@@ -81,7 +81,7 @@ async function handleGet(req, res) {
   }
 }
 
-async function handlePost(req, res) {
+export async function handlePost(req, res) {
   try {
     const body = req.body || {}
     const { lead_id, activity_type, notes, activity_date, logged_by } = body
