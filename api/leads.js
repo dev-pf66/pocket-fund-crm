@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { requireEnv } from './_env.js'
 import { handleTags } from './_tags.js'
+import { handleMcp } from './_mcp.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -95,6 +96,13 @@ export default async function handler(req, res) {
     return handleTags(req, res)
   }
 
+  // The remote MCP server (so claude.ai can query the CRM without a Code
+  // session). Same reason as tags: a standalone api/mcp.js would be the 13th
+  // Serverless Function on the Hobby plan's hard cap of 12. See api/_mcp.js.
+  if (req.query.resource === 'mcp') {
+    return handleMcp(req, res)
+  }
+
   if (req.method === 'GET') {
     return handleGet(req, res)
   } else if (req.method === 'POST') {
@@ -106,7 +114,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function handleGet(req, res) {
+export async function handleGet(req, res) {
   if (req.query.view === 'stage_events') return handleStageEvents(req, res)
   try {
     const { id, stage, lead_type, limit = 100, include_archived } = req.query
@@ -208,7 +216,7 @@ async function handleStageEvents(req, res) {
   }
 }
 
-async function handlePost(req, res) {
+export async function handlePost(req, res) {
   try {
     const body = req.body
 
@@ -284,7 +292,7 @@ async function handlePost(req, res) {
   }
 }
 
-async function handlePatch(req, res) {
+export async function handlePatch(req, res) {
   try {
     const body = req.body || {}
     const id = req.query.id || body.id

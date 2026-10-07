@@ -47,6 +47,7 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `POST` | [`/api/leads?resource=tags&action=assign`](#post-apileadsresourcetagsactionassign) | API key | Bulk-apply a tag to leads |
 | `PATCH` | [`/api/leads?resource=tags&id=`](#patch-apileadsresourcetagsid123) | API key | Rename a tag |
 | `DELETE` | [`/api/leads?resource=tags&lead_id=&tag_id=`](#delete-apileadsresourcetagslead_id123tag_id11) | API key | Unassign a tag from one lead |
+| `POST` | [`/api/mcp`](#remote-mcp-server) | API key (header) or per-connector auth | Remote MCP server — the HTTP API above, as MCP tools |
 | `POST` | [`/api/events/fire`](#post-apieventsfire) | Supabase JWT | Fire an internal app event (Task Tracker integration) |
 | `GET`/`POST` | [`/api/weekly-digest`](#cron-jobs-internal) | Cron secret | Per-analyst rollup posted to Sage (Mon 03:30 UTC) |
 | `POST` | [`/api/callhippo-sync`](#cron-jobs-internal) | Cron secret | Import CallHippo dials into `crm_outreach_log` (daily) |
@@ -862,6 +863,50 @@ points at the id, not the name.
 Remove a tag from one lead. Does **not** delete the tag itself.
 
 **200 Response:** `{ "success": true }`
+
+---
+
+## Remote MCP server
+
+`POST /api/mcp` — a [Model Context Protocol](https://modelcontextprotocol.io) server exposing the
+CRM as tools, so an MCP client (e.g. a custom connector in claude.ai) can query and update it
+without a shell session. Built for Streamable HTTP in **stateless mode** — a fresh server/transport
+per request, no session ID, since a serverless function has no persistent process to keep a
+session alive in.
+
+It is dispatched from `api/leads.js?resource=mcp`, not a standalone `api/mcp.js` file — see the
+**Hobby-plan 12-function cap** note under Cron Jobs below; the implementation lives in `api/_mcp.js`
+(underscore-prefixed like `_tags.js`, so Vercel doesn't count it as its own function).
+`vercel.json` rewrites the clean path `/api/mcp` to it.
+
+**Auth:** inherited from `/api/leads` itself — whatever gets the real HTTP request past
+`api/leads.js`'s own `x-api-key` check (or claude.ai's OAuth flow, if a header-auth connector isn't
+available) reaches the MCP endpoint too. There is no separate MCP-specific auth check.
+
+**Every tool is a thin wrapper around the exact handler the REST routes above call** — `list_leads`
+calls the same function as `GET /api/leads`, `create_lead` the same as `POST /api/leads`, and so on.
+A tool call cannot drift from what the documented HTTP endpoint accepts, because it runs the same
+code, just invoked in-process instead of over a second socket.
+
+| Tool | Mirrors | Notes |
+|---|---|---|
+| `list_leads` | `GET /api/leads` | `id`, `stage`, `lead_type`, `limit`, `include_archived` |
+| `create_lead` | `POST /api/leads` | `fields: {...}` — flat object, see Lead Object Schema below |
+| `update_lead` | `PATCH /api/leads?id=` | `id`, `fields: {...}` — patchable fields only |
+| `list_activities` | `GET /api/activities` | `lead_id`, `activity_type`, `limit` |
+| `log_activity` | `POST /api/activities` | `lead_id`, `activity_type` required |
+| `list_investors` | `GET /api/investors` | `id`, `status`, `investor_type`, `search`, `limit` |
+| `create_investor` | `POST /api/investors` | `fields: {...}` |
+| `get_analytics` | `GET /api/analytics` | no params |
+| `list_tags` | `GET /api/leads?resource=tags` | `lead_id`, `with_usage` |
+| `create_tag` | `POST /api/leads?resource=tags` | `name`, `color` |
+| `assign_tag_to_leads` | `POST /api/leads?resource=tags&action=assign` | `tag_id`, `lead_ids: [...]` |
+| `rename_tag` | `PATCH /api/leads?resource=tags&id=` | `id`, `name` |
+
+Not exposed as MCP tools (deliberately, not an oversight): `analyze-transcript`, `enrich-linkedin`,
+`analyze-outreach` (each spends `ANTHROPIC_API_KEY` credits per call — a cost nobody should be able
+to trigger just by asking an MCP-connected Claude a question), and `events/fire` (expects a Supabase
+user JWT, not the shared API key; internal to the app's own frontend).
 
 ---
 

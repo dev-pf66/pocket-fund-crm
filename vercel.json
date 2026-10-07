@@ -21,6 +21,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/mcp",
+      "destination": "/api/leads?resource=mcp"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
