@@ -41,7 +41,7 @@ const EMPTY_OUTREACH = {
 }
 
 function OutreachTracker() {
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const { toast } = useToast()
   const industryOptions = useFieldOptions('industry')
   const dealSizeOptions = useFieldOptions('deal_size')
@@ -1025,6 +1025,8 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
           edits={entryEdits}
           setEdits={setEntryEdits}
           saving={entrySaving}
+          people={people}
+          currentPersonId={currentPerson?.id}
           industryOptions={industryOptions}
           dealSizeOptions={dealSizeOptions}
           locationOptions={locationOptions}
@@ -1040,6 +1042,8 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
           rows={csvPreview.rows}
           skipped={csvPreview.skipped}
           importing={csvImporting}
+          people={people}
+          currentPersonId={currentPerson?.id}
           industryOptions={industryOptions}
           dealSizeOptions={dealSizeOptions}
           locationOptions={locationOptions}
@@ -1314,7 +1318,7 @@ const modalBoxStyle = {
   maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
 }
 
-function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, industryOptions, dealSizeOptions, locationOptions, leadSourceOptions, onSave, onClose }) {
+function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, people = [], currentPersonId, industryOptions, dealSizeOptions, locationOptions, leadSourceOptions, onSave, onClose }) {
   const fv = k => edits[k] !== undefined ? edits[k] : (lead?.[k] ?? '')
   const set = (k, v) => setEdits(prev => ({ ...prev, [k]: v }))
   const dirty = Object.keys(edits).length > 0 && !!lead?.id
@@ -1407,6 +1411,19 @@ function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, indu
                   <div style={{ fontSize: '13px', color: '#374151', padding: '7px 0' }}>{STAGE_LABELS[lead.stage] || lead.stage}</div>
                 </div>
               )}
+              {people.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Assign to</div>
+                  <select style={inputStyle} value={fv('assigned_to') || ''} onChange={e => set('assigned_to', e.target.value ? parseInt(e.target.value) : null)}>
+                    <option value="">— Unassigned</option>
+                    {people.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.id === currentPersonId ? ' (me)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </>
           ) : (
             <div style={{ gridColumn: '1 / -1', fontSize: '14px', color: '#374151' }}>
@@ -1428,7 +1445,7 @@ function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, indu
   )
 }
 
-function CsvPreviewModal({ rows, skipped, importing, industryOptions, dealSizeOptions, locationOptions, leadSourceOptions, onRowEdit, onImport, onClose }) {
+function CsvPreviewModal({ rows, skipped, importing, people = [], currentPersonId, industryOptions, dealSizeOptions, locationOptions, leadSourceOptions, onRowEdit, onImport, onClose }) {
   const [expandedIdx, setExpandedIdx] = useState(null)
   const dupeCount = rows.filter(r => r._dupe).length
   const newCount = rows.length - dupeCount
@@ -1543,6 +1560,14 @@ function CsvPreviewModal({ rows, skipped, importing, industryOptions, dealSizeOp
                               <option value="">—</option>
                               {[5,4,3,2,1].map(n => <option key={n} value={n}>{n}</option>)}
                             </select></div>
+                          {people.length > 0 && (
+                            <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Assign to</div>
+                              <select style={inputStyle} value={fv(row, 'assigned_to') || ''} onChange={e => onRowEdit(idx, 'assigned_to', e.target.value ? parseInt(e.target.value) : null)}>
+                                <option value="">— Unassigned</option>
+                                {people.map(p => <option key={p.id} value={p.id}>{p.name}{p.id === currentPersonId ? ' (me)' : ''}</option>)}
+                              </select>
+                            </div>
+                          )}
                           <div style={{ gridColumn: '1 / -1' }}><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Notes</div>
                             <input style={inputStyle} value={fv(row, 'notes')} onChange={e => onRowEdit(idx, 'notes', e.target.value)} placeholder="Optional notes…" /></div>
                         </div>
