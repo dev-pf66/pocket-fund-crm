@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead, getEmailTemplates } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
-import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap } from 'lucide-react'
+import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap, X, AlertTriangle, ExternalLink } from 'lucide-react'
 import { useFieldOptions } from '../hooks/useFieldOptions'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
@@ -71,6 +71,38 @@ function OutreachTracker() {
   const [savingEdits, setSavingEdits] = useState(false)
 
   const [quickLogging, setQuickLogging] = useState(false)
+
+  // Real-time LinkedIn URL dedup check
+  const urlCheckTimer = useRef(null)
+  const [urlCheck, setUrlCheck] = useState({ status: 'idle', lead: null }) // idle|checking|found|not_found
+
+  // Post-add result modal (single entry)
+  const [entryResult, setEntryResult] = useState(null) // { lead, isNew, outreach } | null
+  const [entryEdits, setEntryEdits] = useState({})
+  const [entrySaving, setEntrySaving] = useState(false)
+
+  // CSV preview modal (shown before actual import)
+  const [csvPreview, setCsvPreview] = useState(null) // { rows: [{...fields, _dupe, _existingLead, _edits}] } | null
+  const [csvImporting, setCsvImporting] = useState(false)
+
+  useEffect(() => {
+    clearTimeout(urlCheckTimer.current)
+    const url = quickUrl.trim()
+    if (!isLinkedInUrl(url)) {
+      setUrlCheck(c => c.status === 'idle' ? c : { status: 'idle', lead: null })
+      return
+    }
+    setUrlCheck({ status: 'checking', lead: null })
+    urlCheckTimer.current = setTimeout(async () => {
+      try {
+        const lead = await findLeadByLinkedInUrl(url)
+        setUrlCheck({ status: lead ? 'found' : 'not_found', lead: lead || null })
+      } catch {
+        setUrlCheck({ status: 'idle', lead: null })
+      }
+    }, 450)
+    return () => clearTimeout(urlCheckTimer.current)
+  }, [quickUrl])
 
   const [filter, setFilter] = useState({
     view: 'today', // 'today', 'week', 'all'
@@ -164,7 +196,9 @@ function OutreachTracker() {
       }, currentPerson?.id, currentPerson?.name)
 
       setQuickUrl('')
-      toast.success(leadCreated ? `Logged + created lead "${lead.name}"` : `Logged DM to ${lead.name}`)
+      setUrlCheck({ status: 'idle', lead: null })
+      setEntryResult({ lead, isNew: leadCreated, outreach: { outreach_type: 'linkedin_message', status: 'sent', platform_details: url } })
+      setEntryEdits({})
       await loadData()
     } catch (error) {
       console.error('Quick-log failed:', error)
@@ -198,6 +232,11 @@ function OutreachTracker() {
       }
 
       await logOutreach(outreachData, currentPerson?.id, currentPerson?.name)
+      const leadForModal = outreachData.lead_id
+        ? leads.find(l => l.id === outreachData.lead_id) || { id: outreachData.lead_id, name: outreachData.lead_name, firm_name: outreachData.firm_name }
+        : { name: outreachData.lead_name, firm_name: outreachData.firm_name }
+      setEntryResult({ lead: leadForModal, isNew: !outreachData.lead_id || !newOutreach.lead_id, outreach: outreachData })
+      setEntryEdits({})
       clearNewOutreach()
       setShowForm(false)
       await loadData()
@@ -279,24 +318,68 @@ function OutreachTracker() {
         return
       }
 
-      // Single batch insert instead of N sequential calls
-      const imported = await logOutreachBatch(validRows, currentPerson?.id)
-
-      const msg = skipped > 0
-        ? `Imported ${imported} · skipped ${skipped} row${skipped === 1 ? '' : 's'} without a lead name`
-        : `Imported ${imported} outreach entr${imported === 1 ? 'y' : 'ies'}`
-      toast.success(msg)
+      // Dedup check against already-loaded leads (name+firm, case-insensitive)
+      const byNameFirm = new Map()
+      for (const l of leads) {
+        const key = `${(l.name || '').toLowerCase()}|${(l.firm_name || '').toLowerCase()}`
+        byNameFirm.set(key, l)
+      }
+      const previewRows = validRows.map(row => {
+        const key = `${(row.lead_name || '').toLowerCase()}|${(row.firm_name || '').toLowerCase()}`
+        const nameOnly = `${(row.lead_name || '').toLowerCase()}|`
+        const existing = byNameFirm.get(key) || byNameFirm.get(nameOnly) || null
+        return { ...row, _dupe: !!existing, _existingLead: existing, _edits: {} }
+      })
+      setCsvPreview({ rows: previewRows, skipped })
       setCsvFile(null)
       setShowCsvUpload(false)
-      // Switch to "all" view so imported entries are visible regardless of
-      // what date the CSV had — avoids the "upload succeeded but nothing
-      // appears" confusion when CSV dates aren't today.
-      setFilter(f => ({ ...f, view: 'all' }))
     } catch (error) {
       console.error('CSV upload failed:', error)
       toast.error('Failed to upload CSV: ' + error.message)
     } finally {
       setCsvUploading(false)
+    }
+  }
+
+  async function handleCsvImport() {
+    if (!csvPreview) return
+    setCsvImporting(true)
+    try {
+      // Apply any in-modal edits before importing
+      const rows = csvPreview.rows.map(r => {
+        const { _dupe, _existingLead, _edits, ...base } = r
+        return { ...base, ..._edits }
+      })
+      const imported = await logOutreachBatch(rows, currentPerson?.id)
+      setCsvPreview(null)
+      toast.success(`Imported ${imported} outreach entr${imported === 1 ? 'y' : 'ies'}`)
+      setFilter(f => ({ ...f, view: 'all' }))
+      await loadData()
+    } catch (err) {
+      console.error('CSV import failed:', err)
+      toast.error('Import failed: ' + err.message)
+    } finally {
+      setCsvImporting(false)
+    }
+  }
+
+  async function handleEntrySave() {
+    if (!entryResult?.lead?.id || Object.keys(entryEdits).length === 0) {
+      setEntryResult(null)
+      return
+    }
+    setEntrySaving(true)
+    try {
+      await updateLead(entryResult.lead.id, entryEdits)
+      toast.success('Lead updated')
+      setEntryResult(null)
+      setEntryEdits({})
+      await loadData()
+    } catch (err) {
+      console.error('Failed to save lead:', err)
+      toast.error('Failed to save: ' + err.message)
+    } finally {
+      setEntrySaving(false)
     }
   }
 
@@ -450,6 +533,29 @@ function OutreachTracker() {
             {quickLogging ? 'Logging…' : 'Log DM'}
           </button>
         </div>
+        {urlCheck.status === 'checking' && (
+          <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #6b7280', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+            Checking database…
+          </div>
+        )}
+        {urlCheck.status === 'found' && urlCheck.lead && (
+          <div style={{ marginTop: '8px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '5px 10px', color: '#92400e' }}>
+            <AlertTriangle size={13} style={{ flexShrink: 0 }} />
+            <span>Already in DB — <strong>{urlCheck.lead.name}</strong>{urlCheck.lead.firm_name ? ` · ${urlCheck.lead.firm_name}` : ''}{urlCheck.lead.stage ? ` · Stage: ${urlCheck.lead.stage.replace(/_/g, ' ')}` : ''}</span>
+            {urlCheck.lead.id && (
+              <a href={`/leads/${urlCheck.lead.id}`} target="_blank" rel="noreferrer" style={{ marginLeft: '4px', color: '#b45309' }}>
+                <ExternalLink size={11} />
+              </a>
+            )}
+          </div>
+        )}
+        {urlCheck.status === 'not_found' && (
+          <div style={{ marginTop: '8px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '5px 10px', color: '#166534' }}>
+            <CheckCircle size={13} style={{ flexShrink: 0 }} />
+            New lead — not in the database yet
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -910,6 +1016,46 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
         )}
       </div>
 
+      {/* Entry Result Modal — shown after quick-log or manual add */}
+      {entryResult && (
+        <EntryResultModal
+          lead={entryResult.lead}
+          isNew={entryResult.isNew}
+          outreach={entryResult.outreach}
+          edits={entryEdits}
+          setEdits={setEntryEdits}
+          saving={entrySaving}
+          industryOptions={industryOptions}
+          dealSizeOptions={dealSizeOptions}
+          locationOptions={locationOptions}
+          leadSourceOptions={leadSourceOptions}
+          onSave={handleEntrySave}
+          onClose={() => { setEntryResult(null); setEntryEdits({}) }}
+        />
+      )}
+
+      {/* CSV Preview Modal — shown after parsing, before import */}
+      {csvPreview && (
+        <CsvPreviewModal
+          rows={csvPreview.rows}
+          skipped={csvPreview.skipped}
+          importing={csvImporting}
+          industryOptions={industryOptions}
+          dealSizeOptions={dealSizeOptions}
+          locationOptions={locationOptions}
+          leadSourceOptions={leadSourceOptions}
+          onRowEdit={(idx, field, value) => {
+            setCsvPreview(prev => {
+              const rows = [...prev.rows]
+              rows[idx] = { ...rows[idx], _edits: { ...rows[idx]._edits, [field]: value } }
+              return { ...prev, rows }
+            })
+          }}
+          onImport={handleCsvImport}
+          onClose={() => setCsvPreview(null)}
+        />
+      )}
+
       {/* Details Modal */}
       {showDetailsModal && selectedOutreach && (
         <div
@@ -1146,6 +1292,276 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const STAGE_LABELS = {
+  cold_outreach: 'Cold Outreach', outreach: 'Outreach', responded: 'Responded',
+  meeting_booked: 'Meeting Booked', warm_active: 'Warm / Active', client: 'Client', passed: 'Passed'
+}
+
+const OUTREACH_TYPE_LABELS = { cold_email: 'Cold Email', linkedin_message: 'LinkedIn', phone_call: 'Phone', other: 'Other' }
+const STATUS_LABELS = { sent: 'Sent', replied: 'Replied', no_response: 'No Response', bounced: 'Bounced' }
+
+const overlayStyle = {
+  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  zIndex: 2000, padding: '16px'
+}
+const modalBoxStyle = {
+  background: 'white', borderRadius: '12px', width: '100%', maxWidth: '560px',
+  maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
+}
+
+function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, industryOptions, dealSizeOptions, locationOptions, leadSourceOptions, onSave, onClose }) {
+  const fv = k => edits[k] !== undefined ? edits[k] : (lead?.[k] ?? '')
+  const set = (k, v) => setEdits(prev => ({ ...prev, [k]: v }))
+  const dirty = Object.keys(edits).length > 0 && !!lead?.id
+  const inputStyle = { width: '100%', padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', background: 'white', boxSizing: 'border-box' }
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={modalBoxStyle} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+                Outreach logged ✓
+              </div>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 600,
+                background: isNew ? '#f0fdf4' : '#fffbeb',
+                color: isNew ? '#166534' : '#92400e',
+                border: `1px solid ${isNew ? '#bbf7d0' : '#fde68a'}`
+              }}>
+                {isNew ? <><CheckCircle size={12} /> New lead created</> : <><AlertTriangle size={12} /> Already in database</>}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '2px' }}>
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Outreach</div>
+            <div style={{ fontSize: '13px', color: '#374151', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <span>{OUTREACH_TYPE_LABELS[outreach?.outreach_type] || '—'}</span>
+              <span style={{ color: '#9ca3af' }}>·</span>
+              <span>{STATUS_LABELS[outreach?.status] || 'Sent'}</span>
+              {outreach?.platform_details && <><span style={{ color: '#9ca3af' }}>·</span><span style={{ color: '#6b7280' }}>{outreach.platform_details}</span></>}
+            </div>
+          </div>
+
+          {lead?.id ? (
+            <>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Name</div>
+                <input style={inputStyle} value={fv('name')} onChange={e => set('name', e.target.value)} />
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Firm</div>
+                <input style={inputStyle} value={fv('firm_name')} onChange={e => set('firm_name', e.target.value)} />
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Industry</div>
+                <select style={inputStyle} value={fv('industry')} onChange={e => set('industry', e.target.value)}>
+                  <option value="">—</option>
+                  {industryOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Deal Size</div>
+                <select style={inputStyle} value={fv('deal_size')} onChange={e => set('deal_size', e.target.value)}>
+                  <option value="">—</option>
+                  {dealSizeOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Location</div>
+                <select style={inputStyle} value={fv('location')} onChange={e => set('location', e.target.value)}>
+                  <option value="">—</option>
+                  {locationOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Lead Source</div>
+                <select style={inputStyle} value={fv('lead_source')} onChange={e => set('lead_source', e.target.value)}>
+                  <option value="">—</option>
+                  {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Fit Score</div>
+                <select style={inputStyle} value={fv('fit_score') || ''} onChange={e => set('fit_score', e.target.value ? parseInt(e.target.value) : null)}>
+                  <option value="">—</option>
+                  {[5,4,3,2,1].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              {lead.stage && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Stage</div>
+                  <div style={{ fontSize: '13px', color: '#374151', padding: '7px 0' }}>{STAGE_LABELS[lead.stage] || lead.stage}</div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ gridColumn: '1 / -1', fontSize: '14px', color: '#374151' }}>
+              <strong>{lead?.name}</strong>{lead?.firm_name ? ` · ${lead.firm_name}` : ''}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '12px 20px 20px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid #f3f4f6' }}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={saving}>Close</button>
+          {dirty && (
+            <button className="btn btn-primary" onClick={onSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CsvPreviewModal({ rows, skipped, importing, industryOptions, dealSizeOptions, locationOptions, leadSourceOptions, onRowEdit, onImport, onClose }) {
+  const [expandedIdx, setExpandedIdx] = useState(null)
+  const dupeCount = rows.filter(r => r._dupe).length
+  const newCount = rows.length - dupeCount
+  const inputStyle = { width: '100%', padding: '6px 8px', border: '1px solid #e5e7eb', borderRadius: '5px', fontSize: '12px', background: 'white', boxSizing: 'border-box' }
+
+  const fv = (row, k) => row._edits?.[k] !== undefined ? row._edits[k] : (row[k] ?? '')
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={{ ...modalBoxStyle, maxWidth: '740px' }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+                CSV Preview — {rows.length} row{rows.length !== 1 ? 's' : ''}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, padding: '3px 8px', borderRadius: '999px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
+                  {newCount} new
+                </span>
+                {dupeCount > 0 && (
+                  <span style={{ fontSize: '12px', fontWeight: 600, padding: '3px 8px', borderRadius: '999px', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e' }}>
+                    {dupeCount} already in DB
+                  </span>
+                )}
+                {skipped > 0 && (
+                  <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                    {skipped} skipped (no name)
+                  </span>
+                )}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '2px' }} disabled={importing}>
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ overflowY: 'auto', maxHeight: 'calc(90vh - 140px)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
+              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lead Name</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Firm</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Type</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fit</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}></th>
+                <th style={{ padding: '10px 12px', width: '32px' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <>
+                  <tr
+                    key={idx}
+                    style={{ borderBottom: expandedIdx === idx ? 'none' : '1px solid #f3f4f6', background: expandedIdx === idx ? '#f9fafb' : 'white', cursor: 'pointer' }}
+                    onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
+                  >
+                    <td style={{ padding: '10px 12px', fontWeight: 500, color: '#111827' }}>{fv(row, 'lead_name') || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{fv(row, 'firm_name') || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{OUTREACH_TYPE_LABELS[row.outreach_type] || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{row.fit_score || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{STATUS_LABELS[row.status] || '—'}</td>
+                    <td style={{ padding: '10px 12px' }}>
+                      {row._dupe ? (
+                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 7px', borderRadius: '999px', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <AlertTriangle size={10} /> In DB
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 7px', borderRadius: '999px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
+                          New
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#9ca3af', fontSize: '10px' }}>
+                      {expandedIdx === idx ? '▲' : '▼'}
+                    </td>
+                  </tr>
+                  {expandedIdx === idx && (
+                    <tr key={`${idx}-edit`} style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+                      <td colSpan={7} style={{ padding: '0 12px 14px' }}>
+                        {row._dupe && row._existingLead && (
+                          <div style={{ marginBottom: '10px', fontSize: '12px', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <AlertTriangle size={12} />
+                            Matches existing lead: <strong>{row._existingLead.name}</strong>{row._existingLead.firm_name ? ` · ${row._existingLead.firm_name}` : ''}
+                            {row._existingLead.stage ? ` · Stage: ${STAGE_LABELS[row._existingLead.stage] || row._existingLead.stage}` : ''}
+                          </div>
+                        )}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Lead Name</div>
+                            <input style={inputStyle} value={fv(row, 'lead_name')} onChange={e => onRowEdit(idx, 'lead_name', e.target.value)} /></div>
+                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Firm</div>
+                            <input style={inputStyle} value={fv(row, 'firm_name')} onChange={e => onRowEdit(idx, 'firm_name', e.target.value)} /></div>
+                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Industry</div>
+                            <select style={inputStyle} value={fv(row, 'industry')} onChange={e => onRowEdit(idx, 'industry', e.target.value)}>
+                              <option value="">—</option>
+                              {industryOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                            </select></div>
+                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Deal Size</div>
+                            <select style={inputStyle} value={fv(row, 'deal_size')} onChange={e => onRowEdit(idx, 'deal_size', e.target.value)}>
+                              <option value="">—</option>
+                              {dealSizeOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                            </select></div>
+                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Location</div>
+                            <select style={inputStyle} value={fv(row, 'location')} onChange={e => onRowEdit(idx, 'location', e.target.value)}>
+                              <option value="">—</option>
+                              {locationOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                            </select></div>
+                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Fit Score</div>
+                            <select style={inputStyle} value={fv(row, 'fit_score') || ''} onChange={e => onRowEdit(idx, 'fit_score', e.target.value ? parseInt(e.target.value) : null)}>
+                              <option value="">—</option>
+                              {[5,4,3,2,1].map(n => <option key={n} value={n}>{n}</option>)}
+                            </select></div>
+                          <div style={{ gridColumn: '1 / -1' }}><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Notes</div>
+                            <input style={inputStyle} value={fv(row, 'notes')} onChange={e => onRowEdit(idx, 'notes', e.target.value)} placeholder="Optional notes…" /></div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={importing}>Cancel</button>
+          <button className="btn btn-primary" onClick={onImport} disabled={importing}>
+            {importing ? 'Importing…' : `Import ${rows.length} row${rows.length !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
