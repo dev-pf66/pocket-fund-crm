@@ -21,6 +21,14 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({ from: (...args) => h.db.from(...args) })
 }))
 
+// The session gate ("who is using it") has its own guardrail file,
+// test/mcp-session.test.js. Here every session is live as person 7, so this
+// file keeps testing plumbing only.
+vi.mock('../api/_mcp-session.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  checkSession: async () => ({ ok: true, person: { id: 7, name: 'Test Person' } }),
+}))
+
 process.env.VITE_SUPABASE_URL = 'http://localhost'
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service'
 process.env.CRM_API_KEY = 'test-key'
@@ -78,8 +86,8 @@ describe('GET/POST/DELETE /api/mcp (via api/leads.js?resource=mcp)', () => {
       const { tools } = await client.listTools()
       expect(tools.map((t) => t.name).sort()).toEqual([
         'assign_tag_to_leads', 'create_investor', 'create_lead', 'create_tag',
-        'get_analytics', 'list_activities', 'list_investors', 'list_leads',
-        'list_tags', 'log_activity', 'rename_tag', 'update_lead',
+        'end_session', 'get_analytics', 'list_activities', 'list_investors', 'list_leads',
+        'list_tags', 'log_activity', 'rename_tag', 'start_session', 'update_lead',
       ])
       await client.close()
     })
@@ -88,7 +96,7 @@ describe('GET/POST/DELETE /api/mcp (via api/leads.js?resource=mcp)', () => {
   it('list_leads reaches the real api/leads.js handler, not a copy of its logic', async () => {
     await withServer(async (port) => {
       const client = await connectedClient(port)
-      const result = await client.callTool({ name: 'list_leads', arguments: { limit: 10 } })
+      const result = await client.callTool({ name: 'list_leads', arguments: { session_id: 's', limit: 10 } })
       expect(result.isError).toBe(false)
       const body = JSON.parse(result.content[0].text)
       expect(body).toMatchObject({ success: true, count: 1, data: [{ name: 'Jane Smith' }] })
@@ -99,9 +107,9 @@ describe('GET/POST/DELETE /api/mcp (via api/leads.js?resource=mcp)', () => {
   it('surfaces the real handler\'s validation errors as tool errors, unchanged', async () => {
     await withServer(async (port) => {
       const client = await connectedClient(port)
-      // No name, no owner — api/leads.js's own required-field checks, not
-      // anything _mcp.js adds.
-      const result = await client.callTool({ name: 'create_lead', arguments: { fields: {} } })
+      // No name — api/leads.js's own required-field check, not anything
+      // _mcp.js adds.
+      const result = await client.callTool({ name: 'create_lead', arguments: { session_id: 's', fields: {} } })
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain('name is required')
       await client.close()

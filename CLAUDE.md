@@ -37,7 +37,7 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - Project ref: `lzydgdzjrgvqglxmyfjk` (https://lzydgdzjrgvqglxmyfjk.supabase.co).
 - Client env (local `.env`, gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Server env (`.env.local` via `vercel env pull`, and Vercel prod): `ANTHROPIC_API_KEY`, `CRM_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 059 — 63 files, because 034/046/049 were each used twice by parallel branches; the number is a label, not a key). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
+- Migrations live in `migrations/` (numbered `NNN_*.sql`, currently through 060 — 64 files, because 034/046/049 were each used twice by parallel branches; the number is a label, not a key). Schema changes go through the `/migrate` skill — idempotent SQL only; never hand Dev raw SQL to paste into the dashboard.
 - **Applying a migration (Sept 2026) — the Supabase CLI can do it, no dashboard paste needed.**
   The CLI is linked to `lzydgdzjrgvqglxmyfjk` ("pf sales CRM") and the DB credential is
   cached in the macOS keychain, so `supabase db push` connects on its own. There is no
@@ -82,6 +82,13 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
 - HTTP API at `https://pocket-fund-crm.vercel.app/api/{leads,activities,investors,analytics,enrich-linkedin,analyze-outreach,analyze-transcript}` — use this for reading/writing CRM data, NOT direct Supabase queries.
 - Auth: `x-api-key` header (`CRM_API_KEY`). Agent-side key lives in `~/clawd/.env` as `CRM_API_KEY` (base URL: `CRM_API_URL`). Cron endpoints use `Authorization: Bearer CRON_SECRET` instead.
 - Full reference: `api/README.md` in this repo. The global `/crm` skill also operates this API from any workspace.
+
+- **Remote MCP server `/api/mcp` (Oct 2026)** — the CRM as MCP tools for claude.ai. Auth is the API key
+  or OAuth via **Supabase Auth's OAuth server** (enabled 2026-10-12; consent screen `/oauth/consent`),
+  see `api/_mcp-auth.js`. **Every conversation must ask who is using it** (Dev: several people share his
+  Claude account) — `start_session` → `session_id` on every tool, 30-min idle expiry, writes attributed
+  to that person, trail in `crm_mcp_sessions`. Don't add a tool that bypasses the `tool()` session gate
+  in `api/_mcp.js`. Full reference: `api/README.md` → Remote MCP server.
 
 ## Pipeline machinery (known traps)
 
