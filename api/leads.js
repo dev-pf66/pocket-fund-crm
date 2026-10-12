@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requireEnv } from './_env.js'
 import { handleTags } from './_tags.js'
 import { handleMcp } from './_mcp.js'
+import { authorizeMcp, mcpUnauthorized, handleProtectedResourceMetadata } from './_mcp-auth.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -75,13 +76,34 @@ const PATCH_FIELDS = [
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, Authorization, Mcp-Protocol-Version')
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
   }
 
   if (!requireEnv(res, ['VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CRM_API_KEY'])) return
+
+  // OAuth discovery for the MCP connector — public by definition (it is how
+  // a client learns where to sign in), so it is answered before any auth.
+  // vercel.json rewrites /.well-known/oauth-protected-resource here.
+  if (req.query.resource === 'oauth-protected-resource') {
+    return handleProtectedResourceMetadata(req, res)
+  }
+
+  // The remote MCP server (so claude.ai can query the CRM without a Code
+  // session). Same reason as tags: a standalone api/mcp.js would be the 13th
+  // Serverless Function on the Hobby plan's hard cap of 12. See api/_mcp.js.
+  // It has its own auth — claude.ai cannot send x-api-key, only an OAuth
+  // bearer token — so it is dispatched before the api-key check below.
+  if (req.query.resource === 'mcp') {
+    const auth = await authorizeMcp(req, supabase)
+    if (!auth.ok) {
+      if (auth.status === 403) return res.status(403).json({ error: auth.message })
+      return mcpUnauthorized(req, res, auth.message)
+    }
+    return handleMcp(req, res)
+  }
 
   if (!authenticate(req)) {
     return res.status(401).json({ error: 'Unauthorized. Provide valid x-api-key header.' })
@@ -94,13 +116,6 @@ export default async function handler(req, res) {
   // does not support.
   if (req.query.resource === 'tags') {
     return handleTags(req, res)
-  }
-
-  // The remote MCP server (so claude.ai can query the CRM without a Code
-  // session). Same reason as tags: a standalone api/mcp.js would be the 13th
-  // Serverless Function on the Hobby plan's hard cap of 12. See api/_mcp.js.
-  if (req.query.resource === 'mcp') {
-    return handleMcp(req, res)
   }
 
   if (req.method === 'GET') {

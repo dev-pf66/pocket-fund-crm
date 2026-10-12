@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, createContext, useContext, lazy, Suspense } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { getPeople, supabase } from './lib/supabase'
@@ -8,6 +8,7 @@ import { ToastProvider } from './components/Toast'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ResetPassword from './pages/ResetPassword'
+import OAuthConsent from './pages/OAuthConsent'
 
 // Eagerly loaded — these are the main pages users navigate between
 import TodayWorkspace from './pages/TodayWorkspace'
@@ -60,6 +61,13 @@ const PEOSBoard = lazyWithRetry(() => import('./pages/PEOSBoard'))
 const SellersBoard = lazyWithRetry(() => import('./pages/SellersBoard'))
 const ItalyBoard = lazyWithRetry(() => import('./pages/ItalyBoard'))
 const Notifications = lazyWithRetry(() => import('./pages/Notifications'))
+
+// Signed out on the OAuth consent URL: sign in right here, then land back on
+// the same URL (authorization_id included) instead of the dashboard.
+function LoginThenReturn() {
+  const location = useLocation()
+  return <Login redirectTo={location.pathname + location.search} />
+}
 
 export const AppContext = createContext()
 
@@ -143,6 +151,7 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/oauth/consent" element={<LoginThenReturn />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
@@ -177,6 +186,8 @@ function AppContent() {
         <Suspense fallback={<div className="loading-screen"><div className="loading-spinner"></div><p>Loading...</p></div>}>
           <Routes>
             <Route path="/reset-password" element={<ResetPassword />} />
+            {/* MCP connector consent (Supabase OAuth server) — outside Layout. */}
+            <Route path="/oauth/consent" element={<OAuthConsent />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               {/* /today is the merged workspace: Today + Notifications +
