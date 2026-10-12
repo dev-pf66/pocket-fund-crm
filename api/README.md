@@ -896,6 +896,25 @@ CRM's sign-in service". Logic in `api/_mcp-auth.js`:
   client registration allowed, authorization path `/oauth/consent`. While it is off,
   `…/.well-known/oauth-authorization-server/auth/v1` returns `feature_disabled` and claude.ai still fails.
 
+**Who is using it — sessions (Oct 2026, Dev's call).** Several people share one Claude account, so the
+login says whose *account* it is, never who is at the keyboard. Every MCP conversation therefore has to
+ask. Logic in `api/_mcp-session.js`, table `crm_mcp_sessions` (migration 060):
+
+- `start_session({ person })` takes the human's own answer (name or email), matches it to exactly one
+  live person (never guesses between two; archived and `dev+localtest` excluded) and returns a
+  `session_id`. Server instructions and the tool description tell the model to **ask**, never infer from
+  the account, memory or an earlier chat.
+- **Every other tool requires `session_id`** and is refused, with "ask who is using the CRM", if the
+  session is unknown, ended, from another account, or idle for **30 minutes**
+  (`MCP_SESSION_IDLE_MINUTES`). A new chat has no session, so it asks again. `end_session` ends it
+  on request.
+- Writes are attributed to the session's person: `create_lead` → `created_by` (and owner unless given),
+  `log_activity` → `logged_by`, `update_lead` stage moves → `changed_by`. The person is passed
+  in-process (`req.mcpPersonId`), never read from the HTTP request.
+- **Identification, not authentication**: nobody is stopped from typing a colleague's name. What it
+  guarantees is that nobody is silently assumed, and `crm_mcp_sessions` records who claimed each session,
+  from which account, and when.
+
 **Every tool is a thin wrapper around the exact handler the REST routes above call** — `list_leads`
 calls the same function as `GET /api/leads`, `create_lead` the same as `POST /api/leads`, and so on.
 A tool call cannot drift from what the documented HTTP endpoint accepts, because it runs the same
@@ -903,6 +922,7 @@ code, just invoked in-process instead of over a second socket.
 
 | Tool | Mirrors | Notes |
 |---|---|---|
+| `start_session` / `end_session` | — | see sessions above; every tool below also takes `session_id` |
 | `list_leads` | `GET /api/leads` | `id`, `stage`, `lead_type`, `limit`, `include_archived` |
 | `create_lead` | `POST /api/leads` | `fields: {...}` — flat object, see Lead Object Schema below |
 | `update_lead` | `PATCH /api/leads?id=` | `id`, `fields: {...}` — patchable fields only |

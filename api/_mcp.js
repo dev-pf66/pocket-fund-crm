@@ -6,6 +6,7 @@ import { handleGet as getActivities, handlePost as logActivity } from './activit
 import { handleGet as getInvestors, handlePost as createInvestor } from './investors.js'
 import { default as getAnalytics } from './analytics.js'
 import { handleTags } from './_tags.js'
+import { startSession, checkSession, endSession, SESSION_INSTRUCTIONS, MCP_SESSION_IDLE_MINUTES } from './_mcp-session.js'
 
 // Underscore-prefixed (like _auth.js/_tags.js) so Vercel does NOT count this
 // as its own Serverless Function — the Hobby plan's 12-function cap bit this
@@ -37,8 +38,12 @@ function mockRes() {
 // api/leads.js authenticated for real before ever dispatching to
 // ?resource=mcp, so handing the server's own key through here satisfies that
 // check with the secret it expects; it is not a second, weaker auth path.
-async function callHandler(fn, { method = 'GET', query = {}, body } = {}) {
-  const req = { method, query, body, headers: { 'x-api-key': process.env.CRM_API_KEY } }
+//
+// mcpPersonId is the person on the MCP session (api/_mcp-session.js) — set
+// only on a call that already passed the session gate, so a handler can
+// attribute what it records (e.g. the stage event's changed_by).
+async function callHandler(fn, { method = 'GET', query = {}, body, mcpPersonId } = {}) {
+  const req = { method, query, body, mcpPersonId, headers: { 'x-api-key': process.env.CRM_API_KEY } }
   const res = mockRes()
   await fn(req, res)
   return { status: res.statusCode, body: res.body }
@@ -53,10 +58,56 @@ function toolResult({ status, body }) {
 
 const ACTIVITY_TYPES = ['call', 'email', 'linkedin_message', 'meeting', 'sample_sent', 'proposal_sent', 'note']
 
-function buildServer() {
-  const server = new McpServer({ name: 'pocket-fund-crm', version: '1.0.0' })
+const text = (t, isError = false) => ({ isError, content: [{ type: 'text', text: t }] })
 
-  server.registerTool('list_leads', {
+// ctx.account: whose login the request came in on (OAuth email or 'api-key').
+function buildServer(ctx = {}) {
+  const server = new McpServer(
+    { name: 'pocket-fund-crm', version: '1.0.0' },
+    { instructions: SESSION_INSTRUCTIONS },
+  )
+
+  // Every CRM tool goes through here: it requires a session_id and refuses
+  // the call — telling the model to go and ask who is using it — unless that
+  // session is live. run() receives the session's person for attribution.
+  const tool = (name, config, run) => server.registerTool(name, {
+    ...config,
+    inputSchema: {
+      session_id: z.string().describe('From start_session. If you have none, ask the human who is using the CRM and call start_session first.'),
+      ...config.inputSchema,
+    },
+  }, async ({ session_id, ...args }) => {
+    const s = await checkSession(session_id, ctx.account)
+    if (!s.ok) return text(s.message, true)
+    return run(args, s.person)
+  })
+
+  server.registerTool('start_session', {
+    description: 'Call FIRST in every conversation, before any other CRM tool. Before calling it, ASK the human "Who is using the CRM right now?" and pass their answer as-is. ' +
+      'Never fill this in yourself from the Claude account, the signed-in email, memory, or a previous conversation — several people share this account. ' +
+      `Returns a session_id to pass to every other tool. Sessions end after ${MCP_SESSION_IDLE_MINUTES} minutes idle.`,
+    inputSchema: {
+      person: z.string().describe("The human's own answer: their name or email"),
+    },
+  }, async ({ person }) => {
+    const r = await startSession(person, ctx.account)
+    if (!r.ok) return text(r.message, true)
+    return text(JSON.stringify({
+      session_id: r.sessionId,
+      person: { id: r.person.id, name: r.person.name, email: r.person.email },
+      note: `Pass session_id to every CRM tool. Writes are attributed to ${r.person.name}. Ends after ${MCP_SESSION_IDLE_MINUTES} min idle or end_session.`,
+    }, null, 2))
+  })
+
+  server.registerTool('end_session', {
+    description: 'End the current CRM session when the human says they are done (or hands over to someone else). The next CRM use will have to ask who is using it again.',
+    inputSchema: { session_id: z.string() },
+  }, async ({ session_id }) => {
+    const r = await endSession(session_id, ctx.account)
+    return r.ok ? text(`Session ended${r.name ? ` for ${r.name}` : ''}.`) : text(r.message, true)
+  })
+
+  tool('list_leads', {
     description: 'List or search leads in the CRM pipeline, or fetch one by id. Archived leads are excluded unless include_archived is true.',
     inputSchema: {
       id: z.string().optional().describe('Fetch a single lead by this id'),
@@ -75,22 +126,22 @@ function buildServer() {
     return toolResult(await callHandler(getLeads, { method: 'GET', query }))
   })
 
-  server.registerTool('create_lead', {
-    description: 'Create a new lead. name is required; assigned_to or created_by (a person id) is required — a lead with no owner is invisible to everyone but an admin. Unknown fields are ignored; invalid stage/lead_type/lead_source come back as a 400 naming the valid options. See api/README.md for the full field reference.',
+  tool('create_lead', {
+    description: 'Create a new lead. name is required. created_by defaults to the session\'s person, and so does the owner (assigned_to) unless you pass one. Unknown fields are ignored; invalid stage/lead_type/lead_source come back as a 400 naming the valid options. See api/README.md for the full field reference.',
     inputSchema: {
       fields: z.record(z.string(), z.unknown()).describe('Lead fields as a flat object, e.g. {"name": "...", "firm_name": "...", "assigned_to": 3, "stage": "outreach"}'),
     },
-  }, async (args) => toolResult(await callHandler(createLead, { method: 'POST', body: args.fields })))
+  }, async (args, person) => toolResult(await callHandler(createLead, { method: 'POST', body: { created_by: person.id, ...args.fields } })))
 
-  server.registerTool('update_lead', {
-    description: 'Update an existing lead by id (assigned_to, stage, next_follow_up_date, follow_up_note, notes, is_archived, lead_type, lead_channel, buying_timeline, investment_thesis, prior_acquisitions, engagement_model — see api/README.md). Stage moves are recorded to the audit trail automatically.',
+  tool('update_lead', {
+    description: 'Update an existing lead by id (assigned_to, stage, next_follow_up_date, follow_up_note, notes, is_archived, lead_type, lead_channel, buying_timeline, investment_thesis, prior_acquisitions, engagement_model — see api/README.md). Stage moves are recorded to the audit trail automatically, attributed to the session\'s person.',
     inputSchema: {
       id: z.union([z.string(), z.number()]).describe('Lead id'),
       fields: z.record(z.string(), z.unknown()).describe('Fields to update, e.g. {"stage": "responded"}'),
     },
-  }, async (args) => toolResult(await callHandler(updateLead, { method: 'PATCH', query: { id: String(args.id) }, body: args.fields })))
+  }, async (args, person) => toolResult(await callHandler(updateLead, { method: 'PATCH', query: { id: String(args.id) }, body: args.fields, mcpPersonId: person.id })))
 
-  server.registerTool('list_activities', {
+  tool('list_activities', {
     description: 'List logged activities (calls, emails, meetings, notes) against leads.',
     inputSchema: {
       lead_id: z.union([z.string(), z.number()]).optional(),
@@ -105,18 +156,18 @@ function buildServer() {
     return toolResult(await callHandler(getActivities, { method: 'GET', query }))
   })
 
-  server.registerTool('log_activity', {
+  tool('log_activity', {
     description: 'Log an activity against a lead. lead_id and activity_type are required.',
     inputSchema: {
       lead_id: z.union([z.string(), z.number()]),
       activity_type: z.enum(ACTIVITY_TYPES),
       notes: z.string().optional(),
       activity_date: z.string().optional().describe('ISO timestamp; defaults to now'),
-      logged_by: z.union([z.string(), z.number()]).optional().describe('Person id of whoever did the activity'),
+      logged_by: z.union([z.string(), z.number()]).optional().describe('Person id of whoever did the activity; defaults to the session\'s person'),
     },
-  }, async (args) => toolResult(await callHandler(logActivity, { method: 'POST', body: args })))
+  }, async (args, person) => toolResult(await callHandler(logActivity, { method: 'POST', body: { ...args, logged_by: args.logged_by ?? person.id } })))
 
-  server.registerTool('list_investors', {
+  tool('list_investors', {
     description: 'List or search investors, or fetch one by id.',
     inputSchema: {
       id: z.string().optional(),
@@ -135,19 +186,19 @@ function buildServer() {
     return toolResult(await callHandler(getInvestors, { method: 'GET', query }))
   })
 
-  server.registerTool('create_investor', {
+  tool('create_investor', {
     description: 'Create a new investor. name is required. See api/README.md for the full field reference.',
     inputSchema: {
       fields: z.record(z.string(), z.unknown()),
     },
   }, async (args) => toolResult(await callHandler(createInvestor, { method: 'POST', body: args.fields })))
 
-  server.registerTool('get_analytics', {
+  tool('get_analytics', {
     description: 'Pipeline analytics: stage counts, stage-to-stage conversion rates, and conversion by lead source. Excludes archived leads.',
     inputSchema: {},
   }, async () => toolResult(await callHandler(getAnalytics, { method: 'GET' })))
 
-  server.registerTool('list_tags', {
+  tool('list_tags', {
     description: 'List every tag (optionally with usage counts), or the tags on one lead.',
     inputSchema: {
       lead_id: z.union([z.string(), z.number()]).optional(),
@@ -160,7 +211,7 @@ function buildServer() {
     return toolResult(await callHandler(handleTags, { method: 'GET', query }))
   })
 
-  server.registerTool('create_tag', {
+  tool('create_tag', {
     description: 'Create a tag, or return the existing one if the name already matches case-insensitively.',
     inputSchema: {
       name: z.string(),
@@ -168,7 +219,7 @@ function buildServer() {
     },
   }, async (args) => toolResult(await callHandler(handleTags, { method: 'POST', body: { name: args.name, color: args.color } })))
 
-  server.registerTool('assign_tag_to_leads', {
+  tool('assign_tag_to_leads', {
     description: 'Apply an existing tag to one or more leads. Idempotent — re-applying to an already-tagged lead is a no-op.',
     inputSchema: {
       tag_id: z.union([z.string(), z.number()]),
@@ -178,7 +229,7 @@ function buildServer() {
     method: 'POST', query: { action: 'assign' }, body: { tag_id: args.tag_id, lead_ids: args.lead_ids },
   })))
 
-  server.registerTool('rename_tag', {
+  tool('rename_tag', {
     description: 'Rename a tag in place — every lead carrying it keeps it, under the new name. Tags cannot be deleted by design, only renamed.',
     inputSchema: {
       id: z.union([z.string(), z.number()]),
@@ -189,7 +240,7 @@ function buildServer() {
   return server
 }
 
-export async function handleMcp(req, res) {
+export async function handleMcp(req, res, { account } = {}) {
   if (req.method !== 'POST') {
     // Streamable HTTP also defines GET (server-initiated SSE) and DELETE
     // (session termination) — both meaningless in stateless mode, where
@@ -202,7 +253,7 @@ export async function handleMcp(req, res) {
     // Fresh server + transport per request — no session state to keep alive
     // between invocations of a serverless function, so stateless mode
     // (sessionIdGenerator: undefined) is the only mode that fits.
-    const server = buildServer()
+    const server = buildServer({ account })
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
     await server.connect(transport)
     res.on('close', () => { transport.close(); server.close() })

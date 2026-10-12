@@ -1,5 +1,5 @@
 import { fetchAllRows } from './_db.js'
-import { findPersonByEmail } from '../src/lib/identity.js'
+import { findPersonByEmail, normaliseEmail } from '../src/lib/identity.js'
 
 // Auth for the remote MCP server at /api/mcp (Oct 2026).
 //
@@ -63,7 +63,9 @@ export function mcpUnauthorized(req, res, message) {
 }
 
 /**
- * Who may call /api/mcp. Returns { ok: true } or { ok: false, status?, message? }.
+ * Who may call /api/mcp. Returns { ok: true, account } or { ok: false, status?, message? }.
+ * `account` is whose login this is ('api-key' or the OAuth email) — NOT who
+ * is using it; api/_mcp-session.js asks that separately.
  *
  * - x-api-key: the existing shared key, for agents and scripts.
  * - Authorization: Bearer <Supabase JWT>: a CRM user, via the OAuth flow.
@@ -75,7 +77,7 @@ export function mcpUnauthorized(req, res, message) {
  */
 export async function authorizeMcp(req, supabase) {
   const validKey = process.env.CRM_API_KEY
-  if (validKey && req.headers['x-api-key'] === validKey) return { ok: true }
+  if (validKey && req.headers['x-api-key'] === validKey) return { ok: true, account: 'api-key' }
 
   const auth = req.headers['authorization'] || req.headers['Authorization']
   if (!auth?.startsWith('Bearer ')) return { ok: false }
@@ -95,5 +97,5 @@ export async function authorizeMcp(req, supabase) {
   // the answer — a 401 would send the client round the sign-in loop forever.
   if (!person) return { ok: false, status: 403, message: 'This login has no CRM profile. Sign in to the CRM app once, then reconnect.' }
   if (person.is_archived) return { ok: false, status: 403, message: 'This CRM account is archived.' }
-  return { ok: true }
+  return { ok: true, account: normaliseEmail(user.email) }
 }

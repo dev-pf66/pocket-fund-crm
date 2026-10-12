@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       if (auth.status === 403) return res.status(403).json({ error: auth.message })
       return mcpUnauthorized(req, res, auth.message)
     }
-    return handleMcp(req, res)
+    return handleMcp(req, res, { account: auth.account })
   }
 
   if (!authenticate(req)) {
@@ -364,16 +364,19 @@ export async function handlePatch(req, res) {
       throw error
     }
 
-    // changed_by stays null: this endpoint authenticates a machine via API
-    // key, not a person, so attributing the move to someone would be a lie —
-    // the team strip renders those as "Unattributed". Best-effort: a missing
-    // audit row must not fail the caller's update.
+    // changed_by stays null for a plain API-key call: that authenticates a
+    // machine, not a person, so attributing the move to someone would be a
+    // lie — the team strip renders those as "Unattributed". The one exception
+    // is a call from the MCP server, which has asked the human who they are
+    // (api/_mcp-session.js) and passes that person in-process as
+    // req.mcpPersonId; it is never read from the HTTP request. Best-effort: a
+    // missing audit row must not fail the caller's update.
     if (updates.stage !== undefined && priorStage !== data.stage) {
       const { error: evErr } = await supabase.from('crm_lead_stage_events').insert({
         lead_id: Number(id),
         from_stage: priorStage,
         to_stage: data.stage,
-        changed_by: null
+        changed_by: req.mcpPersonId ?? null
       })
       if (evErr) console.error('stage event insert failed (lead update succeeded):', evErr)
     }
