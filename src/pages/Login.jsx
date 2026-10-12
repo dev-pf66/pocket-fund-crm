@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { signInWithEmail, supabase } from '../lib/supabase'
 
-function Login() {
+// redirectTo: where to land after sign-in. The OAuth consent screen renders
+// Login on its own URL so the authorization_id survives the sign-in.
+function Login({ redirectTo = '/dashboard' }) {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,7 +20,7 @@ function Login() {
 
     try {
       await signInWithEmail(email, password)
-      navigate('/dashboard')
+      navigate(redirectTo)
     } catch (err) {
       console.error('Login error:', err)
       setError(err.message)

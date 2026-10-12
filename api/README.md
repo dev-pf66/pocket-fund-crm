@@ -47,7 +47,7 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `POST` | [`/api/leads?resource=tags&action=assign`](#post-apileadsresourcetagsactionassign) | API key | Bulk-apply a tag to leads |
 | `PATCH` | [`/api/leads?resource=tags&id=`](#patch-apileadsresourcetagsid123) | API key | Rename a tag |
 | `DELETE` | [`/api/leads?resource=tags&lead_id=&tag_id=`](#delete-apileadsresourcetagslead_id123tag_id11) | API key | Unassign a tag from one lead |
-| `POST` | [`/api/mcp`](#remote-mcp-server) | API key (header) or per-connector auth | Remote MCP server — the HTTP API above, as MCP tools |
+| `POST` | [`/api/mcp`](#remote-mcp-server) | API key (header) or OAuth (Supabase) | Remote MCP server — the HTTP API above, as MCP tools |
 | `POST` | [`/api/events/fire`](#post-apieventsfire) | Supabase JWT | Fire an internal app event (Task Tracker integration) |
 | `GET`/`POST` | [`/api/weekly-digest`](#cron-jobs-internal) | Cron secret | Per-analyst rollup posted to Sage (Mon 03:30 UTC) |
 | `POST` | [`/api/callhippo-sync`](#cron-jobs-internal) | Cron secret | Import CallHippo dials into `crm_outreach_log` (daily) |
@@ -879,9 +879,22 @@ It is dispatched from `api/leads.js?resource=mcp`, not a standalone `api/mcp.js`
 (underscore-prefixed like `_tags.js`, so Vercel doesn't count it as its own function).
 `vercel.json` rewrites the clean path `/api/mcp` to it.
 
-**Auth:** inherited from `/api/leads` itself — whatever gets the real HTTP request past
-`api/leads.js`'s own `x-api-key` check (or claude.ai's OAuth flow, if a header-auth connector isn't
-available) reaches the MCP endpoint too. There is no separate MCP-specific auth check.
+**Auth (fixed Oct 2026):** either the shared `x-api-key` header (agents, scripts), or an OAuth bearer
+token from **Supabase Auth's OAuth 2.1 server** — the only path claude.ai can use, because a claude.ai
+connector cannot send a custom header. The first cut accepted the API key only, so claude.ai got a bare
+401, read the SPA's `index.html` as OAuth metadata, and failed with "Couldn't register with Pocket Fund
+CRM's sign-in service". Logic in `api/_mcp-auth.js`:
+
+- `GET /.well-known/oauth-protected-resource` (rewritten to `/api/leads?resource=oauth-protected-resource`,
+  public) names `https://<project>.supabase.co/auth/v1` as the authorization server.
+- An unauthenticated `/api/mcp` call gets `401` + `WWW-Authenticate: Bearer resource_metadata="…"`.
+- Supabase handles client registration, PKCE and tokens; the user signs in and approves at
+  `/oauth/consent` in the SPA (`src/pages/OAuthConsent.jsx`).
+- The token is a Supabase user JWT. It must map (case-insensitively) to a **non-archived** `people` row,
+  else `403`. A bearer token opens `/api/mcp` only — the rest of `/api/leads` stays API-key-only.
+- **Prerequisite outside the code:** Supabase → Authentication → OAuth Server must be enabled, dynamic
+  client registration allowed, authorization path `/oauth/consent`. While it is off,
+  `…/.well-known/oauth-authorization-server/auth/v1` returns `feature_disabled` and claude.ai still fails.
 
 **Every tool is a thin wrapper around the exact handler the REST routes above call** — `list_leads`
 calls the same function as `GET /api/leads`, `create_lead` the same as `POST /api/leads`, and so on.
