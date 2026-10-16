@@ -6,6 +6,8 @@ import { handleGet as getActivities, handlePost as logActivity } from './activit
 import { handleGet as getInvestors, handlePost as createInvestor } from './investors.js'
 import { default as getAnalytics } from './analytics.js'
 import { handleTags } from './_tags.js'
+import { handlePartners } from './_partners.js'
+import { PARTNER_STAGE_KEYS } from '../src/lib/partners.js'
 import { startSession, checkSession, endSession, SESSION_INSTRUCTIONS, MCP_SESSION_IDLE_MINUTES } from './_mcp-session.js'
 
 // Underscore-prefixed (like _auth.js/_tags.js) so Vercel does NOT count this
@@ -236,6 +238,38 @@ function buildServer(ctx = {}) {
       name: z.string(),
     },
   }, async (args) => toolResult(await callHandler(handleTags, { method: 'PATCH', query: { id: String(args.id) }, body: { name: args.name } })))
+
+  tool('list_partners', {
+    description: 'List or search the partner pipeline (creators, professors, funds, podcasts, advisors… — crm_partners, separate from leads), or fetch one by id.',
+    inputSchema: {
+      id: z.union([z.string(), z.number()]).optional().describe('Fetch a single partner by this id'),
+      stage: z.enum(PARTNER_STAGE_KEYS).optional(),
+      category: z.string().optional().describe('e.g. creator, professor, fund, podcast — categories are open-ended'),
+      search: z.string().optional().describe('Matches name, company, handle, email or industry'),
+    },
+  }, async (args) => {
+    const query = { resource: 'partners' }
+    if (args.id !== undefined) query.id = String(args.id)
+    if (args.stage) query.stage = args.stage
+    if (args.category) query.category = args.category
+    if (args.search) query.search = args.search
+    return toolResult(await callHandler(handlePartners, { method: 'GET', query }))
+  })
+
+  tool('create_partner', {
+    description: 'Add a partner to the partner pipeline. name is required; created_by is the session\'s person. Categories are free text, normalised to keys (e.g. "M&A Advisor" → m_a_advisor).',
+    inputSchema: {
+      fields: z.record(z.string(), z.unknown()).describe('e.g. {"name": "...", "categories": ["creator"], "stage": "potential", "company_name": "...", "linkedin_url": "...", "email": "...", "notes": "...", "next_follow_up_date": "2026-11-01"}'),
+    },
+  }, async (args, person) => toolResult(await callHandler(handlePartners, { method: 'POST', query: { resource: 'partners' }, body: { ...args.fields, created_by: person.id } })))
+
+  tool('update_partner', {
+    description: `Update a partner by id — stage (${PARTNER_STAGE_KEYS.join(', ')}), notes, categories, follow-up dates, contact fields. There is no delete: move a dead partner to passed.`,
+    inputSchema: {
+      id: z.union([z.string(), z.number()]).describe('Partner id'),
+      fields: z.record(z.string(), z.unknown()).describe('Fields to update, e.g. {"stage": "in_conversation", "last_contact_date": "2026-10-16"}'),
+    },
+  }, async (args) => toolResult(await callHandler(handlePartners, { method: 'PATCH', query: { resource: 'partners', id: String(args.id) }, body: args.fields })))
 
   return server
 }

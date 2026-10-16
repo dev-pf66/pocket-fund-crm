@@ -87,7 +87,9 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   or OAuth via **Supabase Auth's OAuth server** (enabled 2026-10-12; consent screen `/oauth/consent`),
   see `api/_mcp-auth.js`. **Every conversation must ask who is using it** (Dev: several people share his
   Claude account) — `start_session` → `session_id` on every tool, 30-min idle expiry, writes attributed
-  to that person, trail in `crm_mcp_sessions`. Don't add a tool that bypasses the `tool()` session gate
+  to that person, trail in `crm_mcp_sessions`. Partners (`crm_partners`) are reachable too
+  (Oct 2026: `list/create/update_partner`, HTTP at `/api/leads?resource=partners`, `api/_partners.js`;
+  no delete). Don't add a tool that bypasses the `tool()` session gate
   in `api/_mcp.js`. Full reference: `api/README.md` → Remote MCP server.
 
 ## Pipeline machinery (known traps)

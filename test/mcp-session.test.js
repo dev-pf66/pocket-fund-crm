@@ -79,6 +79,7 @@ function sessionDb() {
       return { data: { ...row, people: PEOPLE.find((p) => p.id === row.person_id) } }
     }
     if (op.table === 'crm_leads' && op.type === 'insert') return { data: { id: 99, ...op.payload } }
+    if (op.table === 'crm_partners' && op.type === 'insert') return { data: { id: 1, ...op.payload } }
     if (op.table === 'crm_lead_activities' && op.type === 'insert') return { data: { id: 1, ...op.payload } }
     if (op.table === 'crm_leads' && op.type === 'update') return { data: { id: 5, ...op.payload } }
     if (op.table === 'crm_leads' && op.single) return { data: { id: 5, stage: 'outreach' } }
@@ -199,6 +200,10 @@ describe('MCP session gate', () => {
 
       await client.callTool({ name: 'log_activity', arguments: { session_id: id, lead_id: 5, activity_type: 'note' } })
       expect(h.db.opsFor('crm_lead_activities', 'insert')[0].payload[0]).toMatchObject({ logged_by: 3 })
+
+      await client.callTool({ name: 'create_partner', arguments: { session_id: id, fields: { name: 'P', created_by: 1 } } })
+      // Forced to the session's person even if the model passes someone else.
+      expect(h.db.opsFor('crm_partners', 'insert')[0].payload).toMatchObject({ created_by: 3 })
 
       await client.callTool({ name: 'update_lead', arguments: { session_id: id, id: 5, fields: { stage: 'responded' } } })
       const ev = h.db.opsFor('crm_lead_stage_events', 'insert')[0]
