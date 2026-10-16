@@ -9,10 +9,10 @@
  * the due/overdue rollup. Nothing here introduces a second source of truth.
  */
 
-import { supabase } from '../supabase'
-import { istToday, istAddDays } from '../dateUtils'
-import { cacheClear } from './core'
-import { updateLead, logActivity } from './leads'
+import { supabase } from '../supabase.js'
+import { istToday, istAddDays } from '../dateUtils.js'
+import { cacheClear } from './core.js'
+import { updateLead, logActivity } from './leads.js'
 
 // A lead that's won or dead never nags.
 const TERMINAL_STAGES = ['client', 'passed']

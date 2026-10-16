@@ -4,9 +4,9 @@
  * activity feed, field options, and lead type options.
  */
 
-import { supabase } from '../supabase'
-import { cacheGet, cacheSet, cacheClear, fetchAllRows } from './core'
-import { updateLead } from './leads'
+import { supabase } from '../supabase.js'
+import { cacheGet, cacheSet, cacheClear, fetchAllRows } from './core.js'
+import { updateLead } from './leads.js'
 
 // ============================================================================
 // SAMPLE DEALS API

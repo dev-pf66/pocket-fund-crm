@@ -18,11 +18,11 @@
  * therefore meaningful from that date forward.
  */
 
-import { supabase } from '../supabase'
-import { istToday, istAddDays, istWeekStart, IST_OFFSET_MS } from '../dateUtils'
-import { fetchAllRows } from './core'
-import { isForwardMove } from './leads'
-import { REPLY_STATUSES } from '../outreachStatus'
+import { supabase } from '../supabase.js'
+import { istToday, istAddDays, istWeekStart, IST_OFFSET_MS } from '../dateUtils.js'
+import { fetchAllRows } from './core.js'
+import { isForwardMove } from './leads.js'
+import { REPLY_STATUSES } from '../outreachStatus.js'
 
 const LIVE_STAGES = ['meeting_booked', 'warm_active']
 

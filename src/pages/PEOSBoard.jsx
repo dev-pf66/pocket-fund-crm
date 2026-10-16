@@ -13,6 +13,7 @@ import { isLinkedInUrl, nameFromLinkedInUrl, placeholderNameFromLinkedInUrl } fr
 import { istToday, istAddDays } from '../lib/dateUtils'
 import { isAdminUser } from '../lib/admin'
 import { runBulk } from '../lib/bulkActions'
+import { DEMO_STAGES } from '../lib/pipelines'
 
 // Effective YYYY-MM-DD (IST) for a demo. Prefers the timed datetime,
 // falls back to the date-only field. en-CA locale yields YYYY-MM-DD.
@@ -60,12 +61,7 @@ function demoMatchesDateFilter(demo, filter, from, to) {
   }
 }
 
-const STAGES = [
-  { key: 'scheduled',  label: 'Scheduled',  color: '#a78bfa' },
-  { key: 'done',       label: 'Demo Done',  color: '#60a5fa' },
-  { key: 'signed_up',  label: 'Signed Up',  color: '#22c55e' },
-  { key: 'passed',     label: 'Passed',     color: '#9ca3af' }
-]
+const STAGES = DEMO_STAGES
 
 // Canned scales for the demo form. Stored as plain strings so admins
 // can extend them later without a schema change.

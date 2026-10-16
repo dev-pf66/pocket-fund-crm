@@ -7,21 +7,14 @@ import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { istToday } from '../lib/dateUtils'
 import { runBulk } from '../lib/bulkActions'
+import { SELLER_STAGES } from '../lib/pipelines'
 
 const todayStr = istToday
 
 // Indian-sellers buyside acquisition pipeline. Deliberately separate from the
 // sales leads board — sellers are acquisition targets, not sales leads, and
 // stay out of the sales funnel / outreach entirely.
-const STAGES = [
-  { key: 'sourced',    label: 'Sourced',    color: '#a78bfa' },
-  { key: 'contacted',  label: 'Contacted',  color: '#60a5fa' },
-  { key: 'intro_call', label: 'Intro Call', color: '#06b6d4' },
-  { key: 'evaluating', label: 'Evaluating', color: '#fbbf24' },
-  { key: 'loi_offer',  label: 'LOI/Offer',  color: '#f97316' },
-  { key: 'acquired',   label: 'Acquired',   color: '#22c55e' },
-  { key: 'passed',     label: 'Passed',     color: '#9ca3af' },
-]
+const STAGES = SELLER_STAGES
 
 // Terminal stages don't need follow-up nudges.
 const TERMINAL_STAGES = new Set(['acquired', 'passed'])

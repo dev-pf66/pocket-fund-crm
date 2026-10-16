@@ -3,11 +3,11 @@
  *
  * Deliberately NOT re-exported wholesale by the crm-api barrel: only
  * cacheClear/cachePeek are public (surfaced via ./cache). The other exports
- * here are internal — sibling modules import them directly from './core'.
+ * here are internal — sibling modules import them directly from './core.js'.
  */
 
-import { supabase } from '../supabase'
-import { IST_OFFSET_MS } from '../dateUtils'
+import { supabase } from '../supabase.js'
+import { IST_OFFSET_MS } from '../dateUtils.js'
 
 // Accepts an optional utcMs so callers can get the IST date for a specific
 // moment; defaults to now. All other code should call istToday() directly.

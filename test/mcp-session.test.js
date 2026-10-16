@@ -81,7 +81,9 @@ function sessionDb() {
     if (op.table === 'crm_leads' && op.type === 'insert') return { data: { id: 99, ...op.payload } }
     if (op.table === 'crm_partners' && op.type === 'insert') return { data: { id: 1, ...op.payload } }
     if (op.table === 'crm_lead_activities' && op.type === 'insert') return { data: { id: 1, ...op.payload } }
-    if (op.table === 'crm_leads' && op.type === 'update') return { data: { id: 5, ...op.payload } }
+    // moveLead's own update is .single(); logActivity's last_activity stamp
+    // is .select('id') and expects an array.
+    if (op.table === 'crm_leads' && op.type === 'update') return { data: op.single ? { id: 5, ...op.payload } : [{ id: 5 }] }
     if (op.table === 'crm_leads' && op.single) return { data: { id: 5, stage: 'outreach' } }
     return { data: [] }
   })

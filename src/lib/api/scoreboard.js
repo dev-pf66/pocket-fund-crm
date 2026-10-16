@@ -25,14 +25,14 @@
  * never silently disagree with the rows above it.
  */
 
-import { supabase } from '../supabase'
-import { istDateStr, fetchAllRows } from './core'
+import { supabase } from '../supabase.js'
+import { istDateStr, fetchAllRows } from './core.js'
 // istWeekStart lives in dateUtils, NOT core — core only re-exports istDateStr.
 // Importing it from core lints clean and is undefined at runtime.
-import { istWeekStart } from '../dateUtils'
-import { isStaleBreach, shouldSurfaceBreach, isMissingInfo, STALE_BREACH_DAYS } from '../leadHealth'
-import { isMeetingBooked, isMeetingHeld } from '../meetingCounts'
-import { isReply } from '../outreachStatus'
+import { istWeekStart } from '../dateUtils.js'
+import { isStaleBreach, shouldSurfaceBreach, isMissingInfo, STALE_BREACH_DAYS } from '../leadHealth.js'
+import { isMeetingBooked, isMeetingHeld } from '../meetingCounts.js'
+import { isReply } from '../outreachStatus.js'
 
 // The retired-stage map and both meeting definitions live in
 // src/lib/meetingCounts.js, shared with api/weekly-digest.js. Dev, 27 Sept:

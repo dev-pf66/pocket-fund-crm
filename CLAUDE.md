@@ -89,7 +89,12 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   Claude account) — `start_session` → `session_id` on every tool, 30-min idle expiry, writes attributed
   to that person, trail in `crm_mcp_sessions`. Partners (`crm_partners`) are reachable too
   (Oct 2026: `list/create/update_partner`, HTTP at `/api/leads?resource=partners`, `api/_partners.js`;
-  no delete). Don't add a tool that bypasses the `tool()` session gate
+  no delete). **Oct 2026: the rest of the CRM too** — outreach, calls, sellers, Italy, demos, lead
+  detail, disposition, Today/notifications, scoreboard (`api/_mcp-tools.js`). Those tools call the
+  **app's own `src/lib/api/*` functions server-side** (`api/_app.js` installs a service-role client via
+  `setSupabaseClient`) — never a second copy. Consequences: `src/lib/**` relative imports carry `.js`
+  extensions so plain Node can load them (keep it that way, or Vercel's functions fail to import), and
+  `fireTTEvent` is a no-op from MCP, so MCP actions file no Sage tasks. Don't add a tool that bypasses the `tool()` session gate
   in `api/_mcp.js`. Full reference: `api/README.md` → Remote MCP server.
 
 ## Pipeline machinery (known traps)

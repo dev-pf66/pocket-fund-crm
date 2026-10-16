@@ -2,7 +2,7 @@
  * CRM API — PE OS demos (crm_demos).
  */
 
-import { supabase } from '../supabase'
+import { supabase } from '../supabase.js'
 
 // ============================================================================
 // PE OS DEMOS

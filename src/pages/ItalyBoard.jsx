@@ -7,6 +7,7 @@ import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { istToday } from '../lib/dateUtils'
 import { runBulk } from '../lib/bulkActions'
+import { ITALY_CONTACT_TYPES, ITALY_STAGES } from '../lib/pipelines'
 
 const todayStr = istToday
 
@@ -14,22 +15,10 @@ const todayStr = istToday
 // sales leads board and from the Indian sellers board — this one holds
 // sellers, buyers, brokers, and other ecosystem contacts together, so the
 // stages below are generic on purpose ("Acquired" doesn't fit a broker).
-const CONTACT_TYPES = [
-  { key: 'seller', label: 'Seller', color: '#a78bfa' },
-  { key: 'buyer',  label: 'Buyer',  color: '#60a5fa' },
-  { key: 'broker', label: 'Broker', color: '#f97316' },
-  { key: 'other',  label: 'Other',  color: '#9ca3af' },
-]
+const CONTACT_TYPES = ITALY_CONTACT_TYPES
 const CONTACT_TYPE_BY_KEY = Object.fromEntries(CONTACT_TYPES.map(t => [t.key, t]))
 
-const STAGES = [
-  { key: 'sourced',   label: 'Sourced',   color: '#a78bfa' },
-  { key: 'contacted', label: 'Contacted', color: '#60a5fa' },
-  { key: 'engaged',   label: 'Engaged',   color: '#06b6d4' },
-  { key: 'active',    label: 'Active',    color: '#fbbf24' },
-  { key: 'closed',    label: 'Closed',    color: '#22c55e' },
-  { key: 'passed',    label: 'Passed',    color: '#9ca3af' },
-]
+const STAGES = ITALY_STAGES
 
 // Terminal stages don't need follow-up nudges.
 const TERMINAL_STAGES = new Set(['closed', 'passed'])
