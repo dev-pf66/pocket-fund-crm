@@ -866,6 +866,28 @@ Remove a tag from one lead. Does **not** delete the tag itself.
 
 ---
 
+## Partners
+
+`crm_partners` — the partner pipeline (creators, professors, funds, podcasts, advisors…), separate from
+leads. Shared team book: the board shows everyone's partners. No endpoint existed until Oct 2026, so the
+MCP connector couldn't see partners at all. Dispatched from `api/leads.js` at `?resource=partners`
+(logic in `api/_partners.js`) for the same 12-function reason as tags. Auth: `x-api-key`.
+
+Stages (closed, shared with the board via `src/lib/partners.js`): `potential` · `reached_out` ·
+`in_conversation` · `active_partner` · `passed`. Categories are **open-ended** text, normalised to the
+board's keys (`"M&A Advisor"` → `m_a_advisor`) and de-duplicated.
+
+| Method | Path | |
+|---|---|---|
+| `GET` | `/api/leads?resource=partners` | Every partner, paged (never truncated at 1000). Filters: `stage`, `category`, `search` (name/company/handle/email/industry) |
+| `GET` | `/api/leads?resource=partners&id=12` | One partner (404 if missing) |
+| `POST` | `/api/leads?resource=partners` | `name` required; optional `categories[]`, `stage`, `company_name`, `industry`, `url`, `linkedin_url`, `email`, `handle`, `audience_size`, `notes`, `next_follow_up_date`, `last_contact_date`, `created_by` |
+| `PATCH` | `/api/leads?resource=partners&id=12` | Same fields except `created_by` (history) |
+
+**No DELETE**, deliberately — move a dead partner to `passed`.
+
+---
+
 ## Remote MCP server
 
 `POST /api/mcp` — a [Model Context Protocol](https://modelcontextprotocol.io) server exposing the
@@ -935,6 +957,9 @@ code, just invoked in-process instead of over a second socket.
 | `create_tag` | `POST /api/leads?resource=tags` | `name`, `color` |
 | `assign_tag_to_leads` | `POST /api/leads?resource=tags&action=assign` | `tag_id`, `lead_ids: [...]` |
 | `rename_tag` | `PATCH /api/leads?resource=tags&id=` | `id`, `name` |
+| `list_partners` | `GET /api/leads?resource=partners` | `id`, `stage`, `category`, `search` |
+| `create_partner` | `POST /api/leads?resource=partners` | `fields: {...}`; `created_by` forced to the session's person |
+| `update_partner` | `PATCH /api/leads?resource=partners&id=` | `id`, `fields: {...}` — no delete |
 
 Not exposed as MCP tools (deliberately, not an oversight): `analyze-transcript`, `enrich-linkedin`,
 `analyze-outreach` (each spends `ANTHROPIC_API_KEY` credits per call — a cost nobody should be able
@@ -1172,18 +1197,7 @@ to query them directly via Supabase.
 
 ### `crm_partners`
 
-Personal pipeline of potential partnership contacts (creators,
-investors, podcasts, etc.). Per-user RLS scoped to `created_by`.
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | integer | Primary key |
-| `name` | string | Partner name |
-| `categories` | text[] | One or more of: `creator`, `community`, `investor`, `fund`, `podcast`, `media`, `competitor`, `adjacent_industry`, plus any custom strings the user adds. GIN-indexed. |
-| `stage` | string | `potential` / `reached_out` / `in_conversation` / `active_partner` / `passed` |
-| `url`, `email`, `handle`, `audience_size`, `notes` | strings | All optional |
-| `next_follow_up_date`, `last_contact_date` | date | Drive the follow-up reminders banner |
-| `created_by` | integer | FK to `people` (RLS owner) |
+Now has an endpoint — see [Partners](#partners) above.
 
 ### `crm_field_options`
 

@@ -57,7 +57,7 @@ function OAuthConsent() {
               <strong>{details.user?.email}</strong>.
             </p>
             <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-              It will be able to read and update leads, activities, investors and tags — the same
+              It will be able to read and update leads, activities, investors, partners and tags — the same
               things you can do in the app. You can revoke it from the connector's settings.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>

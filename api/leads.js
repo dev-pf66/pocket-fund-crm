@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { requireEnv } from './_env.js'
 import { handleTags } from './_tags.js'
+import { handlePartners } from './_partners.js'
 import { handleMcp } from './_mcp.js'
 import { authorizeMcp, mcpUnauthorized, handleProtectedResourceMetadata } from './_mcp-auth.js'
 
@@ -116,6 +117,12 @@ export default async function handler(req, res) {
   // does not support.
   if (req.query.resource === 'tags') {
     return handleTags(req, res)
+  }
+
+  // Partners (crm_partners) — same dispatch-not-a-new-file reason as tags.
+  // See api/_partners.js.
+  if (req.query.resource === 'partners') {
+    return handlePartners(req, res)
   }
 
   if (req.method === 'GET') {

@@ -85,9 +85,10 @@ describe('GET/POST/DELETE /api/mcp (via api/leads.js?resource=mcp)', () => {
       const client = await connectedClient(port)
       const { tools } = await client.listTools()
       expect(tools.map((t) => t.name).sort()).toEqual([
-        'assign_tag_to_leads', 'create_investor', 'create_lead', 'create_tag',
-        'end_session', 'get_analytics', 'list_activities', 'list_investors', 'list_leads',
-        'list_tags', 'log_activity', 'rename_tag', 'start_session', 'update_lead',
+        'assign_tag_to_leads', 'create_investor', 'create_lead', 'create_partner',
+        'create_tag', 'end_session', 'get_analytics', 'list_activities', 'list_investors',
+        'list_leads', 'list_partners', 'list_tags', 'log_activity', 'rename_tag', 'start_session',
+        'update_lead', 'update_partner',
       ])
       await client.close()
     })

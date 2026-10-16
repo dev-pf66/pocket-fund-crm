@@ -8,6 +8,7 @@ import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, AlertCircle, Ch
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { istToday } from '../lib/dateUtils'
 import { runBulk } from '../lib/bulkActions'
+import { PARTNER_STAGES, categoryKeyFromLabel } from '../lib/partners'
 
 const todayStr = istToday
 
@@ -31,13 +32,7 @@ function followUpStatus(dateStr) {
   return null
 }
 
-const STAGES = [
-  { key: 'potential', label: 'Potential', color: '#a78bfa' },
-  { key: 'reached_out', label: 'Reached Out', color: '#60a5fa' },
-  { key: 'in_conversation', label: 'In Conversation', color: '#fbbf24' },
-  { key: 'active_partner', label: 'Active Partner', color: '#22c55e' },
-  { key: 'passed', label: 'Passed', color: '#9ca3af' }
-]
+const STAGES = PARTNER_STAGES
 
 const CATEGORIES = [
   { key: 'creator', label: 'Creator', color: '#ec4899' },
@@ -53,17 +48,6 @@ const CATEGORIES = [
 ]
 
 const CATEGORY_BY_KEY = Object.fromEntries(CATEGORIES.map(c => [c.key, c]))
-
-// Normalize a free-text category name to a stable key (lowercased, spaces
-// and other separators collapsed to underscores).
-function categoryKeyFromLabel(raw) {
-  return String(raw || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 50)
-}
 
 // Title-case a category key for display.
 function labelForCategory(key) {
