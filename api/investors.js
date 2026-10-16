@@ -6,11 +6,11 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Valid enum values
-const VALID_INVESTOR_TYPES = ['Individual LP', 'Family Office', 'Fund of Funds', 'Institutional', 'HNW Individual', 'Strategic', 'Other']
-const VALID_STATUSES = ['prospect', 'contacted', 'in_conversation', 'committed', 'invested', 'passed']
+export const VALID_INVESTOR_TYPES = ['Individual LP', 'Family Office', 'Fund of Funds', 'Institutional', 'HNW Individual', 'Strategic', 'Other']
+export const VALID_STATUSES = ['prospect', 'contacted', 'in_conversation', 'committed', 'invested', 'passed']
 
 // Fields allowed when creating/updating an investor
-const ALLOWED_FIELDS = [
+export const ALLOWED_FIELDS = [
   'name', 'firm', 'email', 'phone', 'linkedin_url',
   'investor_type', 'status', 'check_size_min', 'check_size_max',
   'investment_focus', 'notes'

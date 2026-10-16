@@ -85,10 +85,16 @@ describe('GET/POST/DELETE /api/mcp (via api/leads.js?resource=mcp)', () => {
       const client = await connectedClient(port)
       const { tools } = await client.listTools()
       expect(tools.map((t) => t.name).sort()).toEqual([
-        'assign_tag_to_leads', 'create_investor', 'create_lead', 'create_partner',
-        'create_tag', 'end_session', 'get_analytics', 'list_activities', 'list_investors',
-        'list_leads', 'list_partners', 'list_tags', 'log_activity', 'rename_tag', 'start_session',
-        'update_lead', 'update_partner',
+        'add_call_transcript', 'assign_tag_to_leads', 'claim_call', 'create_demo',
+        'create_investor', 'create_italy_contact', 'create_lead', 'create_partner',
+        'create_seller', 'create_tag', 'dispose_lead', 'end_session', 'get_analytics',
+        'get_lead_detail', 'get_my_day', 'get_scoreboard', 'list_activities', 'list_calls',
+        'list_demos', 'list_field_options', 'list_investor_interactions', 'list_investors',
+        'list_italy_contacts', 'list_leads', 'list_outreach', 'list_partners', 'list_people',
+        'list_sellers', 'list_tags', 'list_unclaimed_calls', 'log_activity', 'log_call',
+        'log_investor_interaction', 'log_outreach', 'rename_tag', 'set_do_not_call',
+        'start_session', 'update_call', 'update_demo', 'update_investor', 'update_italy_contact',
+        'update_lead', 'update_outreach', 'update_partner', 'update_seller',
       ])
       await client.close()
     })

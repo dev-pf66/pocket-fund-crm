@@ -16,7 +16,7 @@
  * local (`missing_channel`) is deliberately NOT the policy version: see below.
  */
 
-import { isMissingInfo, isUnreachable, isStaleBreach, shouldSurfaceBreach } from './leadHealth'
+import { isMissingInfo, isUnreachable, isStaleBreach, shouldSurfaceBreach } from './leadHealth.js'
 
 /**
  * The options, in the order they appear in the dropdown.

@@ -1,13 +1,25 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// import.meta.env is Vite's. The serverless functions also load this module
+// (the MCP server runs the app's own src/lib/api/* logic rather than a second
+// copy of it — see api/_app.js), and under plain Node import.meta.env is
+// undefined. So: the browser still fails loudly without its keys; the server
+// starts with no client and installs its own via setSupabaseClient().
+const env = import.meta.env ?? {}
+const supabaseUrl = env.VITE_SUPABASE_URL
+const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (typeof window !== 'undefined' && (!supabaseUrl || !supabaseAnonKey)) {
   throw new Error('Missing Supabase environment variables')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// `let` + an ES live binding: every `import { supabase }` sees the client
+// setSupabaseClient installs. Only the server calls it, once, at load.
+export let supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null
+
+export function setSupabaseClient(client) {
+  supabase = client
+}
 
 // Get current user
 export async function getCurrentUser() {

@@ -4,11 +4,11 @@
  * dashboard aggregate.
  */
 
-import { supabase } from '../supabase'
-import { normalizeLinkedInUrl, linkedInProfileSlug } from '../linkedin'
-import { cacheGet, cacheSet, cacheClear, fireTTEvent, istDateStr, getDaysBetween, fetchAllRows } from './core'
-import { getCRMSettings } from './misc'
-import { AWAITING_STATUSES } from '../outreachStatus'
+import { supabase } from '../supabase.js'
+import { normalizeLinkedInUrl, linkedInProfileSlug } from '../linkedin.js'
+import { cacheGet, cacheSet, cacheClear, fireTTEvent, istDateStr, getDaysBetween, fetchAllRows } from './core.js'
+import { getCRMSettings } from './misc.js'
+import { AWAITING_STATUSES } from '../outreachStatus.js'
 
 // ============================================================================
 // LEADS API

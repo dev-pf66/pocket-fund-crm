@@ -1,13 +1,15 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
-import { handleGet as getLeads, handlePost as createLead, handlePatch as updateLead } from './leads.js'
+import { handleGet as getLeads, handlePost as createLead, handlePatch as updateLead, VALID_STAGES } from './leads.js'
 import { handleGet as getActivities, handlePost as logActivity } from './activities.js'
 import { handleGet as getInvestors, handlePost as createInvestor } from './investors.js'
 import { default as getAnalytics } from './analytics.js'
 import { handleTags } from './_tags.js'
 import { handlePartners } from './_partners.js'
 import { PARTNER_STAGE_KEYS } from '../src/lib/partners.js'
+import { registerAppTools } from './_mcp-tools.js'
+import { getLeadById, moveLead } from './_app.js'
 import { startSession, checkSession, endSession, SESSION_INSTRUCTIONS, MCP_SESSION_IDLE_MINUTES } from './_mcp-session.js'
 
 // Underscore-prefixed (like _auth.js/_tags.js) so Vercel does NOT count this
@@ -81,7 +83,13 @@ function buildServer(ctx = {}) {
   }, async ({ session_id, ...args }) => {
     const s = await checkSession(session_id, ctx.account)
     if (!s.ok) return text(s.message, true)
-    return run(args, s.person)
+    // A thrown error (a DB constraint, a missing row) comes back to the model
+    // as a tool error it can read and act on, not a dead JSON-RPC call.
+    try {
+      return await run(args, s.person)
+    } catch (e) {
+      return text(`Error: ${e?.message || String(e)}`, true)
+    }
   })
 
   server.registerTool('start_session', {
@@ -141,7 +149,30 @@ function buildServer(ctx = {}) {
       id: z.union([z.string(), z.number()]).describe('Lead id'),
       fields: z.record(z.string(), z.unknown()).describe('Fields to update, e.g. {"stage": "responded"}'),
     },
-  }, async (args, person) => toolResult(await callHandler(updateLead, { method: 'PATCH', query: { id: String(args.id) }, body: args.fields, mcpPersonId: person.id })))
+  }, async (args, person) => {
+    // A stage change goes through the app's moveLead, not the REST PATCH, so
+    // it runs the same bookkeeping as dragging the card: the "Moved to" note,
+    // the stage event, the reply back-sync on reaching responded, and the
+    // meeting-HELD activity when a lead leaves meeting_booked (which is what
+    // the funnel and the digest count). Other fields still go through the
+    // REST handler's validation, first — so a bad lead_type can't leave a
+    // half-applied update with the stage already moved.
+    const { stage, ...rest } = args.fields || {}
+    if (stage !== undefined && !VALID_STAGES.includes(stage)) {
+      return text(`Invalid stage. Must be one of: ${VALID_STAGES.join(', ')}`, true)
+    }
+    let result = null
+    if (Object.keys(rest).length) {
+      result = await callHandler(updateLead, { method: 'PATCH', query: { id: String(args.id) }, body: rest, mcpPersonId: person.id })
+      if (result.status >= 400) return toolResult(result)
+    }
+    if (stage !== undefined) {
+      const current = await getLeadById(args.id)
+      const lead = current.stage === stage ? current : await moveLead(current.id, stage, person.id)
+      return toolResult({ status: 200, body: { success: true, data: lead } })
+    }
+    return toolResult(result)
+  })
 
   tool('list_activities', {
     description: 'List logged activities (calls, emails, meetings, notes) against leads.',
@@ -270,6 +301,8 @@ function buildServer(ctx = {}) {
       fields: z.record(z.string(), z.unknown()).describe('Fields to update, e.g. {"stage": "in_conversation", "last_contact_date": "2026-10-16"}'),
     },
   }, async (args) => toolResult(await callHandler(handlePartners, { method: 'PATCH', query: { resource: 'partners', id: String(args.id) }, body: args.fields })))
+
+  registerAppTools(tool)
 
   return server
 }

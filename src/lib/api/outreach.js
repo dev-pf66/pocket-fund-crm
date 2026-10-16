@@ -3,13 +3,13 @@
  * per-person dashboard stats, weekly funnel, outreach analytics.
  */
 
-import { supabase } from '../supabase'
-import { normalizeLinkedInUrl } from '../linkedin'
-import { istAddDays, istWeekStart } from '../dateUtils'
-import { cacheClear, fireTTEvent, istDateStr, fetchAllRows } from './core'
-import { advanceLeadStage, createLead, findLeadByEmailOrNameFirm } from './leads'
-import { logActivityManual } from './misc'
-import { isReply, REPLY_STATUSES } from '../outreachStatus'
+import { supabase } from '../supabase.js'
+import { normalizeLinkedInUrl } from '../linkedin.js'
+import { istAddDays, istWeekStart } from '../dateUtils.js'
+import { cacheClear, fireTTEvent, istDateStr, fetchAllRows } from './core.js'
+import { advanceLeadStage, createLead, findLeadByEmailOrNameFirm } from './leads.js'
+import { logActivityManual } from './misc.js'
+import { isReply, REPLY_STATUSES } from '../outreachStatus.js'
 
 // Explicit ceiling for the two "give me the whole log" readers below. Both
 // feed a scrollable table that Analytics also re-aggregates, so they want a

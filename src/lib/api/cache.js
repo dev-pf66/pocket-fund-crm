@@ -7,4 +7,4 @@
  * re-exported to the barrel.
  */
 
-export { cacheClear, cachePeek } from './core'
+export { cacheClear, cachePeek } from './core.js'

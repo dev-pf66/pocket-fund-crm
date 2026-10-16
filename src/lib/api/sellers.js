@@ -2,7 +2,7 @@
  * CRM API — Indian sellers (crm_sellers), the buyside acquisition pipeline.
  */
 
-import { supabase } from '../supabase'
+import { supabase } from '../supabase.js'
 
 // ============================================================================
 // INDIAN SELLERS (buyside acquisition pipeline)

@@ -16,14 +16,14 @@
  * this repo has shipped that bug three times.
  */
 
-import { supabase } from '../supabase'
-import { istToday, istAddDays, IST_OFFSET_MS } from '../dateUtils'
-import { cacheClear, fireTTEvent, istDateStr, fetchAllRows } from './core'
-import { advanceLeadStage } from './leads'
-import { promoteOutreachToLead } from './outreach'
-import { logActivityManual } from './misc'
-import { statusForOutcome, isPickup, isConversation, summarizeCalls, rate } from '../callOutcomes'
-import { phoneKey } from '../callList'
+import { supabase } from '../supabase.js'
+import { istToday, istAddDays, IST_OFFSET_MS } from '../dateUtils.js'
+import { cacheClear, fireTTEvent, istDateStr, fetchAllRows } from './core.js'
+import { advanceLeadStage } from './leads.js'
+import { promoteOutreachToLead } from './outreach.js'
+import { logActivityManual } from './misc.js'
+import { statusForOutcome, isPickup, isConversation, summarizeCalls, rate } from '../callOutcomes.js'
+import { phoneKey } from '../callList.js'
 
 /**
  * Bulk-create leads for the call queue from a parsed call list.

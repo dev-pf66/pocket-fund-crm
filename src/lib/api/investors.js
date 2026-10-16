@@ -2,8 +2,8 @@
  * CRM API — investors (crm_investors) and their interactions.
  */
 
-import { supabase } from '../supabase'
-import { cacheGet, cacheSet, cacheClear } from './core'
+import { supabase } from '../supabase.js'
+import { cacheGet, cacheSet, cacheClear } from './core.js'
 
 // ============================================================================
 // INVESTORS API

@@ -100,7 +100,7 @@ export async function checkSession(sessionId, account, now = new Date()) {
   if (!sessionId || !UUID.test(sessionId)) return { ok: false, message: `No active session. ${ASK}` }
 
   const { data: s, error } = await db().from('crm_mcp_sessions')
-    .select('id, person_id, account_email, last_seen_at, ended_at, ended_reason, tool_calls, people(id, name, email, is_archived)')
+    .select('id, person_id, account_email, last_seen_at, ended_at, ended_reason, tool_calls, people(id, name, email, is_admin, is_archived)')
     .eq('id', sessionId).maybeSingle()
   if (error) throw error
   // A session opened under another account is treated as unknown, not leaked.

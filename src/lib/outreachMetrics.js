@@ -2,7 +2,7 @@
 // and the main Dashboard's "My Week" block. All dates are IST calendar
 // days (see dateUtils.js).
 
-import { istToday, istAddDays, istWeekStart } from './dateUtils'
+import { istToday, istAddDays, istWeekStart } from './dateUtils.js'
 
 // Consistent reply-rate coloring across the app: green >10%, amber 5–10%,
 // red <5%. Returns 'inherit' when there's no outreach yet (rate is a

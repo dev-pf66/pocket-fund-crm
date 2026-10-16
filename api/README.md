@@ -961,6 +961,38 @@ code, just invoked in-process instead of over a second socket.
 | `create_partner` | `POST /api/leads?resource=partners` | `fields: {...}`; `created_by` forced to the session's person |
 | `update_partner` | `PATCH /api/leads?resource=partners&id=` | `id`, `fields: {...}` — no delete |
 
+**The rest of the CRM (Oct 2026)** — `api/_mcp-tools.js`. These have no REST route: each tool calls the
+**app's own function** (`src/lib/api/*`, loaded server-side by `api/_app.js` with a service-role client),
+so the bookkeeping is identical to the browser's. Session person = `currentPersonId` throughout.
+
+| Tool | App function | Notes |
+|---|---|---|
+| `list_people` | `getPeople` | ids for assigned_to / logged_by; read-only — account admin stays Dev's |
+| `list_field_options` | `getFieldOptions` / `getLeadTypeOptions` | valid dropdown values |
+| `get_lead_detail` | lead + activities, outreach, calls, transcripts, tags, demos, stage history | transcripts truncated (`transcript_chars`) |
+| `update_lead` (stage) | `moveLead` | a stage in `fields` now runs the drag-the-card bookkeeping: note, stage event, reply back-sync, **meeting-held activity on leaving meeting_booked**. Other fields still go through REST validation first |
+| `dispose_lead` | `disposeLead` | `dead` needs a reason from `dead_reason` options; `later` needs a date |
+| `set_do_not_call` | `setDoNotCall` | |
+| `list_outreach` / `log_outreach` / `update_outreach` | `getOutreachLog`, `logOutreach`, `updateOutreach` | replied → reply → pipeline sync. Refuses phone calls (use the call tools) |
+| `list_calls` / `log_call` / `update_call` | `getCallLog`, `logCall`, `updateCall` | status/connected derived from `call_outcome`; a typed status is dropped |
+| `list_unclaimed_calls` / `claim_call` | `getUnclaimedCalls`, `claimCall` | claims for the session person only |
+| `add_call_transcript` | `logCallTranscript` | stored as-is — **no AI analysis** (credits) |
+| `list/create/update_seller(s)` | `src/lib/api/sellers.js` | stage validated against `SELLER_STAGES` |
+| `list/create/update_italy_contact(s)` | `src/lib/api/italy-pipeline.js` | stage + `contact_type` validated |
+| `list/create/update_demo(s)` | `src/lib/api/demos.js` | stage validated against `DEMO_STAGES` |
+| `update_investor` | `updateInvestor` | `ALLOWED_FIELDS` + type/status validated |
+| `list_investor_interactions` / `log_investor_interaction` | `src/lib/api/investors.js` | |
+| `get_my_day` | `getTodayQueue` + `getNotificationFeed` | the session person's Today tab |
+| `get_scoreboard` | `getScoreboard` | default this week, IST |
+
+Board vocabularies live in `src/lib/partners.js` / `src/lib/pipelines.js` and the boards import them, so
+a tool can't write a stage that would make a card vanish from every column.
+
+**Deliberately not exposed:** any delete, unassign or unclaim; admin (people, targets, settings,
+field-option edits, archive sweeps); AI analysis (`analyze-transcript`, `enrich-linkedin`,
+`analyze-outreach` — they cost credits); Sage task creation. **Sage tasks the app fires on a reply or a
+stage move (`fireTTEvent`) do not fire from MCP** — that path needs a browser session.
+
 Not exposed as MCP tools (deliberately, not an oversight): `analyze-transcript`, `enrich-linkedin`,
 `analyze-outreach` (each spends `ANTHROPIC_API_KEY` credits per call — a cost nobody should be able
 to trigger just by asking an MCP-connected Claude a question), and `events/fire` (expects a Supabase

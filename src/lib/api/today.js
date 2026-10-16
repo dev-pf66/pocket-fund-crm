@@ -3,13 +3,13 @@
  * escalations, and the header counters/rollups.
  */
 
-import { supabase } from '../supabase'
-import { istAddDays, istWeekStart } from '../dateUtils'
-import { cacheClear, istDateStr, getDaysBetween, fetchAllRows } from './core'
-import { logActivity, calculateStaleness, updateLead } from './leads'
-import { runBulk } from '../bulkActions'
-import { advanceFollowUpCadence, clearFollowUp, snoozeFollowUp } from './followups'
-import { getCRMSettings } from './misc'
+import { supabase } from '../supabase.js'
+import { istAddDays, istWeekStart } from '../dateUtils.js'
+import { cacheClear, istDateStr, getDaysBetween, fetchAllRows } from './core.js'
+import { logActivity, calculateStaleness, updateLead } from './leads.js'
+import { runBulk } from '../bulkActions.js'
+import { advanceFollowUpCadence, clearFollowUp, snoozeFollowUp } from './followups.js'
+import { getCRMSettings } from './misc.js'
 
 // ============================================================================
 // TODAY TAB API

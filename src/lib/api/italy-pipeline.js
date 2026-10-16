@@ -3,7 +3,7 @@
  * pipeline (sellers, buyers, brokers, other contacts).
  */
 
-import { supabase } from '../supabase'
+import { supabase } from '../supabase.js'
 
 // ============================================================================
 // ITALY PIPELINE (mixed-ecosystem buyside pipeline)

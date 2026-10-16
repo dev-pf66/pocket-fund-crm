@@ -17,7 +17,7 @@
  *     visible non-name beats a plausible fake one.
  */
 
-import { normalizePhone } from './phone'
+import { normalizePhone } from './phone.js'
 
 // Enough digits to be a phone rather than an extension, a headcount or a year.
 const MIN_PHONE_DIGITS = 7

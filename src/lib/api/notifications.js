@@ -37,11 +37,11 @@
  * Archived leads never produce a signal, anywhere in this file.
  */
 
-import { supabase } from '../supabase'
-import { istToday, istAddDays } from '../dateUtils'
-import { fetchAllRows, getDaysBetween } from './core'
-import { getCallbacksDue } from './calls'
-import { getTodayThresholds } from './today'
+import { supabase } from '../supabase.js'
+import { istToday, istAddDays } from '../dateUtils.js'
+import { fetchAllRows, getDaysBetween } from './core.js'
+import { getCallbacksDue } from './calls.js'
+import { getTodayThresholds } from './today.js'
 
 const TERMINAL_LEAD_STAGES = ['client', 'passed']
 const ENGAGED_STAGES = ['responded', 'meeting_booked', 'warm_active']

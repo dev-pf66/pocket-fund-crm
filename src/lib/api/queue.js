@@ -3,10 +3,10 @@
  * per-person first-touch queue, and the reached-out transition.
  */
 
-import { supabase } from '../supabase'
-import { normalizeLinkedInUrl, nameFromLinkedInUrl, placeholderNameFromLinkedInUrl } from '../linkedin'
-import { cacheClear, fetchAllRows } from './core'
-import { logOutreach } from './outreach'
+import { supabase } from '../supabase.js'
+import { normalizeLinkedInUrl, nameFromLinkedInUrl, placeholderNameFromLinkedInUrl } from '../linkedin.js'
+import { cacheClear, fetchAllRows } from './core.js'
+import { logOutreach } from './outreach.js'
 
 // ============================================================================
 // OUTREACH QUEUE API

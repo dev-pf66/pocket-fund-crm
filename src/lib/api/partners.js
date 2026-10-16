@@ -2,7 +2,7 @@
  * CRM API — potential partners (crm_partners).
  */
 
-import { supabase } from '../supabase'
+import { supabase } from '../supabase.js'
 
 // ============================================================================
 // POTENTIAL PARTNERS

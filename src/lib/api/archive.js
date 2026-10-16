@@ -20,9 +20,9 @@
  * takes that same criteria object. Nothing sweeps on a schedule or on load.
  */
 
-import { supabase } from '../supabase'
-import { istToday, istAddDays } from '../dateUtils'
-import { cacheClear, fetchAllRows } from './core'
+import { supabase } from '../supabase.js'
+import { istToday, istAddDays } from '../dateUtils.js'
+import { cacheClear, fetchAllRows } from './core.js'
 
 /** Won deals are never swept. A client going quiet is an account-management
  *  problem, not pipeline clutter, and burying it is how a renewal gets missed. */

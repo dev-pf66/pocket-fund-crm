@@ -10,7 +10,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Valid enum values
-const VALID_STAGES = ['outreach', 'responded', 'meeting_booked', 'warm_active', 'client', 'reach_out_later', 'passed']
+export const VALID_STAGES = ['outreach', 'responded', 'meeting_booked', 'warm_active', 'client', 'reach_out_later', 'passed']
 // Fallback only. lead_type is admin-managed in crm_lead_type_options (migration
 // 022) and the UI reads it from there via useLeadTypes, so a hardcoded list here
 // drifts the moment an admin adds a type: the app writes it happily while this
