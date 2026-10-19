@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { fetchAllRows } from './_db.js'
 import { requireEnv } from './_env.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
@@ -47,26 +48,27 @@ export async function handleGet(req, res) {
   try {
     const { lead_id, activity_type, limit = 50 } = req.query
 
-    let query = supabase
-      .from('crm_lead_activities')
-      .select(`
-        *,
-        lead:crm_leads(name, firm_name, stage)
-      `)
-      .order('activity_date', { ascending: false })
-      .limit(parseInt(limit))
+    // Paged past PostgREST's silent 1,000-row cap (see _db.js).
+    const data = await fetchAllRows(() => {
+      let query = supabase
+        .from('crm_lead_activities')
+        .select(`
+          *,
+          lead:crm_leads(name, firm_name, stage)
+        `)
+        .order('activity_date', { ascending: false })
+        .order('id', { ascending: false })
 
-    if (lead_id) {
-      query = query.eq('lead_id', lead_id)
-    }
+      if (lead_id) {
+        query = query.eq('lead_id', lead_id)
+      }
 
-    if (activity_type) {
-      query = query.eq('activity_type', activity_type)
-    }
+      if (activity_type) {
+        query = query.eq('activity_type', activity_type)
+      }
 
-    const { data, error } = await query
-
-    if (error) throw error
+      return query
+    }, { maxRows: parseInt(limit) || 50 })
 
     return res.status(200).json({
       success: true,

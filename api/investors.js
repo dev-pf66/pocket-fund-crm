@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { fetchAllRows } from './_db.js'
 import { requireEnv } from './_env.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
@@ -73,31 +74,31 @@ export async function handleGet(req, res) {
       return res.status(200).json({ success: true, data })
     }
 
-    // List investors with filters
-    let query = supabase
-      .from('crm_investors')
-      .select('*')
-      .order('updated_at', { ascending: false })
-      .limit(parseInt(limit))
+    // List investors with filters. Paged past PostgREST's silent 1,000-row cap (see _db.js).
+    const data = await fetchAllRows(() => {
+      let query = supabase
+        .from('crm_investors')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .order('id', { ascending: false })
 
-    if (status) {
-      query = query.eq('status', status)
-    }
-
-    if (investor_type) {
-      query = query.eq('investor_type', investor_type)
-    }
-
-    if (search) {
-      const sanitized = search.replace(/[%_,.()"'\\]/g, '')
-      if (sanitized) {
-        query = query.or(`name.ilike.%${sanitized}%,firm.ilike.%${sanitized}%,email.ilike.%${sanitized}%`)
+      if (status) {
+        query = query.eq('status', status)
       }
-    }
 
-    const { data, error } = await query
+      if (investor_type) {
+        query = query.eq('investor_type', investor_type)
+      }
 
-    if (error) throw error
+      if (search) {
+        const sanitized = search.replace(/[%_,.()"'\\]/g, '')
+        if (sanitized) {
+          query = query.or(`name.ilike.%${sanitized}%,firm.ilike.%${sanitized}%,email.ilike.%${sanitized}%`)
+        }
+      }
+
+      return query
+    }, { maxRows: parseInt(limit) || 100 })
 
     return res.status(200).json({
       success: true,
