@@ -3,6 +3,7 @@ import { requireEnv } from './_env.js'
 import { handleTags } from './_tags.js'
 import { handlePartners } from './_partners.js'
 import { handleMcp } from './_mcp.js'
+import { fetchAllRows } from './_db.js'
 import { authorizeMcp, mcpUnauthorized, handleProtectedResourceMetadata } from './_mcp-auth.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
@@ -162,27 +163,32 @@ export async function handleGet(req, res) {
     // List leads with filters. Archived leads are out of the working book by
     // default so this agrees with the app's boards and counts; pass
     // ?include_archived=true to see them.
-    let query = supabase
-      .from('crm_leads')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(parseInt(limit))
+    //
+    // Paged: PostgREST caps one select at 1,000 rows and returns the truncated
+    // page with NO error, so ?limit=10000 used to return exactly 1,000 once the
+    // book passed that (2026-10-15: live numbers read 1,000 leads / 3 clients,
+    // real 1,075 / 10). id breaks created_at ties so pages never skip or repeat.
+    const data = await fetchAllRows(() => {
+      let query = supabase
+        .from('crm_leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
 
-    if (include_archived !== 'true') {
-      query = query.eq('is_archived', false)
-    }
+      if (include_archived !== 'true') {
+        query = query.eq('is_archived', false)
+      }
 
-    if (stage) {
-      query = query.eq('stage', stage)
-    }
+      if (stage) {
+        query = query.eq('stage', stage)
+      }
 
-    if (lead_type) {
-      query = query.eq('lead_type', lead_type)
-    }
+      if (lead_type) {
+        query = query.eq('lead_type', lead_type)
+      }
 
-    const { data, error } = await query
-
-    if (error) throw error
+      return query
+    }, { maxRows: parseInt(limit) || 100 })
 
     return res.status(200).json({
       success: true,
@@ -212,20 +218,20 @@ async function handleStageEvents(req, res) {
       return res.status(400).json({ success: false, error: 'since must be YYYY-MM-DD' })
     }
 
-    let query = supabase
-      .from('crm_lead_stage_events')
-      .select('id, lead_id, from_stage, to_stage, changed_by, changed_at, crm_leads(name, stage, is_archived)')
-      .order('changed_at', { ascending: false })
-      .limit(parseInt(limit))
+    // Paged: PostgREST caps one select at 1,000 rows with no error (see _db.js).
+    const data = await fetchAllRows(() => {
+      let query = supabase
+        .from('crm_lead_stage_events')
+        .select('id, lead_id, from_stage, to_stage, changed_by, changed_at, crm_leads(name, stage, is_archived)')
+        .order('changed_at', { ascending: false })
+        .order('id', { ascending: false })
+      if (to_stage) query = query.eq('to_stage', to_stage)
+      if (from_stage) query = query.eq('from_stage', from_stage)
+      if (since) query = query.gte('changed_at', since)
+      return query
+    }, { maxRows: parseInt(limit) || 100 })
 
-    if (to_stage) query = query.eq('to_stage', to_stage)
-    if (from_stage) query = query.eq('from_stage', from_stage)
-    if (since) query = query.gte('changed_at', since)
-
-    const { data, error } = await query
-    if (error) throw error
-
-    const rows = (data || []).map(({ crm_leads: lead, ...event }) => ({
+    const rows = data.map(({ crm_leads: lead, ...event }) => ({
       ...event,
       lead_name: lead?.name ?? null,
       current_stage: lead?.stage ?? null,
