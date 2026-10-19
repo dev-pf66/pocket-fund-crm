@@ -168,13 +168,9 @@ export async function handleGet(req, res) {
     // page with NO error, so ?limit=10000 used to return exactly 1,000 once the
     // book passed that (2026-10-15: live numbers read 1,000 leads / 3 clients,
     // real 1,075 / 10). id breaks created_at ties so pages never skip or repeat.
-    const data = await fetchAllRows(() => {
-      let query = supabase
-        .from('crm_leads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-
+    // total is the exact row count for these filters, so a caller can check
+    // count === total (or raise limit) instead of guessing at truncation.
+    const filtered = (query) => {
       if (include_archived !== 'true') {
         query = query.eq('is_archived', false)
       }
@@ -188,11 +184,21 @@ export async function handleGet(req, res) {
       }
 
       return query
-    }, { maxRows: parseInt(limit) || 100 })
+    }
+    const [data, { count: total, error: countError }] = await Promise.all([
+      fetchAllRows(() => filtered(supabase
+        .from('crm_leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })), { maxRows: parseInt(limit) || 100 }),
+      filtered(supabase.from('crm_leads').select('id', { count: 'exact', head: true }))
+    ])
+    if (countError) throw countError
 
     return res.status(200).json({
       success: true,
       count: data.length,
+      total,
       data
     })
   } catch (error) {
