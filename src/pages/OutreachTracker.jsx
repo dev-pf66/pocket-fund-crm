@@ -1047,7 +1047,6 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
           industryOptions={industryOptions}
           dealSizeOptions={dealSizeOptions}
           locationOptions={locationOptions}
-          leadSourceOptions={leadSourceOptions}
           onRowEdit={(idx, field, value) => {
             setCsvPreview(prev => {
               const rows = [...prev.rows]
@@ -1445,7 +1444,7 @@ function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, peop
   )
 }
 
-function CsvPreviewModal({ rows, skipped, importing, people = [], currentPersonId, industryOptions, dealSizeOptions, locationOptions, leadSourceOptions, onRowEdit, onImport, onClose }) {
+function CsvPreviewModal({ rows, skipped, importing, people = [], currentPersonId, industryOptions, dealSizeOptions, locationOptions, onRowEdit, onImport, onClose }) {
   const [expandedIdx, setExpandedIdx] = useState(null)
   const dupeCount = rows.filter(r => r._dupe).length
   const newCount = rows.length - dupeCount

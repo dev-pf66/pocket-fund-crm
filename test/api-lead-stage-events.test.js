@@ -16,9 +16,10 @@ vi.mock('@supabase/supabase-js', () => ({
         select(cols) { h.calls.push(['from', table], ['select', cols]); return chain },
         order(col, opts) { h.calls.push(['order', col, opts]); return chain },
         limit(n) { h.calls.push(['limit', n]); return chain },
+        range(a, z) { h.calls.push(['range', a, z]); chain.slice = [a, z + 1]; return chain },
         eq(col, v) { h.calls.push(['eq', col, v]); return chain },
         gte(col, v) { h.calls.push(['gte', col, v]); return chain },
-        then(resolve) { return Promise.resolve({ data: h.rows, error: null }).then(resolve) }
+        then(resolve) { return Promise.resolve({ data: chain.slice ? h.rows.slice(...chain.slice) : h.rows, error: null }).then(resolve) }
       }
       return chain
     }
@@ -53,7 +54,7 @@ describe('GET /api/leads?view=stage_events', () => {
     expect(h.calls).toContainEqual(['from', 'crm_lead_stage_events'])
     expect(h.calls).toContainEqual(['eq', 'to_stage', 'client'])
     expect(h.calls).toContainEqual(['gte', 'changed_at', '2026-10-01'])
-    expect(h.calls).toContainEqual(['limit', 1000])
+    expect(h.calls).toContainEqual(['range', 0, 999])
     expect(h.calls.some(c => c[0] === 'from' && c[1] === 'crm_leads')).toBe(false)
   })
 
