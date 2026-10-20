@@ -5,6 +5,7 @@ import { handlePartners } from './_partners.js'
 import { handleMcp } from './_mcp.js'
 import { fetchAllRows } from './_db.js'
 import { authorizeMcp, mcpUnauthorized, handleProtectedResourceMetadata } from './_mcp-auth.js'
+import { resolvePersonByEmail } from './_people.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -289,11 +290,17 @@ export async function handlePost(req, res) {
     // has to say who the lead belongs to. Rejecting is the only honest option:
     // defaulting to some house account would put leads in a book nobody reads,
     // and defaulting to NULL is the bug this replaces.
-    const ownerId = body.assigned_to ?? body.created_by
-    if (ownerId === undefined || ownerId === null || ownerId === '') {
+    let ownerId = body.assigned_to ?? body.created_by
+    const noOwner = (v) => v === undefined || v === null || v === ''
+    if (noOwner(ownerId) && typeof body.owner_email === 'string' && body.owner_email.trim()) {
+      const owner = await resolvePersonByEmail(supabase, body.owner_email, 'owner_email')
+      if (owner.error) return res.status(400).json({ success: false, error: owner.error })
+      ownerId = owner.id
+    }
+    if (noOwner(ownerId)) {
       return res.status(400).json({
         success: false,
-        error: 'assigned_to (or created_by) is required — a lead with no owner is invisible to everyone but an admin. Pass the person id of whoever this lead belongs to.'
+        error: 'assigned_to (or created_by, or owner_email) is required — a lead with no owner is invisible to everyone but an admin. Pass the person id or email of whoever this lead belongs to.'
       })
     }
 
