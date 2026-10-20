@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { fetchAllRows } from './_db.js'
 import { requireEnv } from './_env.js'
+import { resolvePersonByEmail } from './_people.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -86,7 +87,8 @@ export async function handleGet(req, res) {
 export async function handlePost(req, res) {
   try {
     const body = req.body || {}
-    const { lead_id, activity_type, notes, activity_date, logged_by } = body
+    const { lead_id, activity_type, notes, activity_date } = body
+    let logged_by = body.logged_by
 
     if (!lead_id) {
       return res.status(400).json({ success: false, error: 'lead_id is required' })
@@ -97,6 +99,15 @@ export async function handlePost(req, res) {
         success: false,
         error: `Invalid activity_type. Must be one of: ${VALID_ACTIVITY_TYPES.join(', ')}`
       })
+    }
+
+    // logged_by_email: the scoreboard credits calls by logged_by, so an
+    // unattributed activity is a call nobody made. See api/_people.js.
+    if ((logged_by === undefined || logged_by === null || logged_by === '') &&
+        typeof body.logged_by_email === 'string' && body.logged_by_email.trim()) {
+      const who = await resolvePersonByEmail(supabase, body.logged_by_email, 'logged_by_email')
+      if (who.error) return res.status(400).json({ success: false, error: who.error })
+      logged_by = who.id
     }
 
     const date = activity_date || new Date().toISOString()

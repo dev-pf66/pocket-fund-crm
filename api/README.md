@@ -189,6 +189,7 @@ Content-Type: application/json
 | `name` | string | **Yes** | Lead name (cannot be empty) |
 | `assigned_to` | integer | **Yes** | Person id who owns this lead. Required — a lead with no owner is invisible to everyone but an admin under RLS, and absent from every per-person surface. `created_by` is accepted in its place; whichever you send, both are set. |
 | `created_by` | integer | No | Defaults to `assigned_to` |
+| `owner_email` | string | No | Use instead of `assigned_to` when you know who owns the lead but not their CRM id (the task tracker's call log does this). Matched case-insensitively against `people.email`; no match, an archived account, or two live matches is a 400. An explicit `assigned_to`/`created_by` wins. |
 | `email` | string | No | |
 | `phone` | string | No | |
 | `firm_name` | string | No | |
@@ -369,6 +370,7 @@ Log an activity on a lead. Also stamps the lead's `last_activity_date` / `last_a
 | `notes` | string | No | |
 | `activity_date` | string | No | ISO timestamp; defaults to now |
 | `logged_by` | integer | No | Person ID; omit for agent-logged activities |
+| `logged_by_email` | string | No | Use instead of `logged_by` when you know who made the call but not their CRM id. Same matching and 400s as `owner_email` on leads. The scoreboard credits calls by `logged_by`, so a call logged without either counts for nobody. |
 
 **Example:**
 ```bash
