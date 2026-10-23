@@ -65,7 +65,7 @@ export function buildNavGroups({ isAdmin = false, notifications = {} } = {}) {
         },
         { to: '/outreach', label: 'Tracker', icon: 'Target' },
         { to: '/cold-calls', label: 'Cold Calls', icon: 'PhoneCall' },
-        { to: '/outreach-admin', label: 'Log', icon: 'ClipboardList', show: isAdmin },
+        { to: '/outreach-admin', label: 'Log', icon: 'ClipboardList' },
       ],
     },
     {

@@ -16,7 +16,7 @@
 //  3. The overdue badge must ride on Today. It used to live on the
 //     Notifications entry, and deleting that entry would otherwise delete the
 //     only "you are behind" signal in the chrome.
-//  4. Log is admin-only. Team-wide outreach history is not an analyst surface.
+//  4. Log is visible to all users (Oct 2026, Dev's call — analysts need the queue feature).
 //  5. The five contact tables stay (Dev's standing July 2026 decision).
 
 import { describe, it, expect } from 'vitest'
@@ -30,13 +30,13 @@ const appJsx = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8
 const routeExists = (path) => appJsx.includes(`path="${path}"`)
 
 describe('the menu is short', () => {
-  it('gives an analyst 11 items, not 14', () => {
-    expect(navRoutes(analyst)).toHaveLength(11)
+  it('gives an analyst 12 items, not 14', () => {
+    expect(navRoutes(analyst)).toHaveLength(12)
   })
 
-  it('gives the daily group 3 items for an analyst, 4 for an admin', () => {
+  it('gives the daily group 4 items for an analyst, 4 for an admin', () => {
     const daily = (o) => buildNavGroups(o).find(g => g.label === 'Daily Work').items
-    expect(daily(analyst)).toHaveLength(3)
+    expect(daily(analyst)).toHaveLength(4)
     expect(daily(admin)).toHaveLength(4)
   })
 
@@ -94,9 +94,9 @@ describe('no tab was removed by deleting a page', () => {
 })
 
 describe('what stays', () => {
-  it('keeps Log for admins only — team-wide history is not an analyst surface', () => {
+  it('keeps Log for everyone — analysts need the queue feature (Oct 2026)', () => {
     expect(navRoutes(admin)).toContain('/outreach-admin')
-    expect(navRoutes(analyst)).not.toContain('/outreach-admin')
+    expect(navRoutes(analyst)).toContain('/outreach-admin')
   })
 
   it('keeps Tracker and Cold Calls for everyone', () => {
