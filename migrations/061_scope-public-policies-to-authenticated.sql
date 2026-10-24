@@ -14,6 +14,8 @@
 --
 -- Run via the /migrate skill. Idempotent. Verify afterwards from outside with
 -- the anon key: reads should return 0 rows and writes 42501.
+
+DO $$
 DECLARE
   p RECORD;
   n INT := 0;
