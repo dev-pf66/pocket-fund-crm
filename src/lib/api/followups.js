@@ -13,6 +13,7 @@ import { supabase } from '../supabase.js'
 import { istToday, istAddDays } from '../dateUtils.js'
 import { cacheClear } from './core.js'
 import { updateLead, logActivity } from './leads.js'
+import { ownerScopeIds, scopeToOwners } from './cover.js'
 
 // A lead that's won or dead never nags.
 const TERMINAL_STAGES = ['client', 'passed']
@@ -255,7 +256,7 @@ export async function getFollowUpNotifications(personId = null, { limit = 8 } = 
     .gte('next_follow_up_date', floor)
     .not('stage', 'in', `(${TERMINAL_STAGES.join(',')})`)
     .order('next_follow_up_date')
-  if (personId) q = q.eq('assigned_to', personId)
+  q = scopeToOwners(q, await ownerScopeIds(personId))
 
   const { data, error } = await q
   if (error) throw error
@@ -293,7 +294,7 @@ export async function getFollowUpBoard(personId = null, { upcomingDays = 14, ove
     .gte('next_follow_up_date', floor)
     .not('stage', 'in', `(${TERMINAL_STAGES.join(',')})`)
     .order('next_follow_up_date')
-  if (personId) q = q.eq('assigned_to', personId)
+  q = scopeToOwners(q, await ownerScopeIds(personId))
 
   const { data, error } = await q
   if (error) throw error

@@ -8,6 +8,7 @@ import { supabase } from '../supabase.js'
 import { normalizeLinkedInUrl, linkedInProfileSlug } from '../linkedin.js'
 import { cacheGet, cacheSet, cacheClear, fireTTEvent, istDateStr, getDaysBetween, fetchAllRows } from './core.js'
 import { getCRMSettings } from './misc.js'
+import { getCoveredOwnerIds } from './cover.js'
 import { AWAITING_STATUSES } from '../outreachStatus.js'
 
 // ============================================================================
@@ -188,11 +189,21 @@ async function runStageSideEffects(lead, oldStage, newStage, currentPersonId = n
  * Get leads with optional filters. When personId is provided, restricts
  * results to leads the person created OR is assigned to, so each user
  * only sees their own book.
+ *
+ * filters.includeCovered also brings in the books that person covers
+ * (./cover.js) — the Pipeline board passes it so a non-admin maintaining
+ * someone else's leads can actually see them. Off by default: the dashboard
+ * and stats read through here and must keep counting the person's own book.
  */
 export async function getLeads(filters = {}, personId = null) {
   const cacheKey = 'leads:' + (personId ?? 'all') + ':' + JSON.stringify(filters)
   const cached = cacheGet(cacheKey, 15000) // 15s TTL
   if (cached) return cached
+
+  const covered = personId && filters.includeCovered ? await getCoveredOwnerIds(personId) : []
+  const ownerScope = covered.length
+    ? `created_by.eq.${personId},assigned_to.in.(${[personId, ...covered].join(',')})`
+    : `created_by.eq.${personId},assigned_to.eq.${personId}`
 
   // Built fresh per page: a Supabase query builder is single-use, so
   // fetchAllRows needs a factory rather than one shared builder.
@@ -210,7 +221,7 @@ export async function getLeads(filters = {}, personId = null) {
     if (filters.stage) query = query.eq('stage', filters.stage)
     if (filters.lead_type) query = query.eq('lead_type', filters.lead_type)
     if (filters.needs_sample_deals !== undefined) query = query.eq('needs_sample_deals', filters.needs_sample_deals)
-    if (personId) query = query.or(`created_by.eq.${personId},assigned_to.eq.${personId}`)
+    if (personId) query = query.or(ownerScope)
     return query
   }
 
