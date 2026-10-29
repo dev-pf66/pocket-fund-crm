@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../App'
 import { getPeople, setUserAdmin, deleteUser, adminSetUserPassword, generateTempPassword, setUserArchived, setUserTargets } from '../lib/supabase'
-import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption, previewArchiveSweep, runArchiveSweep, undoArchiveSweep, countOwnedRecords, reassignOwnedRecords } from '../lib/crm-api'
+import { getLeadTypeOptions, addLeadTypeOption, deleteLeadTypeOption, getFieldOptions, addFieldOption, deleteFieldOption, previewArchiveSweep, runArchiveSweep, undoArchiveSweep, countOwnedRecords, reassignOwnedRecords, getLeadCoverLinks, startLeadCover, endLeadCover } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
 import StalenessSettings from '../components/StalenessSettings'
 import TagManager from '../components/TagManager'
@@ -300,6 +300,10 @@ function Admin() {
   const [targetsDaily, setTargetsDaily] = useState('')
   const [targetsWeekly, setTargetsWeekly] = useState('')
   const [savingTargets, setSavingTargets] = useState(false)
+  // Lead cover (migration 062): open coverer → owner links. A coverer gets the
+  // owner's leads on their Today / notifications / Pipeline "My Leads".
+  const [coverLinks, setCoverLinks] = useState([])
+  const [coverLoadFailed, setCoverLoadFailed] = useState(false)
 
   // Lead type state
   const [leadTypes, setLeadTypes] = useState([])
@@ -307,6 +311,44 @@ function Admin() {
   const [newTypeName, setNewTypeName] = useState('')
   const [addingType, setAddingType] = useState(false)
   const [deletingTypeId, setDeletingTypeId] = useState(null)
+
+  useEffect(() => {
+    getLeadCoverLinks()
+      .then(setCoverLinks)
+      .catch(err => {
+        console.error('Failed to load lead cover:', err)
+        setCoverLoadFailed(true)
+      })
+  }, [])
+
+  async function handleStartCover(coverer, ownerId) {
+    const owner = users.find(p => p.id === ownerId)
+    setActingId(coverer.id)
+    try {
+      const link = await startLeadCover(coverer.id, ownerId, currentPerson?.id)
+      setCoverLinks(prev => prev.some(l => l.id === link.id) ? prev : [...prev, link])
+      toast.success(`${coverer.name || coverer.email} now covers ${owner?.name || 'that person'}'s leads`)
+    } catch (err) {
+      toast.error(err.message || 'Could not start cover')
+    } finally {
+      setActingId(null)
+    }
+  }
+
+  async function handleEndCover(coverer, ownerId) {
+    const owner = users.find(p => p.id === ownerId)
+    if (!window.confirm(`Stop ${coverer.name || coverer.email} covering ${owner?.name || 'this person'}'s leads? Their leads leave ${coverer.name || 'this person'}'s Today and notifications. Nothing is reassigned or deleted.`)) return
+    setActingId(coverer.id)
+    try {
+      await endLeadCover(coverer.id, ownerId, currentPerson?.id)
+      setCoverLinks(prev => prev.filter(l => !(l.coverer_id === coverer.id && l.owner_id === ownerId)))
+      toast.success('Cover ended')
+    } catch (err) {
+      toast.error(err.message || 'Could not end cover')
+    } finally {
+      setActingId(null)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -684,6 +726,12 @@ function Admin() {
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Email</th>
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Role</th>
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Targets</th>
+                  <th
+                    style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}
+                    title="Covers: this person also gets these people's leads on their Today, notifications and Pipeline 'My Leads'. Ownership does not move."
+                  >
+                    Covers
+                  </th>
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Joined</th>
                   <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151', textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -729,6 +777,42 @@ function Admin() {
                             ? `${u.daily_outreach_target ?? 0}/day · ${u.weekly_outreach_target ?? 0}/wk`
                             : 'No target'}
                         </button>
+                      </td>
+                      <td style={{ padding: '10px 8px' }}>
+                        {coverLoadFailed ? (
+                          <span style={{ fontSize: '12px', color: '#b91c1c' }}>couldn&apos;t load</span>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                            {coverLinks.filter(l => l.coverer_id === u.id).map(l => {
+                              const owner = users.find(p => p.id === l.owner_id)
+                              return (
+                                <button
+                                  key={l.id}
+                                  className="btn btn-sm"
+                                  onClick={() => handleEndCover(u, l.owner_id)}
+                                  disabled={busy}
+                                  title={`Covering ${owner?.name || 'unknown'}'s leads since ${new Date(l.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}. Click to stop.`}
+                                >
+                                  {owner?.name || `#${l.owner_id}`} ×
+                                </button>
+                              )
+                            })}
+                            {!u.is_archived && (
+                              <select
+                                value=""
+                                onChange={(e) => e.target.value && handleStartCover(u, Number(e.target.value))}
+                                disabled={busy}
+                                aria-label={`Choose whose leads ${u.name || u.email} covers`}
+                                style={{ fontSize: '12px', padding: '2px 4px' }}
+                              >
+                                <option value="">+ cover…</option>
+                                {users
+                                  .filter(p => p.id !== u.id && !p.is_archived && !coverLinks.some(l => l.coverer_id === u.id && l.owner_id === p.id))
+                                  .map(p => <option key={p.id} value={p.id}>{p.name || p.email}</option>)}
+                              </select>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '10px 8px', color: '#6b7280' }}>
                         {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}

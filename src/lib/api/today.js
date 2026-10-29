@@ -10,13 +10,15 @@ import { logActivity, calculateStaleness, updateLead } from './leads.js'
 import { runBulk } from '../bulkActions.js'
 import { advanceFollowUpCadence, clearFollowUp, snoozeFollowUp } from './followups.js'
 import { getCRMSettings } from './misc.js'
+import { ownerScopeIds, scopeToOwners } from './cover.js'
 
 // ============================================================================
 // TODAY TAB API
 // ============================================================================
 // Per-user daily work queue (src/pages/Today.jsx). Every fetch is scoped to
-// the current person via assigned_to (RLS applies on top as the signed-in
-// user); admins pass null where noted to see everything. Staleness
+// the current person's leads PLUS the books they cover (./cover.js — Sidharth
+// maintains Dev's), via assigned_to; RLS applies on top as the signed-in
+// user; admins pass null where noted to see everything. Staleness
 // thresholds come from crm_settings with 3/7/14 fallbacks.
 
 // Ranking weights: warm/responded leads outrank a booked meeting waiting on
@@ -88,13 +90,13 @@ export function todayRank(lead) {
 export async function getTodayQueue(personId, { limit = 25 } = {}) {
   if (!personId) return { leads: [], total: 0 }
   const today = istDateStr()
+  const owners = await ownerScopeIds(personId)
 
-  const { data, error } = await supabase
+  const { data, error } = await scopeToOwners(supabase
     .from('crm_leads')
     .select('*')
-    .eq('assigned_to', personId)
     .eq('is_archived', false)
-    .in('stage', TODAY_QUEUE_STAGES)
+    .in('stage', TODAY_QUEUE_STAGES), owners)
   if (error) throw error
 
   const candidates = (data || []).filter(lead => {
@@ -168,13 +170,13 @@ export async function getFollowUpsDue(personId) {
   const today = istDateStr()
   const horizon = istAddDays(today, RECENT_WINDOW_DAYS)
   const floor = istAddDays(today, -RECENT_WINDOW_DAYS)
+  const owners = await ownerScopeIds(personId)
 
-  const { data, error } = await supabase
+  const { data, error } = await scopeToOwners(supabase
     .from('crm_leads')
     .select('*')
-    .eq('assigned_to', personId)
     .eq('is_archived', false)
-    .not('stage', 'in', '(passed,client)')
+    .not('stage', 'in', '(passed,client)'), owners)
   if (error) throw error
 
   const marks = new Set([t.cold, t.warm, t.active])
@@ -204,6 +206,7 @@ export async function getFollowUpsDue(personId) {
  */
 export async function getEscalations(personId = null, { limit = 10 } = {}) {
   const t = await getTodayThresholds()
+  const owners = await ownerScopeIds(personId)
 
   // Paged: team-wide this is every open lead, and the sort below runs over
   // the whole set — a truncated page wouldn't just shorten the list, it would
@@ -214,8 +217,7 @@ export async function getEscalations(personId = null, { limit = 10 } = {}) {
       .select('*')
       .eq('is_archived', false)
       .not('stage', 'in', '(passed,client)')
-    if (personId) q = q.eq('assigned_to', personId)
-    return q
+    return scopeToOwners(q, owners)
   })
 
   const escalations = data.filter(lead => {
@@ -314,13 +316,15 @@ export async function getTodayCounters(personId) {
   const thisWeekStart = istWeekStart(istDateStr())
   const lastWeekStart = istAddDays(thisWeekStart, -7)
   const activityFrom = new Date(lastWeekStart + 'T00:00:00+05:30').toISOString()
+  const owners = await ownerScopeIds(personId)
 
-  const leadsQ = supabase
+  // Overdue covers the books this person covers; touches stay THEIR OWN work
+  // (logged_by), never the owner's.
+  const leadsQ = scopeToOwners(supabase
     .from('crm_leads')
     .select('id, stage, created_at, last_activity_date')
     .eq('is_archived', false)
-    .eq('assigned_to', personId)
-    .not('stage', 'in', '(passed,client)')
+    .not('stage', 'in', '(passed,client)'), owners)
 
   const touchesQ = supabase
     .from('crm_lead_activities')

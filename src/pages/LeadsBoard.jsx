@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, moveLead, updateLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus, bulkMarkTouched, leadOwnerId, getTags, getTagsByLead, addTagToLeads, createTag } from '../lib/crm-api'
+import { getLeads, moveLead, updateLead, getCRMSettings, cachePeek, getDemoLeadIds, getLeadLatestOutreachStatus, bulkMarkTouched, leadOwnerId, getCoveredOwnerIds, getTags, getTagsByLead, addTagToLeads, createTag } from '../lib/crm-api'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import LeadCard from '../components/LeadCard'
@@ -126,6 +126,9 @@ function LeadsBoard() {
   // Map<lead_id, latest_outreach_status>. Drives the response-status filter.
   const [responseStatusByLead, setResponseStatusByLead] = useState(() => new Map())
   const [settings, setSettings] = useState(null)
+  // Owners whose books this person covers (crm_lead_cover) — their leads load
+  // onto this board and count as "My Leads".
+  const [coveredOwnerIds, setCoveredOwnerIds] = useState(() => new Set())
   const [showAddForm, setShowAddForm] = useState(false)
   const [draggedLead, setDraggedLead] = useState(null)
   const [showFilters, setShowFilters] = useSessionState('lb:showFilters', false)
@@ -189,13 +192,16 @@ function LeadsBoard() {
     if (!currentPerson?.id) return
     try {
       // Admins pull everything (leadScopeId null); non-admins pull their own.
-      const [data, demoIds, statusMap, tagList, tagMap] = await Promise.all([
-        getLeads({ includeArchived: showArchived }, leadScopeId),
+      const [data, demoIds, statusMap, tagList, tagMap, covered] = await Promise.all([
+        // includeCovered: a non-admin covering someone else's book loads it too.
+        getLeads({ includeArchived: showArchived, includeCovered: true }, leadScopeId),
         getDemoLeadIds(leadScopeId).catch(() => new Set()),
         getLeadLatestOutreachStatus(leadScopeId).catch(() => new Map()),
         getTags().catch(() => []),
-        getTagsByLead().catch(() => new Map())
+        getTagsByLead().catch(() => new Map()),
+        getCoveredOwnerIds(currentPerson.id).catch(() => [])
       ])
+      setCoveredOwnerIds(new Set(covered))
       setTags(tagList)
       setTagsByLead(tagMap)
       setLeads(data)
@@ -347,9 +353,9 @@ function LeadsBoard() {
       // leadOwnerId, not assigned_to: the board lists a lead if you created it
       // OR own it, and the card already says "Added by <you>", so filtering on
       // assigned_to alone filed your own leads under "Unassigned" and hid them
-      // from "My Leads".
+      // from "My Leads". A book you cover counts as yours here too.
       const ownerId = leadOwnerId(lead)
-      if (assignmentFilter === 'mine' && ownerId !== currentPerson?.id) continue
+      if (assignmentFilter === 'mine' && ownerId !== currentPerson?.id && !coveredOwnerIds.has(ownerId)) continue
       if (assignmentFilter === 'unassigned' && ownerId != null) continue
 
       // Analyst filter (specific person — admins use this to drill into a
@@ -472,7 +478,7 @@ function LeadsBoard() {
     }
 
     return result
-  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead, tagFilter, tagsByLead, healthFilter])
+  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, coveredOwnerIds, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead, tagFilter, tagsByLead, healthFilter])
 
   // Counts for the "needs attention" dropdown, over the leads this board can
   // actually render. Counting stages the board never shows (passed,

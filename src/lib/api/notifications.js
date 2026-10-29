@@ -42,6 +42,7 @@ import { istToday, istAddDays } from '../dateUtils.js'
 import { fetchAllRows, getDaysBetween } from './core.js'
 import { getCallbacksDue } from './calls.js'
 import { getTodayThresholds } from './today.js'
+import { ownerScopeIds, scopeToOwners } from './cover.js'
 
 const TERMINAL_LEAD_STAGES = ['client', 'passed']
 const ENGAGED_STAGES = ['responded', 'meeting_booked', 'warm_active']
@@ -115,6 +116,7 @@ function describeTiming(dateStr, today) {
 /** Scheduled reach-outs on leads: the original signal, minus the 14-day floor. */
 async function leadFollowUps(personId, today) {
   const horizon = istAddDays(today, UPCOMING_DAYS)
+  const owners = await ownerScopeIds(personId)
   const rows = await fetchAllRows(() => {
     let q = supabase
       .from('crm_leads')
@@ -125,8 +127,7 @@ async function leadFollowUps(personId, today) {
       .not('stage', 'in', `(${TERMINAL_LEAD_STAGES.join(',')})`)
       .order('next_follow_up_date')
       .order('id')
-    if (personId) q = q.eq('assigned_to', personId)
-    return q
+    return scopeToOwners(q, owners)
   })
 
   return rows.map(l => {
@@ -164,6 +165,7 @@ async function leadFollowUps(personId, today) {
  * rows for one lead is how a feed starts feeling like noise.
  */
 async function wentQuiet(personId, today, thresholds) {
+  const owners = await ownerScopeIds(personId)
   const rows = await fetchAllRows(() => {
     let q = supabase
       .from('crm_leads')
@@ -172,8 +174,7 @@ async function wentQuiet(personId, today, thresholds) {
       .in('stage', ENGAGED_STAGES)
       .is('next_follow_up_date', null)
       .order('id')
-    if (personId) q = q.eq('assigned_to', personId)
-    return q
+    return scopeToOwners(q, owners)
   })
 
   const limitFor = {

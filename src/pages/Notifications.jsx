@@ -228,6 +228,7 @@ function Notifications() {
           items={visible.filter(i => i.urgency === bucket.key)}
           personById={personById}
           showOwner={isAdmin && showAllOwners}
+          viewerId={currentPerson?.id}
           pendingId={pendingId}
           handlers={{ handleTouch, handleSnooze, handleClear, handleClaim }}
         />
@@ -243,7 +244,7 @@ function Notifications() {
   )
 }
 
-function Section({ title, subtitle, tone, items, personById, showOwner, pendingId, handlers }) {
+function Section({ title, subtitle, tone, items, personById, showOwner, viewerId, pendingId, handlers }) {
   if (!items.length) return null
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '16px' }}>
@@ -265,7 +266,11 @@ function Section({ title, subtitle, tone, items, personById, showOwner, pendingI
           <Row
             key={item.id}
             item={item}
-            ownerName={showOwner ? (personById.get(item.ownerId)?.name || 'Unassigned') : null}
+            // Also named when the item is from a book the viewer covers
+            // (crm_lead_cover), so it never reads as their own lead.
+            ownerName={showOwner || (item.ownerId && item.ownerId !== viewerId)
+              ? (personById.get(item.ownerId)?.name || 'Unassigned')
+              : null}
             busy={pendingId === item.id}
             handlers={handlers}
           />

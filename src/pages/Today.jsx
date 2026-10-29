@@ -82,6 +82,14 @@ function Today() {
     return map
   }, [people])
 
+  // A lead from a book this person covers (crm_lead_cover) rather than their
+  // own: name the owner on the row so the two are never confused.
+  const coveredOwnerName = (lead) => {
+    if (!lead.assigned_to || lead.assigned_to === currentPerson?.id) return null
+    const name = personById.get(lead.assigned_to)?.name || 'someone else'
+    return name.charAt(0).toUpperCase() + name.slice(1)
+  }
+
   // Every movement update goes through here. Writing the refresh separately
   // from the initial load is what let them drift: the refresh set `movement`
   // but neither `movementFailed` nor `comparableFrom`, so a transient error on
@@ -573,6 +581,7 @@ function Today() {
               onTouched={handleTouched}
               onSnooze={handleSnooze}
               onDismiss={handleDismiss}
+              coveredOwner={coveredOwnerName(lead)}
               selected={selectedIds.has(lead.id)}
               onToggleSelect={() => toggleSelect(lead.id)}
             />
@@ -605,6 +614,7 @@ function Today() {
               onTouched={handleTouched}
               onSnooze={handleSnooze}
               onDismiss={handleDismiss}
+              coveredOwner={coveredOwnerName(lead)}
               contextOverride={followUpContext(lead)}
               selected={selectedIds.has(lead.id)}
               onToggleSelect={() => toggleSelect(lead.id)}
@@ -629,7 +639,7 @@ function Today() {
               settings={settings}
               busy={pendingId === lead.id}
               pinged={pingedIds.has(lead.id)}
-              ownerName={isAdmin ? (personById.get(leadOwnerId(lead))?.name || 'Unassigned') : null}
+              ownerName={isAdmin ? (personById.get(leadOwnerId(lead))?.name || 'Unassigned') : coveredOwnerName(lead)}
               onPing={handlePingDev}
             />
           ))
@@ -714,7 +724,7 @@ function followUpContext(lead) {
   return `day ${daysStaleFor(lead)} since last touch — cadence mark`
 }
 
-function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contextOverride, selected, onToggleSelect }) {
+function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contextOverride, coveredOwner, selected, onToggleSelect }) {
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
   const [showSnooze, setShowSnooze] = useState(false)
@@ -752,6 +762,7 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
             {lead.firm_name && <span style={{ color: '#6b7280', fontSize: '13px' }}>— {lead.firm_name}</span>}
             <StageChip stage={lead.stage} />
             {settings && <StalenessBadge lead={lead} settings={settings} />}
+            {coveredOwner && <CoveredOwnerChip name={coveredOwner} />}
           </div>
           <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
             {contextOverride || touchContext(lead)}
@@ -851,6 +862,18 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
         </div>
       )}
     </div>
+  )
+}
+
+/** "Dev's lead" — marks a lead from a book the viewer covers, not their own. */
+function CoveredOwnerChip({ name }) {
+  return (
+    <span
+      title={`You cover ${name}'s leads. Still ${name}'s lead — your work on it is credited to you.`}
+      style={{ fontSize: '11px', fontWeight: 500, color: '#5b21b6', background: '#ede9fe', borderRadius: '9999px', padding: '1px 8px' }}
+    >
+      {name}&apos;s lead
+    </span>
   )
 }
 
