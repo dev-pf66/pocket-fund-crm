@@ -318,21 +318,75 @@ function OutreachTracker() {
         return
       }
 
-      // Dedup check against already-loaded leads (name+firm, case-insensitive)
-      const byNameFirm = new Map()
-      for (const l of leads) {
-        const key = `${(l.name || '').toLowerCase()}|${(l.firm_name || '').toLowerCase()}`
-        byNameFirm.set(key, l)
+      // Apply the same date default logOutreachBatch would apply, so the
+      // dedup key matches what is already stored.
+      const today = istToday()
+      const rowsWithDefaults = validRows.map(r => ({
+        ...r,
+        outreach_date: r.outreach_date || today,
+      }))
+
+      // Load existing log (90 days back) for dedup matching.
+      const existingLog = await getOutreachLog({ days_back: 90 }, currentPerson?.id)
+
+      // Key: "lead_name|date|type" — first match wins if multiple exist.
+      const existingMap = new Map()
+      for (const entry of existingLog) {
+        const key = `${(entry.lead_name || '').toLowerCase().trim()}|${entry.outreach_date}|${entry.outreach_type}`
+        if (!existingMap.has(key)) existingMap.set(key, entry)
       }
-      const previewRows = validRows.map(row => {
-        const key = `${(row.lead_name || '').toLowerCase()}|${(row.firm_name || '').toLowerCase()}`
-        const nameOnly = `${(row.lead_name || '').toLowerCase()}|`
-        const existing = byNameFirm.get(key) || byNameFirm.get(nameOnly) || null
-        return { ...row, _dupe: !!existing, _existingLead: existing, _edits: {} }
-      })
-      setCsvPreview({ rows: previewRows, skipped })
+
+      // Fields that can meaningfully change on a re-upload.
+      const COMPARABLE = ['status', 'notes', 'message_content', 'platform_details', 'fit_score']
+
+      const toInsert = []
+      const toUpdate = [] // { id, changes }
+      let unchangedCount = 0
+
+      for (const row of rowsWithDefaults) {
+        const key = `${(row.lead_name || '').toLowerCase().trim()}|${row.outreach_date}|${row.outreach_type}`
+        const existing = existingMap.get(key)
+
+        if (!existing) {
+          toInsert.push(row)
+          continue
+        }
+
+        const changes = {}
+        for (const field of COMPARABLE) {
+          const newVal = row[field] ?? null
+          const oldVal = existing[field] ?? null
+          if (String(newVal ?? '') !== String(oldVal ?? '')) changes[field] = newVal
+        }
+
+        if (Object.keys(changes).length === 0) {
+          unchangedCount++
+        } else {
+          toUpdate.push({ id: existing.id, changes })
+        }
+      }
+
+      let insertedCount = 0
+      if (toInsert.length > 0) {
+        insertedCount = await logOutreachBatch(toInsert, currentPerson?.id)
+      }
+
+      let updatedCount = 0
+      for (const { id, changes } of toUpdate) {
+        await updateOutreach(id, changes)
+        updatedCount++
+      }
+
+      const parts = []
+      if (insertedCount > 0) parts.push(`${insertedCount} added`)
+      if (updatedCount > 0) parts.push(`${updatedCount} updated`)
+      if (unchangedCount > 0) parts.push(`${unchangedCount} unchanged`)
+      if (skipped > 0) parts.push(`${skipped} skipped (no name)`)
+      toast.success(parts.join(' · ') || 'Nothing to import')
+
       setCsvFile(null)
       setShowCsvUpload(false)
+      setFilter(f => ({ ...f, view: 'all' }))
     } catch (error) {
       console.error('CSV upload failed:', error)
       toast.error('Failed to upload CSV: ' + error.message)
