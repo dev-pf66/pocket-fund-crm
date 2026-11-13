@@ -684,7 +684,10 @@ function OutreachTracker() {
             <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/day</span>
           </div>
           <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--gray-600)' }}>
-            {weeklyStats.filter(d => d.goal_met).length}/{weeklyStats.length} days hit goal
+            {/* "days hit goal" with no target set read as a quota nobody agreed
+                to (targets zeroed Aug 2026). With no target, goal_met is
+                "any outreach that day" — so say that. */}
+            {weeklyStats.filter(d => d.goal_met).length}/{weeklyStats.length} {hasGoal ? 'days hit goal' : 'days with outreach'}
           </div>
         </div>
       </div>

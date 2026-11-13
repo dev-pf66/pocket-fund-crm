@@ -316,8 +316,16 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     ability to save a lead.
   - `disposed_at` counts as a touch in `daysSinceTouch`, so answering the clock resets it. The
     clock asks "has someone said what is happening", not "has a row changed".
-  - **Never archives and never deletes.** A passed lead stays in the pipeline's passed column so
-    the team can see what was lost and why. Archiving is a separate bulk admin act.
+  - **Never archives and never deletes.** A passed lead keeps its row (stage `passed`) so the
+    team can see what was lost and why. Archiving is a separate bulk admin act.
+  - **Passed leads are NOT on the Pipeline board, by design** (Dev, 2026-11-13: "the past leads
+    don't need to be on the board. We just need them in our database. We don't want to delete
+    them."). `LeadsBoard.jsx` has no Passed column — don't add one. They stay queryable.
+  - **Today's one-click Dead stays reason-free** (Dev, 2026-11-13, asked whether it should open
+    the disposition popup to force a reason: "it does not need a reason... if they're dead, then
+    they're dead"). Don't route it through `DispositionModal`. The modal's own `dead` reason
+    requirement (above) is unchanged — it gates that deliberate 30-day answer only, and was not
+    part of the question.
   - **`STALE_SURFACE_WINDOW_DAYS = 30`** — a breach surfaces only if it crossed the clock within
     the last 30 days. `isStaleBreach` stays true for the whole backlog (73 leads today; 41 surface,
     32 do not). If a refactor makes the two agree, 32 leads silently cease to exist — there is a
@@ -378,6 +386,17 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     (`responded`/`meeting_booked`/`warm_active`; follow-ups also keep `reach_out_later`, who did
     respond). An `outreach` lead has never answered and belongs to Cold Calls / Tracker / Pipeline.
     MCP `get_my_day` inherits it via `getTodayQueue`. Guardrail: `test/today-responded-only.test.js`.
+  - **"Touched" and "Reached out" are deliberately different words** (Dev, 2026-11-13): touched =
+    a lead you are already in conversation with; reached out = first outreach. Don't unify the
+    button labels across Today and Notifications. Note they also write different activity notes
+    (`markLeadTouched` → `Touched…`, `logFollowUpTouch` → `Followed up…`), and the scoreboard's
+    "F/U done" column counts only the `Followed up` prefix — a follow-up cleared from Today's
+    "Follow-ups due" section with Touched does not count there. Raised with Dev 2026-11-13;
+    unresolved, and it is scoreboard maths, so don't change it from a UI pass.
+- **Card click on the Pipeline board opens the lead in a popup** (Dev, 2026-11-13 — same as the
+  other boards), with an "Open full page" link to `/leads/:id` for everything else. The popup is
+  `LeadForm` in edit mode and saves only the fields that changed, through the same `updateLead`
+  path as the detail page. Dragging still goes through `moveLead`.
 - **The left menu is data, in `src/lib/nav.js`** (Sept 2026) — pure and icon-free (names resolved
   to elements by an `ICONS` map in `Layout.jsx`) so `test/nav-shape.test.js` can pin the shape in
   the node-environment suite. Adding a tab means editing that module, and the test will tell you

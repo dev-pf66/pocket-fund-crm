@@ -10,6 +10,10 @@
   --primary-hover: #1d4ed8;
   --primary-subtle: rgba(37, 99, 235, 0.08);
   --primary-border: rgba(37, 99, 235, 0.22);
+  /* Used by the lead-type badge, ActivityFeed and two board rules since long
+     before it existed — undefined, so those backgrounds silently rendered
+     transparent. Defined Nov 2026. */
+  --primary-light: #eff6ff;
 
   /* Semantic */
   --success: #16a34a;
@@ -8153,4 +8157,140 @@ input, select, textarea {
 .enrichment-badge-no_context {
   background: var(--gray-100);
   color: var(--gray-600);
+}
+
+
+/* ==========================================================================
+   UI batch 1 (Nov 2026) — floor fixes. Appended last on purpose: several of
+   these override earlier duplicate rules by source order.
+   ========================================================================== */
+
+/* Keyboard focus you can see. `.btn:focus-visible` used to swap the outline
+   for an 8%-opacity ring (~1.1:1 against white) — no button showed focus. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* `.form-control` is used on the Sellers, Partners, Italy, PE OS and Outreach
+   Admin search boxes and dropdowns but was never defined, so they rendered as
+   unstyled browser inputs. Same look as .form-input. */
+.form-control {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--gray-900);
+  background: white;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+.form-control::placeholder {
+  color: var(--gray-500);
+}
+
+/* A destructive action that sits on every row (Today's Dead, Notifications'
+   drop-reminder, Lead detail's Delete) stays neutral until you point at it.
+   Red is reserved for overdue/stale — 25 red buttons a screen drowned it. */
+.btn-danger-quiet {
+  color: var(--gray-600);
+}
+.btn-danger-quiet:hover:not(:disabled),
+.btn-danger-quiet:focus-visible {
+  color: var(--danger);
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+/* Holds a missing button's slot so action columns line up row to row. */
+.btn-slot-empty {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Lead detail header: name + stage on the left, actions on the right; both
+   wrap instead of running off a narrow screen. */
+.page-header {
+  flex-wrap: wrap;
+}
+.lead-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.lead-detail-title h1 {
+  overflow-wrap: anywhere;
+}
+.lead-detail-stage .inline-field-display {
+  cursor: pointer;
+}
+.lead-detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Popup title row: heading plus "Open full page" on the lead edit popup. */
+.modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 1.25rem;
+}
+.modal-title-row h2 {
+  margin-bottom: 0;
+}
+
+/* Lead Terminal launcher: it was a 60px bubble fixed over the bottom-right
+   corner, which is exactly where every list keeps its row actions. Now a 28px
+   tab inside the page's right padding (2rem), so it covers no content on a
+   laptop. Ctrl+T still opens it. */
+.chat-terminal-bubble {
+  width: 28px;
+  height: 28px;
+  right: 2px;
+  bottom: 2px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+}
+.chat-terminal-bubble:hover {
+  transform: none;
+}
+@media (max-width: 768px) {
+  .chat-terminal-bubble {
+    width: 36px;
+    height: 36px;
+    right: 8px;
+    bottom: 8px;
+  }
+  .main-content {
+    padding-bottom: 56px;
+  }
+}
+
+/* Motion off for people who ask for it. Nothing here is information-bearing:
+   spinners still show their (static) ring next to "Loading…". */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

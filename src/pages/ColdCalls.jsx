@@ -56,7 +56,7 @@ function localToIso(value) {
 
 function ColdCalls() {
   const { currentPerson, people } = useApp()
-  const { toast } = useToast()
+  const { notify } = useToast()
   const isAdmin = isAdminUser(currentPerson)
 
   const [tab, setTab] = useSessionState('cc:tab', 'call')
@@ -84,7 +84,7 @@ function ColdCalls() {
             <PhoneCall size={24} /> Cold Calls
           </h1>
           <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>
-            Dials count toward the daily goal. Pickups and conversations are what we manage on.
+            Every dial counts as outreach. Pickups and conversations are what we manage on.
           </p>
         </div>
         {tab !== 'call' && tab !== 'queue' && (
@@ -156,10 +156,10 @@ function ColdCalls() {
         </button>
       </div>
 
-      {tab === 'call' && <CallMode person={currentPerson} toast={toast} />}
-      {tab === 'claim' && <ClaimView person={currentPerson} toast={toast} onCountChange={setUnclaimedCount} />}
+      {tab === 'call' && <CallMode person={currentPerson} notify={notify} />}
+      {tab === 'claim' && <ClaimView person={currentPerson} notify={notify} onCountChange={setUnclaimedCount} />}
       {tab === 'funnel' && <FunnelView daysBack={daysBack} personId={scopeId} teamScope={isAdmin && teamScope} />}
-      {tab === 'queue' && <CallQueueView person={currentPerson} isAdmin={isAdmin} people={people} toast={toast} />}
+      {tab === 'queue' && <CallQueueView person={currentPerson} isAdmin={isAdmin} people={people} notify={notify} />}
       {tab === 'callers' && <CallersView daysBack={daysBack} />}
       {tab === 'history' && <HistoryView daysBack={daysBack} people={people} isAdmin={isAdmin} />}
     </div>
@@ -170,7 +170,7 @@ function ColdCalls() {
 // CALL MODE — the dial list
 // ============================================================================
 
-function CallMode({ person, toast }) {
+function CallMode({ person, notify }) {
   const [loading, setLoading] = useState(true)
   const [queue, setQueue] = useState([])
   const [callbacks, setCallbacks] = useState([])
@@ -229,11 +229,11 @@ function CallMode({ person, toast }) {
       }
     } catch (e) {
       console.error(e)
-      toast?.(`Could not load the call queue: ${e.message}`, 'error')
+      notify?.(`Could not load the call queue: ${e.message}`, 'error')
     } finally {
       setLoading(false)
     }
-  }, [person?.id, toast])
+  }, [person?.id, notify])
 
   useEffect(() => { load() }, [load])
 
@@ -302,14 +302,14 @@ function CallMode({ person, toast }) {
       setTranscriptIds(prev => new Set(prev).add(row.id))
       setTranscriptFor(null)
       setRowTranscript('')
-      toast?.('Transcript saved', 'success')
+      notify?.('Transcript saved', 'success')
     } catch (e) {
       console.error(e)
-      toast?.(`Could not save the transcript: ${e.message}`, 'error')
+      notify?.(`Could not save the transcript: ${e.message}`, 'error')
     } finally {
       setSavingTranscript(false)
     }
-  }, [rowTranscript, savingTranscript, person?.id, toast])
+  }, [rowTranscript, savingTranscript, person?.id, notify])
 
   const submit = useCallback(async (outcome, extra = {}) => {
     if (!current || !person?.id || saving) return
@@ -346,19 +346,19 @@ function CallMode({ person, toast }) {
           if (saved?.id) setTranscriptIds(prev => new Set(prev).add(saved.id))
         } catch (e) {
           console.error(e)
-          toast?.(`Call logged, but the transcript did not save: ${e.message}`, 'error')
+          notify?.(`Call logged, but the transcript did not save: ${e.message}`, 'error')
         }
       }
 
-      toast?.(`${current.name} — ${outcomeLabel(outcome)}`, outcome === 'meeting_booked' ? 'success' : 'info')
+      notify?.(`${current.name} — ${outcomeLabel(outcome)}`, outcome === 'meeting_booked' ? 'success' : 'info')
       advance()
     } catch (e) {
       console.error(e)
-      toast?.(`Could not log the call: ${e.message}`, 'error')
+      notify?.(`Could not log the call: ${e.message}`, 'error')
     } finally {
       setSaving(false)
     }
-  }, [current, person, saving, duration, notes, recordingUrl, transcript, toast, advance])
+  }, [current, person, saving, duration, notes, recordingUrl, transcript, notify, advance])
 
   const pickOutcome = useCallback((outcome) => {
     // A callback without a time is just a note nobody will read. Everything
@@ -476,7 +476,7 @@ function CallMode({ person, toast }) {
               className="btn btn-secondary"
               onClick={() => {
                 navigator.clipboard?.writeText(String(current.phone || ''))
-                toast?.('Number copied', 'info')
+                notify?.('Number copied', 'info')
               }}
             >
               <Copy size={14} /> Copy
@@ -488,9 +488,14 @@ function CallMode({ person, toast }) {
               className="btn btn-secondary"
               style={{ marginLeft: 'auto' }}
               onClick={async () => {
-                await setDoNotCall(current.id, true)
-                toast?.(`${current.name} marked do-not-call`, 'info')
-                advance()
+                try {
+                  await setDoNotCall(current.id, true)
+                  notify?.(`${current.name} marked do-not-call`, 'info')
+                  advance()
+                } catch (e) {
+                  console.error(e)
+                  notify?.(`Could not mark ${current.name} do-not-call: ${e.message}`, 'error')
+                }
               }}
             >
               <Ban size={14} /> Do not call
@@ -689,7 +694,7 @@ function CallMode({ person, toast }) {
 // its caller claims it. Claiming and classifying are one tap where possible,
 // because a call sitting unclaimed is a call missing from the funnel.
 
-function ClaimView({ person, toast, onCountChange }) {
+function ClaimView({ person, notify, onCountChange }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -725,11 +730,11 @@ function ClaimView({ person, toast, onCountChange }) {
         return next
       })
       setExpanded(null)
-      toast?.(outcome ? `Claimed — ${outcomeLabel(outcome)}` : 'Claimed', 'success')
+      notify?.(outcome ? `Claimed — ${outcomeLabel(outcome)}` : 'Claimed', 'success')
     } catch (e) {
       // The "already claimed" race is a normal outcome, not a crash: two
       // people can tap the same call. Refresh so they see the truth.
-      toast?.(e.message, 'error')
+      notify?.(e.message, 'error')
       if (/already claimed/i.test(e.message)) load()
     } finally {
       setBusyId(null)
@@ -1272,7 +1277,7 @@ function CallersView({ daysBack }) {
  */
 const UNBATCHED = '__unbatched__'
 
-function CallQueueView({ person, isAdmin, people, toast }) {
+function CallQueueView({ person, isAdmin, people, notify }) {
   const [loading, setLoading] = useState(true)
   const [queue, setQueue] = useState([])
   const [exhausted, setExhausted] = useState([])
@@ -1288,11 +1293,11 @@ function CallQueueView({ person, isAdmin, people, toast }) {
       setExhausted(q.exhausted)
     } catch (e) {
       console.error(e)
-      toast?.(`Could not load the queue: ${e.message}`, 'error')
+      notify?.(`Could not load the queue: ${e.message}`, 'error')
     } finally {
       setLoading(false)
     }
-  }, [person?.id, toast])
+  }, [person?.id, notify])
 
   useEffect(() => { load() }, [load])
 
@@ -1319,9 +1324,9 @@ function CallQueueView({ person, isAdmin, people, toast }) {
   async function handleAdded(result) {
     const { added, skipped } = result
     if (added === 0) {
-      toast?.(skipped > 0 ? `All ${skipped} already in the CRM` : 'Nothing to add', 'info')
+      notify?.(skipped > 0 ? `All ${skipped} already in the CRM` : 'Nothing to add', 'info')
     } else {
-      toast?.(
+      notify?.(
         `Added ${added} to the call queue${skipped > 0 ? ` · ${skipped} already on file` : ''}`,
         'success'
       )
