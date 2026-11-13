@@ -381,6 +381,11 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   analysis, which stays a deliberate click. Unanalysed transcripts are listed as unanalysed, never
   skipped: a silently shorter list reads as "no call happened".
 - Today tab (`src/pages/Today.jsx`): shows each person's work for that day — that's its whole job; don't redesign it into another pipeline view. Shipped July 2026 (`feature/today-tab` PR merged).
+  - **Responded-and-beyond only (Dev, Nov 2026).** Every lead read on the tab — queue, follow-ups,
+    the overdue counter, the unassigned banner — filters `stage IN TODAY_ENGAGED_STAGES`
+    (`responded`/`meeting_booked`/`warm_active`; follow-ups also keep `reach_out_later`, who did
+    respond). An `outreach` lead has never answered and belongs to Cold Calls / Tracker / Pipeline.
+    MCP `get_my_day` inherits it via `getTodayQueue`. Guardrail: `test/today-responded-only.test.js`.
   - **"Touched" and "Reached out" are deliberately different words** (Dev, 2026-11-13): touched =
     a lead you are already in conversation with; reached out = first outreach. Don't unify the
     button labels across Today and Notifications. Note they also write different activity notes
