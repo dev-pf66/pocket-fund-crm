@@ -130,6 +130,9 @@ function LeadsBoard() {
   // onto this board and count as "My Leads".
   const [coveredOwnerIds, setCoveredOwnerIds] = useState(() => new Set())
   const [showAddForm, setShowAddForm] = useState(false)
+  // Card click opens the lead in a popup (Dev, Nov 2026 — same as the other
+  // boards); the popup links to the full detail page for everything else.
+  const [editingLead, setEditingLead] = useState(null)
   const [draggedLead, setDraggedLead] = useState(null)
   const [showFilters, setShowFilters] = useSessionState('lb:showFilters', false)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
@@ -1226,7 +1229,7 @@ function LeadsBoard() {
                     settings={settings}
                     latestOutreachStatus={responseStatusByLead.get(lead.id)}
                     onDragStart={handleDragStart}
-                    onClick={() => navigate(`/leads/${lead.id}`)}
+                    onClick={() => setEditingLead(lead)}
                     onRefresh={loadLeads}
                     selected={selectedIds.has(lead.id)}
                     onToggleSelect={() => toggleSelect(lead.id)}
@@ -1237,6 +1240,18 @@ function LeadsBoard() {
           )
         })}
       </div>
+
+      {editingLead && (
+        <LeadForm
+          key={editingLead.id}
+          lead={editingLead}
+          onClose={() => setEditingLead(null)}
+          onSave={() => {
+            setEditingLead(null)
+            loadLeads()
+          }}
+        />
+      )}
 
       {showAddForm && (
         <LeadForm

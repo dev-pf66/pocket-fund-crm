@@ -789,7 +789,7 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
           <Link to={`/leads/${lead.id}`} className="btn btn-sm btn-secondary">
             Open
           </Link>
-          {lead.linkedin_url && (
+          {lead.linkedin_url ? (
             <a
               href={lead.linkedin_url}
               target="_blank"
@@ -799,6 +799,12 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
             >
               <ExternalLink size={14} />
             </a>
+          ) : (
+            // Holds the slot so Touched/Snooze/Dead line up down the list
+            // whether or not a lead has a LinkedIn on file.
+            <span className="btn btn-sm btn-secondary btn-slot-empty" title="No LinkedIn on file" aria-hidden="true">
+              <ExternalLink size={14} />
+            </span>
           )}
           <div style={{ position: 'relative' }}>
             <button
@@ -834,11 +840,10 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
             )}
           </div>
           <button
-            className="btn btn-sm btn-secondary"
+            className="btn btn-sm btn-secondary btn-danger-quiet"
             onClick={confirmDismiss}
             disabled={busy}
             title="Mark as a dead lead (stage → Passed) and remove from the queue"
-            style={{ color: '#b91c1c' }}
           >
             <XCircle size={14} /> Dead
           </button>

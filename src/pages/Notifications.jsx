@@ -342,15 +342,20 @@ function Row({ item, ownerName, busy, handlers }) {
             </button>
           )}
           <Link to={item.href} className="btn btn-sm btn-secondary">Open</Link>
-          {item.linkedinUrl && (
+          {item.linkedinUrl ? (
             <a href={item.linkedinUrl} target="_blank" rel="noopener noreferrer"
               className="btn btn-sm btn-secondary" title="Open LinkedIn profile">
               <ExternalLink size={14} />
             </a>
+          ) : item.kind === 'followup' && (
+            // Holds the slot so the buttons line up down the list.
+            <span className="btn btn-sm btn-secondary btn-slot-empty" title="No LinkedIn on file" aria-hidden="true">
+              <ExternalLink size={14} />
+            </span>
           )}
           {item.kind === 'followup' && (
-            <button className="btn btn-sm btn-secondary" onClick={() => handlers.handleClear(item)} disabled={busy}
-              title="Drop the reminder entirely" style={{ color: '#b91c1c' }}>
+            <button className="btn btn-sm btn-secondary btn-danger-quiet" onClick={() => handlers.handleClear(item)} disabled={busy}
+              title="Drop the reminder entirely" aria-label="Drop the reminder">
               <X size={14} />
             </button>
           )}

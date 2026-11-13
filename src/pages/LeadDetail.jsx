@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getLeadById, getLeadActivities, logActivity, updateLead, deleteLead, getLeadTranscripts, createTranscript, deleteTranscript, getTags, getLeadTags, addTagToLead, removeTagFromLead, calculateLeadScore, enrichLeadFromLinkedIn, assignLead, analyzeTranscript, getOutreachForLead, getDemosForLead, createTrackerTask, getCallsForLead, setLeadArchived } from '../lib/crm-api'
 import { useApp } from '../App'
-import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck, CheckSquare, Archive, ArchiveRestore } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, Linkedin, Calendar, FileText, Trash2, Edit2, Save, X, TrendingUp, Tag, Sparkles, UserCheck, CheckSquare, Archive, ArchiveRestore, Plus } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import StageChip from '../components/StageChip'
 import LeadHealthFlag from '../components/LeadHealthFlag'
@@ -25,15 +25,21 @@ function InlineField({ value, onSave, type = 'text', options = null, placeholder
   const [draft, setDraft] = useState(value ?? '')
   const [saving, setSaving] = useState(false)
   const savedRef = useRef(false)
+  const keyNavRef = useRef(false)
 
   useEffect(() => {
     if (!editing) setDraft(value ?? '')
+    keyNavRef.current = false
   }, [value, editing])
 
-  async function commit() {
+  // `override` lets a select save on pick. It used to save only on blur, so
+  // choosing a new stage did nothing visible until you clicked somewhere else
+  // — and navigating away first could drop the change.
+  async function commit(override) {
     if (savedRef.current) return
     savedRef.current = true
-    const next = typeof draft === 'string' ? draft.trim() : draft
+    const raw = override !== undefined ? override : draft
+    const next = typeof raw === 'string' ? raw.trim() : raw
     const current = value ?? ''
     if (next === current) {
       setEditing(false)
@@ -79,9 +85,21 @@ function InlineField({ value, onSave, type = 'text', options = null, placeholder
       <select
         autoFocus
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Escape') cancel() }}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          // A pick saves at once. Arrow keys on a closed select (Windows)
+          // fire onChange per step, and a stage change runs side effects that
+          // can't be undone (meeting auto-log, Sage events) — so keyboard
+          // stepping only moves the draft; Enter or leaving the field saves.
+          if (!keyNavRef.current) commit(e.target.value)
+        }}
+        onBlur={() => commit()}
+        onMouseDown={() => { keyNavRef.current = false }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') cancel()
+          else if (e.key === 'Enter') { e.preventDefault(); commit() }
+          else if (e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End' || e.key.length === 1) keyNavRef.current = true
+        }}
         disabled={saving}
         style={inputStyle}
       >
@@ -96,7 +114,7 @@ function InlineField({ value, onSave, type = 'text', options = null, placeholder
         autoFocus
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onBlur={() => commit()}
         onKeyDown={(e) => {
           if (e.key === 'Escape') cancel()
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commit()
@@ -114,7 +132,7 @@ function InlineField({ value, onSave, type = 'text', options = null, placeholder
       type={type}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
+      onBlur={() => commit()}
       onKeyDown={(e) => {
         if (e.key === 'Escape') cancel()
         if (e.key === 'Enter') commit()
@@ -162,6 +180,19 @@ function LeadDetail() {
   }, [id])
 
   const [showActivityForm, setShowActivityForm] = useSessionState(`ld:${id}:showActivityForm`, false)
+  // The header's "Log activity" opens the form in the timeline card and brings
+  // it into view — that card sits ~1,500px down the page on a laptop.
+  const activityCardRef = useRef(null)
+  function openActivityForm() {
+    setShowActivityForm(true)
+    requestAnimationFrame(() => {
+      const card = activityCardRef.current
+      if (!card) return
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      card.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+      card.querySelector('select, input, textarea')?.focus({ preventScroll: true })
+    })
+  }
   const [showTranscriptForm, setShowTranscriptForm] = useSessionState(`ld:${id}:showTranscriptForm`, false)
   const [newActivity, setNewActivity, clearNewActivity] = useSessionState(`ld:${id}:newActivity`, emptyActivity())
   const [newTranscript, setNewTranscript, clearNewTranscript] = useSessionState(`ld:${id}:newTranscript`, emptyTranscript())
@@ -468,16 +499,32 @@ function LeadDetail() {
 
   return (
     <div>
-      <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Link to="/pipeline" className="back-btn">
+      <div className="page-header lead-detail-header">
+        <div className="lead-detail-title">
+          <Link to="/pipeline" className="back-btn" aria-label="Back to the pipeline">
             <ArrowLeft size={20} />
           </Link>
           <h1>{lead.name}</h1>
+          {/* Stage lives in the header (Nov 2026): it is the thing most often
+              changed on this page, and it used to sit mid-card below eight
+              other fields. Same InlineField, same saveField('stage') path. */}
+          <div className="lead-detail-stage" title="Change stage">
+            <InlineField
+              value={lead.stage}
+              onSave={(v) => saveField('stage', v)}
+              type="select"
+              options={STAGE_OPTIONS}
+              renderValue={(v) => <StageChip stage={v} />}
+            />
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="lead-detail-actions">
           {!isEditing ? (
             <>
+              <button className="btn btn-primary" onClick={openActivityForm} title="Log a call, email, meeting or note on this lead">
+                <Plus size={16} />
+                Log activity
+              </button>
               <button className="btn btn-secondary" onClick={() => setShowTaskModal(true)} title="Create a task in the Sage task tracker for this lead">
                 <CheckSquare size={16} />
                 Add Task
@@ -496,7 +543,7 @@ function LeadDetail() {
                 {lead.is_archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
                 {lead.is_archived ? 'Restore' : 'Archive'}
               </button>
-              <button className="btn btn-danger" onClick={handleDelete}>
+              <button className="btn btn-secondary btn-danger-quiet" onClick={handleDelete}>
                 <Trash2 size={16} />
                 Delete
               </button>
@@ -1068,17 +1115,6 @@ function LeadDetail() {
               </div>
 
               <div className="info-item">
-                <label>Stage</label>
-                <InlineField
-                  value={lead.stage}
-                  onSave={(v) => saveField('stage', v)}
-                  type="select"
-                  options={STAGE_OPTIONS}
-                  renderValue={(v) => <StageChip stage={v} />}
-                />
-              </div>
-
-              <div className="info-item">
                 <label>Outreach Stage</label>
                 <InlineField
                   value={lead.outreach_stage || ''}
@@ -1576,12 +1612,12 @@ function LeadDetail() {
         )}
 
         {/* Activity Timeline */}
-        <div className="card">
+        <div className="card" ref={activityCardRef}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h2>Activity Timeline</h2>
             <button
               className="btn btn-sm btn-primary"
-              onClick={() => setShowActivityForm(!showActivityForm)}
+              onClick={() => (showActivityForm ? setShowActivityForm(false) : openActivityForm())}
             >
               {showActivityForm ? 'Cancel' : '+ Log Activity'}
             </button>

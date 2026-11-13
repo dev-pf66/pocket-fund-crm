@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createLead, updateLead, previewLinkedInEnrichment, findDuplicateLead } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { Link } from 'react-router-dom'
@@ -6,7 +6,7 @@ import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
-import { Sparkles, AlertTriangle } from 'lucide-react'
+import { Sparkles, AlertTriangle, ExternalLink } from 'lucide-react'
 
 const DUPLICATE_MATCH_LABELS = {
   linkedin_url: 'the same LinkedIn profile',
@@ -14,18 +14,8 @@ const DUPLICATE_MATCH_LABELS = {
   name_firm: 'the same name and firm'
 }
 
-function LeadForm({ onClose, onSave, lead = null }) {
-  const { currentPerson } = useApp()
-  const { toast } = useToast()
-  const leadTypes = useLeadTypes()
-  const [loading, setLoading] = useState(false)
-  const [autoFilling, setAutoFilling] = useState(false)
-  // A lead already on file matching what's being typed. A warning, not a block —
-  // the form is the deliberate path, so it tells you and lets you decide.
-  const [duplicate, setDuplicate] = useState(null)
-  // Only persist the new-lead draft across navigation; edit mode is seeded
-  // from the `lead` prop so persistence would desync if the lead changed.
-  const initialForm = {
+function formFrom(lead) {
+  return {
     name: lead?.name || '',
     firm_name: lead?.firm_name || '',
     email: lead?.email || '',
@@ -38,10 +28,49 @@ function LeadForm({ onClose, onSave, lead = null }) {
     lead_source: lead?.lead_source || '',
     notes: lead?.notes || ''
   }
-  const [formData, setFormData, clearFormData] = useSessionState(
-    lead ? `lf:edit:${lead.id}` : 'lf:new',
-    initialForm
-  )
+}
+
+function LeadForm({ onClose, onSave, lead = null }) {
+  const { currentPerson } = useApp()
+  const { toast } = useToast()
+  const leadTypes = useLeadTypes()
+  const [loading, setLoading] = useState(false)
+  const [autoFilling, setAutoFilling] = useState(false)
+  // A lead already on file matching what's being typed. A warning, not a block —
+  // the form is the deliberate path, so it tells you and lets you decide.
+  const [duplicate, setDuplicate] = useState(null)
+  const initialForm = formFrom(lead)
+  // Only the NEW-lead draft persists across navigation. Edit mode used to
+  // persist too (key `lf:edit:<id>`), which meant a popup left by any route
+  // other than Cancel came back next time pre-filled with the OLD values — and
+  // saving would then write that stale stage/notes over whatever had changed
+  // since. Edit mode is the Pipeline card's click target now (Nov 2026), so it
+  // is plain component state, seeded fresh from the lead on every open.
+  const [newDraft, setNewDraft, clearNewDraft] = useSessionState('lf:new', formFrom(null))
+  const [editDraft, setEditDraft] = useState(initialForm)
+  const formData = lead ? editDraft : newDraft
+  const setFormData = lead ? setEditDraft : setNewDraft
+  const clearFormData = lead ? () => {} : clearNewDraft
+
+  // Unsaved edits in the popup are not persisted, so a stray overlay click,
+  // Escape or "Open full page" asks before throwing them away.
+  const isDirty = !!lead && Object.keys(initialForm).some(k => editDraft[k] !== initialForm[k])
+  function close() {
+    if (isDirty && !window.confirm('Discard your unsaved changes to this lead?')) return false
+    onClose()
+    return true
+  }
+  const closeRef = useRef(close)
+  closeRef.current = close
+  useEffect(() => {
+    function onKey(e) {
+      // A native select/autocomplete eats its own Escape; only close when the
+      // keypress reached us unhandled.
+      if (e.key === 'Escape' && !e.defaultPrevented) closeRef.current()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -134,7 +163,18 @@ function LeadForm({ onClose, onSave, lead = null }) {
       }
       let saved
       if (lead?.id) {
-        saved = await updateLead(lead.id, payload, currentPerson.id)
+        // Send only what changed. Writing all eleven fields back would turn
+        // NULLs into '' (lead_source, lead_type…) and overwrite edits made
+        // elsewhere since the board loaded.
+        // A field cleared in the popup is written as NULL, not '' — "is it
+        // missing" filters look for NULL.
+        const changed = {}
+        for (const k of Object.keys(formData)) {
+          if (formData[k] !== initialForm[k]) changed[k] = formData[k] === '' ? null : formData[k]
+        }
+        saved = Object.keys(changed).length
+          ? await updateLead(lead.id, changed, currentPerson.id)
+          : lead
       } else {
         saved = await createLead(payload, currentPerson.id)
       }
@@ -149,9 +189,16 @@ function LeadForm({ onClose, onSave, lead = null }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
-        <h2>{lead ? 'Edit Lead' : 'Add New Lead'}</h2>
+    <div className="modal-overlay" onClick={close}>
+      <div className="modal modal-large" role="dialog" aria-modal="true" aria-label={lead ? `Edit ${lead.name || 'lead'}` : 'Add new lead'} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-title-row">
+          <h2>{lead ? 'Edit Lead' : 'Add New Lead'}</h2>
+          {lead?.id && (
+            <Link to={`/leads/${lead.id}`} className="btn btn-sm btn-secondary" onClick={(e) => { if (!close()) e.preventDefault() }}>
+              <ExternalLink size={14} /> Open full page
+            </Link>
+          )}
+        </div>
 
         {duplicate && (
           <div className="form-duplicate-warning">
@@ -319,7 +366,7 @@ function LeadForm({ onClose, onSave, lead = null }) {
           </div>
 
           <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <button type="button" className="btn btn-secondary" onClick={close}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={loading}>

@@ -171,8 +171,9 @@ Examples:
         onClick={() => setIsOpen(true)}
         className="chat-terminal-bubble"
         title="Lead Terminal (Ctrl+T)"
+        aria-label="Open Lead Terminal (Ctrl+T)"
       >
-        <Terminal size={24} />
+        <Terminal size={14} />
       </button>
     )
   }

@@ -29,7 +29,16 @@ export function ToastProvider({ children }) {
     warn: (msg) => addToast(msg, 'warn'),
   }), [addToast])
 
-  const value = useMemo(() => ({ toast }), [toast])
+  // `notify(message, type)` is the call-shaped form, for code that passes one
+  // function down as a prop. `toast` is an OBJECT — `toast(msg)` throws
+  // "toast is not a function". ColdCalls did exactly that at 13 call sites,
+  // and the throw after a successful logCall skipped advance(): the dial was
+  // saved but the screen stayed on the same lead (test/toast-shape.test.js).
+  const notify = useCallback((message, type = 'info') => {
+    addToast(message, ['error', 'success', 'info', 'warn'].includes(type) ? type : 'info')
+  }, [addToast])
+
+  const value = useMemo(() => ({ toast, notify }), [toast, notify])
 
   return (
     <ToastContext.Provider value={value}>
