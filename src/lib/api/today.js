@@ -21,18 +21,28 @@ import { ownerScopeIds, scopeToOwners } from './cover.js'
 // user; admins pass null where noted to see everything. Staleness
 // thresholds come from crm_settings with 3/7/14 fallbacks.
 
+// Today counts only people who have RESPONDED (Dev, Nov 2026). A lead still
+// at `outreach` has never answered — it belongs to the outreach motion
+// (Cold Calls, the Tracker, Pipeline), not to anyone's day. Every lead read
+// on this tab — queue, follow-ups, the overdue counter, the unassigned
+// banner — is filtered to these stages in SQL, so an un-responded lead can't
+// leak into a count. Guardrail: test/today-responded-only.test.js.
+export const TODAY_ENGAGED_STAGES = ['responded', 'meeting_booked', 'warm_active']
+
 // Ranking weights: warm/responded leads outrank a booked meeting waiting on
-// its date, then outreach in progress. Stages absent here (client, passed,
-// reach_out_later) never enter the queue.
+// its date. Stages absent here (outreach, client, passed, reach_out_later)
+// never enter the queue.
 export const TODAY_STAGE_WEIGHTS = {
   responded: 5,
   warm_active: 5,
-  meeting_booked: 3,
-  outreach: 2
+  meeting_booked: 3
 }
 
 const TODAY_QUEUE_STAGES = Object.keys(TODAY_STAGE_WEIGHTS)
-const TODAY_ENGAGED_STAGES = ['responded', 'meeting_booked', 'warm_active']
+
+// Follow-ups also carry `reach_out_later`: those people DID respond ("get back
+// to me in three months") and the date they asked for has to come round.
+const TODAY_FOLLOWUP_STAGES = [...TODAY_ENGAGED_STAGES, 'reach_out_later']
 
 // Today only surfaces what's live: activity in the last 2 weeks, or
 // follow-ups due in the next 2 weeks. Older neglected leads stop flooding
@@ -153,7 +163,8 @@ export async function markLeadTouched(lead, currentPersonId, note = '', { source
 /**
  * Follow-ups due: assigned engaged leads (responded/warm/active/meeting)
  * hitting the day-3/7/14 cadence marks (thresholds from settings), plus any
- * non-terminal lead with next_follow_up_date within the next
+ * responded-or-later lead (incl. reach_out_later; never `outreach`) with
+ * next_follow_up_date within the next
  * RECENT_WINDOW_DAYS (overdue, today, or coming up) — the forward-looking
  * half of the window, so a rep sees what's coming, not just what's slipped.
  * A "circle back in a month" scheduled beyond that horizon isn't dropped —
@@ -176,7 +187,7 @@ export async function getFollowUpsDue(personId) {
     .from('crm_leads')
     .select('*')
     .eq('is_archived', false)
-    .not('stage', 'in', '(passed,client)'), owners)
+    .in('stage', TODAY_FOLLOWUP_STAGES), owners)
   if (error) throw error
 
   const marks = new Set([t.cold, t.warm, t.active])
@@ -244,7 +255,7 @@ export async function pingDevOnLead(lead, currentPersonId, currentPersonName) {
   }, currentPersonId)
 }
 
-/** Unassigned, still-workable leads (id + name only — feeds the banner). */
+/** Unassigned leads that have responded (id + name only — feeds the banner). */
 export async function getUnassignedLeads() {
   // Paged: a bulk import drops thousands of unassigned leads in at once, and
   // the banner's count would stick at 1000.
@@ -253,7 +264,7 @@ export async function getUnassignedLeads() {
     .select('id, name, stage')
     .eq('is_archived', false)
     .is('assigned_to', null)
-    .not('stage', 'in', '(passed,client)'))
+    .in('stage', TODAY_ENGAGED_STAGES))
 }
 
 /**
@@ -304,8 +315,8 @@ export async function bulkDismissLeads(leads, currentPersonId) {
 
 /**
  * Header-strip extras that need their own queries:
- * - overdueSLA: assigned leads past their staleness threshold (red), plus
- *   new leads past the first-touch SLA (creation + cold threshold days).
+ * - overdueSLA: assigned responded-or-later leads past their staleness
+ *   threshold (red). Un-responded `outreach` leads are not counted.
  * - touchesThisWeek / touchesLastWeek: activities logged by this person,
  *   bucketed by IST week — the one counter with a computable week-over-week
  *   delta (queue sizes have no historical snapshots).
@@ -324,7 +335,7 @@ export async function getTodayCounters(personId) {
     .from('crm_leads')
     .select('id, stage, created_at, last_activity_date')
     .eq('is_archived', false)
-    .not('stage', 'in', '(passed,client)'), owners)
+    .in('stage', TODAY_ENGAGED_STAGES), owners)
 
   const touchesQ = supabase
     .from('crm_lead_activities')
