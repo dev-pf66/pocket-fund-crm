@@ -6,7 +6,7 @@ import {
   applyFollowUpCadence,
   setFollowUp,
   snoozeFollowUp,
-  clearFollowUp,
+  DEFAULT_FOLLOW_UP_DAYS,
   logFollowUpTouch
 } from '../lib/crm-api'
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
@@ -104,8 +104,13 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
     })
   }
 
+  // There is no "no reminder" for a live lead (Dev, 2026-11-16) — what used to
+  // be Clear now pushes the reminder to the default check-in.
   function handleClear() {
-    run('Reminder cleared', () => clearFollowUp(lead.id, currentPerson?.id))
+    // Same as Notifications' +30d: pushes from the later of today or the date
+    // already set, keeps a running cadence, never pulls a reminder earlier.
+    run(`Pushed ${DEFAULT_FOLLOW_UP_DAYS} days`, () =>
+      snoozeFollowUp(lead, DEFAULT_FOLLOW_UP_DAYS, { note: lead.follow_up_note }, currentPerson?.id))
   }
 
   async function handleCreateCadence() {
@@ -174,8 +179,9 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
             <button className="btn btn-sm btn-primary" onClick={handleReachedOut} disabled={busy}>
               <Check size={14} /> Reached out
             </button>
-            <button className="btn btn-sm btn-secondary" onClick={handleClear} disabled={busy}>
-              <X size={14} /> Clear
+            <button className="btn btn-sm btn-secondary" onClick={handleClear} disabled={busy}
+              title={`Push the reminder back ${DEFAULT_FOLLOW_UP_DAYS} days. Only marking the lead dead ends reminders.`}>
+              <AlarmClock size={14} /> +{DEFAULT_FOLLOW_UP_DAYS} days
             </button>
           </div>
         )}

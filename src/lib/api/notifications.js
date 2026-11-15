@@ -38,6 +38,7 @@
  */
 
 import { supabase } from '../supabase.js'
+import { DEFAULT_FOLLOW_UP_NOTE } from '../followUpPolicy.js'
 import { istToday, istAddDays } from '../dateUtils.js'
 import { fetchAllRows, getDaysBetween } from './core.js'
 import { getCallbacksDue } from './calls.js'
@@ -169,10 +170,12 @@ async function wentQuiet(personId, today, thresholds) {
   const rows = await fetchAllRows(() => {
     let q = supabase
       .from('crm_leads')
-      .select('id, name, firm_name, stage, assigned_to, lead_score, linkedin_url, last_activity_date, created_at, next_follow_up_date')
+      .select('id, name, firm_name, stage, assigned_to, lead_score, linkedin_url, last_activity_date, created_at, next_follow_up_date, follow_up_note')
       .eq('is_archived', false)
       .in('stage', ENGAGED_STAGES)
-      .is('next_follow_up_date', null)
+      // No promise on file — and the automatic 30-day check-in doesn't count as
+      // one (followUpPolicy.isDefaultReminder), or it would mute this for a month.
+      .or(`next_follow_up_date.is.null,follow_up_note.eq.${DEFAULT_FOLLOW_UP_NOTE}`)
       .order('id')
     return scopeToOwners(q, owners)
   })
@@ -183,8 +186,13 @@ async function wentQuiet(personId, today, thresholds) {
     warm_active: thresholds.active
   }
 
+  // One lead, one reason: an automatic check-in already inside the follow-up
+  // window is listed by the `followup` source, so it isn't "gone quiet" too.
+  const followUpHorizon = istAddDays(today, UPCOMING_DAYS)
+
   const out = []
   for (const l of rows) {
+    if (l.next_follow_up_date && l.next_follow_up_date <= followUpHorizon) continue
     // Unowned leads are their own signal (and would otherwise be invisible
     // here anyway whenever personId is set).
     if (!l.assigned_to) continue
