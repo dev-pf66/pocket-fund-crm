@@ -217,7 +217,7 @@ function Today() {
     if (!selectedLeads.length) return
     setBulkBusy(true)
     try {
-      const { succeeded, failed } = await bulkMarkTouched(selectedLeads, currentPerson.id)
+      const { succeeded, failed } = await bulkMarkTouched(selectedLeads, currentPerson.id, '', { followUpIds })
       removeFromQueues(succeeded)
       notifyFollowUpsChanged()
       clearSelection()
@@ -275,7 +275,7 @@ function Today() {
   async function handleTouched(lead, note) {
     setPendingId(lead.id)
     try {
-      await markLeadTouched(lead, currentPerson.id, note)
+      await markLeadTouched(lead, currentPerson.id, note, { followUp: followUpIds.has(lead.id) })
       notifyFollowUpsChanged()
       setQueue(prev => ({
         leads: prev.leads.filter(l => l.id !== lead.id),

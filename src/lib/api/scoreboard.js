@@ -47,6 +47,17 @@ export function currentWeekBounds(today = istDateStr()) {
 }
 
 /**
+ * "F/U done" counts an activity whose note starts `Followed up`. Two writers
+ * produce it: followUpNote (Reached out, always) and touchNote (Touched, only
+ * when it completes a DUE follow-up — isDueFollowUpTouch). They build their
+ * notes from those functions so the two sides cannot drift;
+ * test/follow-up-done.test.js pins the pairing.
+ */
+export function isFollowUpDoneNote(notes) {
+  return /^Followed up/.test(notes || '')
+}
+
+/**
  * Per-person numbers for a week, plus the rot that has no week.
  *
  * `start`/`end` are IST date strings (inclusive). The breach counts are
@@ -76,8 +87,9 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
       .lte('changed_at', `${bounds.end}T23:59:59+05:30`)
       .order('id')),
 
-    // 3. Follow-ups done — logFollowUpTouch writes an activity and retires the
-    //    reminder. The activity is the only durable evidence it happened.
+    // 3. Follow-ups done — a Reached out (logFollowUpTouch) or a Touched that
+    //    completed a due follow-up (markLeadTouched) writes an activity whose note
+    //    starts `Followed up`. The activity is the only durable evidence.
     fetchAllRows(() => supabase
       .from('crm_lead_activities')
       .select('logged_by, activity_date, activity_type, notes')
@@ -142,7 +154,7 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
     if (b) b.meetingsBooked++
   }
 
-  // A follow-up touch is an activity whose note logFollowUpTouch wrote. Matching
+  // A follow-up touch is an activity whose note isFollowUpDoneNote accepts. Matching
   // on the note is ugly but it is the only marker that exists; the alternative
   // is counting every note, and 214 of the last 416 were auto-generated "Lead
   // created in CRM" rows, which would turn an import into a week of hard work.
@@ -153,7 +165,7 @@ export async function getScoreboard({ start, end, people = [] } = {}) {
       const held = bucket(a.logged_by)
       if (held) held.meetingsHeld++
     }
-    if (!/^Followed up/.test(a.notes || '')) continue
+    if (!isFollowUpDoneNote(a.notes)) continue
     const b = bucket(a.logged_by)
     if (b) b.followUpsDone++
   }
