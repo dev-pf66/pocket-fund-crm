@@ -73,6 +73,7 @@ function Investors() {
   // Seed from cache so sidebar nav back to Investors renders instantly.
   const [investors, setInvestors] = useState(() => cachePeek('investors:{}') || [])
   const [loading, setLoading] = useState(() => !cachePeek('investors:{}'))
+  const [loadError, setLoadError] = useState(null)
   const [showForm, setShowForm] = useSessionState('inv:showForm', false)
   const [editingInvestor, setEditingInvestor, clearEditingInvestor] = useSessionState('inv:editingInvestor', null)
   const [searchQuery, setSearchQuery] = useSessionState('inv:searchQuery', '')
@@ -131,8 +132,11 @@ function Investors() {
     try {
       const data = await getInvestors()
       setInvestors(data)
+      setLoadError(null)
     } catch (error) {
       console.error('Failed to load investors:', error)
+      // A swallowed failure read "No investors yet" — say what happened instead.
+      setLoadError(error?.message || 'Unknown error')
     } finally {
       setLoading(false)
     }
@@ -416,6 +420,12 @@ function Investors() {
 
       {/* Table */}
       <div className="card">
+      {loadError && (
+        <div className="alert-banner alert-danger" role="alert">
+          Couldn't load investors: {loadError}
+          <button className="btn btn-sm btn-secondary" onClick={loadInvestors}>Retry</button>
+        </div>
+      )}
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table" style={{ width: '100%' }}>
             <thead>
@@ -442,7 +452,7 @@ function Investors() {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={9} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
-                    {investors.length === 0 ? 'No investors yet. Add your first investor contact above.' : 'No investors match your filters.'}
+                    {loadError ? "Couldn't load investors — see above." : investors.length === 0 ? 'No investors yet. Add your first investor contact above.' : 'No investors match your filters.'}
                   </td>
                 </tr>
               ) : (

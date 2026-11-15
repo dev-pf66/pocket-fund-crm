@@ -13,6 +13,7 @@ import { useLeadTypes } from '../hooks/useLeadTypes'
 import { isAdminUser } from '../lib/admin'
 import { runBulk } from '../lib/bulkActions'
 import { HEALTH_FILTERS, matchesHealthFilter, healthFilterCounts } from '../lib/leadFilters'
+import { BoardColumnHeader, BoardColumnEmpty } from '../components/BoardColumn'
 
 const STAGES = [
   { key: 'outreach', label: 'New Leads (Outreach)', color: '#60a5fa' },
@@ -121,6 +122,7 @@ function LeadsBoard() {
   // Seed from cache so sidebar nav back to Pipeline renders instantly.
   const [leads, setLeads] = useState(() => cachePeek(seedKey) || [])
   const [loading, setLoading] = useState(() => !cachePeek(seedKey))
+  const [loadError, setLoadError] = useState(null)
   // Lead IDs that show up in any PE OS demo. Drives the "PE OS" filter pill.
   const [demoLeadIds, setDemoLeadIds] = useState(() => new Set())
   // Map<lead_id, latest_outreach_status>. Drives the response-status filter.
@@ -210,8 +212,12 @@ function LeadsBoard() {
       setLeads(data)
       setDemoLeadIds(demoIds)
       setResponseStatusByLead(statusMap)
+      setLoadError(null)
     } catch (error) {
       console.error('Failed to load leads:', error)
+      // Say so. A swallowed failure rendered five empty columns — identical
+      // to "you have no leads", which is the worst possible thing to show.
+      setLoadError(error?.message || 'Unknown error')
     } finally {
       setLoading(false)
     }
@@ -1195,6 +1201,13 @@ function LeadsBoard() {
         </div>
       )}
 
+      {loadError && (
+        <div className="alert-banner alert-danger" role="alert">
+          Couldn't load the pipeline: {loadError}
+          <button className="btn btn-sm btn-secondary" onClick={loadLeads}>Retry</button>
+        </div>
+      )}
+
       <div className="crm-board">
         {STAGES.map(stage => {
           const stageLeads = leadsByStage[stage.key] || []
@@ -1206,21 +1219,12 @@ function LeadsBoard() {
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, stage.key)}
             >
-              <div className="crm-column-header" style={{ borderTopColor: stage.color }}>
-                <h3>{stage.label}</h3>
-                <span className="count-badge" style={{ background: stage.color, color: 'var(--text)' }}>
-                  {stageLeads.length}
-                </span>
-              </div>
+              <BoardColumnHeader label={stage.label} color={stage.color} count={stageLeads.length} />
 
               <div className="crm-column-content">
                 <QuickAddCard stage={stage.key} onLeadCreated={loadLeads} />
 
-                {stageLeads.length === 0 && (
-                  <div className="empty-column">
-                    No leads in this stage
-                  </div>
-                )}
+                {stageLeads.length === 0 && <BoardColumnEmpty noun="leads" />}
 
                 {stageLeads.map(lead => (
                   <LeadCard
