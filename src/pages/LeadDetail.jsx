@@ -572,9 +572,9 @@ function LeadDetail() {
       {lead.is_archived && (
         <div className="card" style={{
           padding: '12px 16px', marginBottom: '16px',
-          background: '#f9fafb', border: '1px solid #e5e7eb'
+          background: 'var(--surface-subtle)', border: '1px solid var(--border)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#374151' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-base)', color: 'var(--text-2)' }}>
             <Archive size={15} />
             <span>
               <strong>Archived</strong>
@@ -848,7 +848,7 @@ function LeadDetail() {
 
               {/* Firmographics Section */}
               <div className="form-group full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
-                <h3 style={{ marginBottom: '12px', fontSize: '16px', color: 'var(--gray-700)' }}>Firmographics</h3>
+                <h3 style={{ marginBottom: '12px', fontSize: 'var(--fs-lg)', color: 'var(--gray-700)' }}>Firmographics</h3>
               </div>
 
               <div className="form-group">
@@ -903,7 +903,7 @@ function LeadDetail() {
 
               {/* Decision Timeline Section */}
               <div className="form-group full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
-                <h3 style={{ marginBottom: '12px', fontSize: '16px', color: 'var(--gray-700)' }}>Decision Timeline</h3>
+                <h3 style={{ marginBottom: '12px', fontSize: 'var(--fs-lg)', color: 'var(--gray-700)' }}>Decision Timeline</h3>
               </div>
 
               <div className="form-group">
@@ -952,7 +952,7 @@ function LeadDetail() {
 
               {/* Relationship Strength Section */}
               <div className="form-group full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
-                <h3 style={{ marginBottom: '12px', fontSize: '16px', color: 'var(--gray-700)' }}>Relationship Strength</h3>
+                <h3 style={{ marginBottom: '12px', fontSize: 'var(--fs-lg)', color: 'var(--gray-700)' }}>Relationship Strength</h3>
               </div>
 
               <div className="form-group">
@@ -1149,7 +1149,7 @@ function LeadDetail() {
                   }}
                 />
                 {lead.assigned_date && (
-                  <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>
+                  <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--gray-500)', marginTop: '4px' }}>
                     Assigned {new Date(lead.assigned_date).toLocaleDateString()}
                   </div>
                 )}
@@ -1214,14 +1214,14 @@ function LeadDetail() {
                       color: lead.lead_score >= 75 ? 'var(--success)' : lead.lead_score >= 50 ? 'var(--warning)' : 'var(--gray-500)'
                     }}>
                       {lead.lead_score}
-                      <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/100</span>
+                      <span style={{ fontSize: '18px', color: 'var(--text-muted)' }}>/100</span>
                     </div>
                     <button className="btn btn-sm btn-secondary" onClick={handleCalculateScore} disabled={calculating}>
                       {calculating ? 'Calculating...' : 'Recalculate'}
                     </button>
                   </div>
                   {lead.score_last_calculated && (
-                    <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>
+                    <div style={{ fontSize: 'var(--fs-base)', color: 'var(--gray-500)', marginTop: '4px' }}>
                       Last calculated: {new Date(lead.score_last_calculated).toLocaleString()}
                     </div>
                   )}
@@ -1232,7 +1232,7 @@ function LeadDetail() {
               {(lead.aum || lead.investment_thesis || lead.portfolio_size || lead.fund_vintage || lead.recent_deals) && (
                 <>
                   <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
-                    <h3 style={{ fontSize: '16px', color: 'var(--gray-700)', margin: 0 }}>Firmographics</h3>
+                    <h3 style={{ fontSize: 'var(--fs-lg)', color: 'var(--gray-700)', margin: 0 }}>Firmographics</h3>
                   </div>
 
                   {lead.aum && (
@@ -1276,7 +1276,7 @@ function LeadDetail() {
               {(lead.expected_close_date || lead.budget_discussed || lead.decision_process_stage || lead.key_blockers) && (
                 <>
                   <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
-                    <h3 style={{ fontSize: '16px', color: 'var(--gray-700)', margin: 0 }}>Decision Timeline</h3>
+                    <h3 style={{ fontSize: 'var(--fs-lg)', color: 'var(--gray-700)', margin: 0 }}>Decision Timeline</h3>
                   </div>
 
                   {lead.expected_close_date && (
@@ -1313,7 +1313,7 @@ function LeadDetail() {
               {(lead.relationship_strength || lead.trust_level || lead.mutual_connections || lead.referral_details) && (
                 <>
                   <div className="info-item full-width" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px', marginTop: '16px' }}>
-                    <h3 style={{ fontSize: '16px', color: 'var(--gray-700)', margin: 0 }}>Relationship Strength</h3>
+                    <h3 style={{ fontSize: 'var(--fs-lg)', color: 'var(--gray-700)', margin: 0 }}>Relationship Strength</h3>
                   </div>
 
                   {lead.relationship_strength && (
@@ -1420,7 +1420,7 @@ function LeadDetail() {
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
             {leadTags.length === 0 && (
-              <div style={{ color: 'var(--gray-400)', fontSize: '14px' }}>No tags yet</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>No tags yet</div>
             )}
             {leadTags.map(tag => (
               <div
@@ -1433,7 +1433,7 @@ function LeadDetail() {
                   background: tag.color || '#3b82f6',
                   color: 'white',
                   borderRadius: '16px',
-                  fontSize: '13px',
+                  fontSize: 'var(--fs-base)',
                   fontWeight: '500'
                 }}
               >
@@ -1451,7 +1451,7 @@ function LeadDetail() {
                     justifyContent: 'center',
                     cursor: 'pointer',
                     color: 'white',
-                    fontSize: '14px',
+                    fontSize: 'var(--fs-md)',
                     fontWeight: 'bold',
                     padding: 0
                   }}
@@ -1463,7 +1463,7 @@ function LeadDetail() {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Add Tag</label>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: 'var(--fs-md)', fontWeight: '600' }}>Add Tag</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {allTags.filter(tag => !leadTags.find(lt => lt.id === tag.id)).map(tag => (
                 <button
@@ -1475,7 +1475,7 @@ function LeadDetail() {
                     border: `2px solid ${tag.color || '#3b82f6'}`,
                     color: tag.color || '#3b82f6',
                     borderRadius: '16px',
-                    fontSize: '13px',
+                    fontSize: 'var(--fs-base)',
                     fontWeight: '500',
                     cursor: 'pointer',
                     transition: 'all 0.2s'
@@ -1500,24 +1500,24 @@ function LeadDetail() {
             person-hub actually shows the outreach → reply journey. */}
         {outreachHistory.length > 0 && (
           <div className="card">
-            <h2 style={{ marginBottom: '12px' }}>Outreach History <span style={{ fontSize: '13px', fontWeight: 500, color: '#6b7280' }}>({outreachHistory.length})</span></h2>
+            <h2 style={{ marginBottom: '12px' }}>Outreach History <span style={{ fontSize: 'var(--fs-base)', fontWeight: 500, color: 'var(--text-muted)' }}>({outreachHistory.length})</span></h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {outreachHistory.map(o => (
-                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '12px', color: '#6b7280', fontVariantNumeric: 'tabular-nums', minWidth: '84px' }}>{o.outreach_date}</span>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>{(o.outreach_type || '').replace(/_/g, ' ')}</span>
+                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fafafa', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', minWidth: '84px' }}>{o.outreach_date}</span>
+                  <span style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-2)' }}>{(o.outreach_type || '').replace(/_/g, ' ')}</span>
                   <span style={{
-                    fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '999px',
-                    background: o.status === 'replied' ? '#f0fdf4' : o.status === 'bounced' ? '#fef2f2' : '#f3f4f6',
-                    color: o.status === 'replied' ? '#166534' : o.status === 'bounced' ? '#991b1b' : '#6b7280'
+                    fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--radius-pill)',
+                    background: o.status === 'replied' ? 'var(--success-bg)' : o.status === 'bounced' ? 'var(--danger-bg)' : 'var(--gray-100)',
+                    color: o.status === 'replied' ? 'var(--success-text-strong)' : o.status === 'bounced' ? 'var(--danger-text-strong)' : 'var(--text-muted)'
                   }}>
                     {(o.status || 'sent').replace(/_/g, ' ')}
                   </span>
                   {o.logged_by_person?.name && (
-                    <span style={{ fontSize: '12px', color: '#9ca3af' }}>by {o.logged_by_person.name}</span>
+                    <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>by {o.logged_by_person.name}</span>
                   )}
                   {o.message_content && (
-                    <span style={{ fontSize: '12px', color: '#6b7280', flex: '1 1 100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', flex: '1 1 100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {o.message_content}
                     </span>
                   )}
@@ -1530,20 +1530,20 @@ function LeadDetail() {
         {/* PE OS Demos with this person */}
         {demos.length > 0 && (
           <div className="card">
-            <h2 style={{ marginBottom: '12px' }}>PE OS Demos <span style={{ fontSize: '13px', fontWeight: 500, color: '#6b7280' }}>({demos.length})</span></h2>
+            <h2 style={{ marginBottom: '12px' }}>PE OS Demos <span style={{ fontSize: 'var(--fs-base)', fontWeight: 500, color: 'var(--text-muted)' }}>({demos.length})</span></h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {demos.map(d => (
-                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '12px', color: '#6b7280', fontVariantNumeric: 'tabular-nums', minWidth: '84px' }}>{d.demo_date || 'unscheduled'}</span>
+                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fafafa', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', minWidth: '84px' }}>{d.demo_date || 'unscheduled'}</span>
                   <span style={{
-                    fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '999px',
-                    background: d.stage === 'signed_up' ? '#f0fdf4' : d.stage === 'passed' ? '#fef2f2' : '#eff6ff',
-                    color: d.stage === 'signed_up' ? '#166534' : d.stage === 'passed' ? '#991b1b' : '#1e40af'
+                    fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--radius-pill)',
+                    background: d.stage === 'signed_up' ? 'var(--success-bg)' : d.stage === 'passed' ? 'var(--danger-bg)' : 'var(--primary-light)',
+                    color: d.stage === 'signed_up' ? 'var(--success-text-strong)' : d.stage === 'passed' ? 'var(--danger-text-strong)' : 'var(--primary-text)'
                   }}>
                     {(d.stage || '').replace(/_/g, ' ')}
                   </span>
-                  {d.use_case && <span style={{ fontSize: '12px', color: '#6b7280' }}>{d.use_case}</span>}
-                  {d.next_steps && <span style={{ fontSize: '12px', color: '#6b7280' }}>→ {d.next_steps}</span>}
+                  {d.use_case && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{d.use_case}</span>}
+                  {d.next_steps && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>→ {d.next_steps}</span>}
                 </div>
               ))}
             </div>
@@ -1557,15 +1557,15 @@ function LeadDetail() {
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h2 style={{ margin: 0 }}>Calls</h2>
-              <span style={{ color: 'var(--gray-600)', fontSize: '13px' }}>
+              <span style={{ color: 'var(--gray-600)', fontSize: 'var(--fs-base)' }}>
                 {calls.length} dial{calls.length === 1 ? '' : 's'} ·{' '}
                 {calls.filter(c => c.connected).length} connected
               </span>
             </div>
-            <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', fontSize: 'var(--fs-md)', borderCollapse: 'collapse' }}>
               <tbody>
                 {calls.map(c => (
-                  <tr key={c.id} style={{ borderTop: '1px solid var(--gray-100, #f3f4f6)' }}>
+                  <tr key={c.id} style={{ borderTop: '1px solid var(--gray-100)' }}>
                     <td style={{ padding: '7px 6px', width: '150px', color: 'var(--gray-600)', fontVariantNumeric: 'tabular-nums' }}>
                       {c.called_at
                         ? new Date(c.called_at).toLocaleString('en-US', {
@@ -1579,18 +1579,18 @@ function LeadDetail() {
                         title={c.connected ? 'The line connected' : 'Never picked up'}
                         style={{
                           display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
-                          background: c.connected ? '#16a34a' : '#d1d5db'
+                          background: c.connected ? 'var(--success)' : 'var(--border-strong)'
                         }}
                       />
                     </td>
                     <td style={{ padding: '7px 6px' }}>
                       {c.logged_by_person?.name
-                        || <span style={{ color: '#b45309' }}>unclaimed</span>}
+                        || <span style={{ color: 'var(--warning-text)' }}>unclaimed</span>}
                     </td>
                     <td style={{ padding: '7px 6px', color: outcomeColor(c.call_outcome), fontWeight: 500 }}>
                       {c.call_outcome
                         ? outcomeLabel(c.call_outcome)
-                        : <span style={{ color: 'var(--gray-400, #9ca3af)', fontWeight: 400 }}>no outcome</span>}
+                        : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>no outcome</span>}
                     </td>
                     <td style={{ padding: '7px 6px', width: '70px', textAlign: 'right', color: 'var(--gray-600)' }}>
                       {c.call_duration_seconds > 0 ? fmtDuration(c.call_duration_seconds) : '—'}
@@ -1600,7 +1600,7 @@ function LeadDetail() {
               </tbody>
             </table>
             {calls.some(c => c.notes) && (
-              <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--gray-600)' }}>
+              <div style={{ marginTop: '10px', fontSize: 'var(--fs-base)', color: 'var(--gray-600)' }}>
                 {calls.filter(c => c.notes).map(c => (
                   <div key={c.id} style={{ padding: '4px 0' }}>
                     <strong>{c.outreach_date}:</strong> {c.notes}
@@ -1659,7 +1659,7 @@ function LeadDetail() {
                     onChange={(e) => setNewActivity({ ...newActivity, transcript: e.target.value })}
                     placeholder="Paste full call transcript here..."
                     rows={8}
-                    style={{ fontFamily: 'monospace', fontSize: '13px' }}
+                    style={{ fontFamily: 'monospace', fontSize: 'var(--fs-base)' }}
                   />
                 </div>
               )}
@@ -1698,10 +1698,10 @@ function LeadDetail() {
                       <div style={{
                         background: 'var(--gray-50)',
                         padding: '16px',
-                        borderRadius: '8px',
+                        borderRadius: 'var(--radius-md)',
                         whiteSpace: 'pre-wrap',
                         fontFamily: 'monospace',
-                        fontSize: '13px',
+                        fontSize: 'var(--fs-base)',
                         lineHeight: '1.6',
                         color: 'var(--gray-700)',
                         maxHeight: '400px',
@@ -1757,7 +1757,7 @@ function LeadDetail() {
                   onChange={(e) => setNewTranscript({ ...newTranscript, transcript: e.target.value })}
                   placeholder="Paste full call transcript here..."
                   rows={10}
-                  style={{ fontFamily: 'monospace', fontSize: '13px' }}
+                  style={{ fontFamily: 'monospace', fontSize: 'var(--fs-base)' }}
                 />
               </div>
 
@@ -1794,7 +1794,7 @@ function LeadDetail() {
                     {!transcript.ai_analysis && analysingTranscriptId !== transcript.id && (
                       <button
                         className="btn btn-sm"
-                        style={{ fontSize: '12px' }}
+                        style={{ fontSize: 'var(--fs-sm)' }}
                         onClick={() => triggerAnalysis(transcript.id, transcript.transcript)}
                         title="Analyse with AI"
                       >
@@ -1802,7 +1802,7 @@ function LeadDetail() {
                       </button>
                     )}
                     {analysingTranscriptId === transcript.id && (
-                      <span style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span className="loading-spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></span>
                         Analysing…
                       </span>
@@ -1810,7 +1810,7 @@ function LeadDetail() {
                     {transcript.ai_analysis && (
                       <button
                         className="btn btn-sm"
-                        style={{ fontSize: '12px' }}
+                        style={{ fontSize: 'var(--fs-sm)' }}
                         onClick={() => triggerAnalysis(transcript.id, transcript.transcript)}
                         title="Re-analyse"
                       >
@@ -1837,13 +1837,13 @@ function LeadDetail() {
                       <Sparkles size={14} />
                       <span>AI Analysis</span>
                       {transcript.ai_analysis.analysed_at && (
-                        <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginLeft: 'auto' }}>
                           {new Date(transcript.ai_analysis.analysed_at).toLocaleDateString()}
                         </span>
                       )}
                     </div>
 
-                    <p style={{ margin: '0 0 12px', fontSize: '14px', lineHeight: '1.6', color: '#374151' }}>
+                    <p style={{ margin: '0 0 12px', fontSize: 'var(--fs-md)', lineHeight: '1.6', color: 'var(--text-2)' }}>
                       {transcript.ai_analysis.summary}
                     </p>
 
@@ -1854,12 +1854,12 @@ function LeadDetail() {
                       </span>
 
                       {/* Fit score stars */}
-                      <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                      <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
                         Fit:{' '}
                         {Array.from({ length: 5 }, (_, i) => (
-                          <span key={i} style={{ color: i < transcript.ai_analysis.fit_score ? '#f59e0b' : '#d1d5db' }}>★</span>
+                          <span key={i} style={{ color: i < transcript.ai_analysis.fit_score ? 'var(--warning-text)' : 'var(--gray-300)' }}>★</span>
                         ))}
-                        {' '}<span style={{ color: '#6b7280' }}>({transcript.ai_analysis.fit_reasoning})</span>
+                        {' '}<span style={{ color: 'var(--text-muted)' }}>({transcript.ai_analysis.fit_reasoning})</span>
                       </span>
                     </div>
 
@@ -1950,10 +1950,10 @@ function TaskModal({ leadId, firm, people, defaultAssigneeId, onClose }) {
                   type="button"
                   onClick={() => selectType(p.key)}
                   style={{
-                    padding: '5px 12px', borderRadius: '999px', fontSize: '12px', cursor: 'pointer',
-                    border: taskType === p.key ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
-                    background: taskType === p.key ? '#eff6ff' : 'white',
-                    color: taskType === p.key ? '#1d4ed8' : '#6b7280',
+                    padding: '5px 12px', borderRadius: 'var(--radius-pill)', fontSize: 'var(--fs-sm)', cursor: 'pointer',
+                    border: taskType === p.key ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+                    background: taskType === p.key ? 'var(--primary-light)' : 'white',
+                    color: taskType === p.key ? 'var(--primary-strong)' : 'var(--text-muted)',
                     fontWeight: taskType === p.key ? 600 : 500,
                   }}
                 >

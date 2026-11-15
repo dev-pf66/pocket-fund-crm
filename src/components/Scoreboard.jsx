@@ -31,7 +31,7 @@ const N = ({ value, warn = false, muted = false }) => (
   <td style={{
     padding: '8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     fontWeight: warn && value > 0 ? 700 : 500,
-    color: warn && value > 0 ? '#b91c1c' : muted && value === 0 ? '#9ca3af' : '#111827'
+    color: warn && value > 0 ? 'var(--danger-text)' : muted && value === 0 ? 'var(--text-muted)' : 'var(--text)'
   }}>{value}</td>
 )
 
@@ -66,7 +66,7 @@ function Scoreboard() {
 
   if (loading && !board) return <div className="card" style={{ padding: '20px' }}>Loading scoreboard…</div>
   if (error) return (
-    <div className="card" style={{ padding: '20px', color: '#b91c1c' }}>
+    <div className="card" style={{ padding: '20px', color: 'var(--danger-text)' }}>
       Could not load the scoreboard: {error.message}
     </div>
   )
@@ -82,9 +82,9 @@ function Scoreboard() {
       </div>
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
-            <tr style={{ background: '#f9fafb' }}>
+            <tr style={{ background: 'var(--surface-subtle)' }}>
               <th style={{ textAlign: 'left', padding: '8px' }}>Person</th>
               <th style={{ textAlign: 'right', padding: '8px' }} title="Leads in their book, excluding archived">Book</th>
               <th style={{ textAlign: 'right', padding: '8px' }} title="Outreach rows logged this week — dials included">Outreach</th>
@@ -102,26 +102,26 @@ function Scoreboard() {
                   still owed an answer but not flooding the queue. Dev's call:
                   "let's just do the last thirty days — let those start coming up.
                   And for the backlog, keep them as unupdated so we have to update it." */}
-              <th style={{ textAlign: 'right', padding: '8px', color: '#b91c1c' }}
+              <th style={{ textAlign: 'right', padding: '8px', color: 'var(--danger-text)' }}
                   title={`Crossed the ${STALE_BREACH_DAYS}-day clock within the last 30 days — this week's work`}>
                 Needs update
               </th>
-              <th style={{ textAlign: 'right', padding: '8px', color: '#b91c1c' }}
+              <th style={{ textAlign: 'right', padding: '8px', color: 'var(--danger-text)' }}
                   title={`Every lead past the ${STALE_BREACH_DAYS}-day clock, including the older backlog that no longer nags`}>
                 Backlog
               </th>
-              <th style={{ textAlign: 'right', padding: '8px', color: '#b91c1c' }} title="Leads missing required info for the stage they have reached">No info</th>
-              <th style={{ textAlign: 'right', padding: '8px', color: '#b91c1c' }} title="Leads at meeting stage or beyond with no transcript on file">No transcript</th>
+              <th style={{ textAlign: 'right', padding: '8px', color: 'var(--danger-text)' }} title="Leads missing required info for the stage they have reached">No info</th>
+              <th style={{ textAlign: 'right', padding: '8px', color: 'var(--danger-text)' }} title="Leads at meeting stage or beyond with no transcript on file">No transcript</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(r => {
               const isMe = r.personId === currentPerson?.id
               return (
-                <tr key={r.personId} style={{ borderTop: '1px solid #f3f4f6', background: isMe ? '#f8fafc' : undefined }}>
+                <tr key={r.personId} style={{ borderTop: '1px solid var(--gray-100)', background: isMe ? 'var(--surface-subtle)' : undefined }}>
                   <td style={{ padding: '8px', fontWeight: isMe ? 600 : 500 }}>
                     {r.name || `person ${r.personId}`}
-                    {isMe && <span style={{ marginLeft: 6, fontSize: '11px', color: '#6b7280' }}>you</span>}
+                    {isMe && <span style={{ marginLeft: 6, fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>you</span>}
                   </td>
                   <N value={r.liveLeads} muted />
                   <N value={r.outreachDone} />
@@ -139,7 +139,7 @@ function Scoreboard() {
             })}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: '2px solid #e5e7eb', fontWeight: 700 }}>
+            <tr style={{ borderTop: '2px solid var(--border)', fontWeight: 700 }}>
               <td style={{ padding: '8px' }}>Team</td>
               <N value={team.liveLeads} />
               <N value={team.outreachDone} />
@@ -160,14 +160,14 @@ function Scoreboard() {
       {/* The team row sums only the rows above it, so work with no person on it
           has to be reported separately rather than folded in or dropped. */}
       {unattributedOutreach > 0 && (
-        <div style={{ marginTop: '10px', fontSize: '12px', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '8px 10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ marginTop: '10px', fontSize: 'var(--fs-sm)', color: 'var(--warning-text-strong)', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 'var(--radius)', padding: '8px 10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
           <AlertTriangle size={14} />
           {unattributedOutreach} outreach row{unattributedOutreach === 1 ? '' : 's'} this week
           have no person recorded, so they are in nobody&rsquo;s count and not in the team total.
         </div>
       )}
 
-      <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>
+      <div style={{ marginTop: '10px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
         The three red columns have no week — a lead 60 days untouched is a problem today whichever
         week you are looking at. <Link to="/pipeline">Work them in the pipeline</Link>.
       </div>

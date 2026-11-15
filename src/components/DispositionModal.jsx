@@ -79,11 +79,11 @@ function DispositionModal({ lead, onClose, onDone }) {
       <div className="modal" style={{ maxWidth: '540px' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
           <h2 style={{ margin: 0, fontSize: '18px' }}>What is happening with {lead.name}?</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
             <X size={18} />
           </button>
         </div>
-        <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '14px' }}>
+        <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', marginBottom: '14px' }}>
           Nobody has updated this lead in over 30 days. Pick one — whichever you pick,
           it stays in the CRM.
         </div>
@@ -95,15 +95,15 @@ function DispositionModal({ lead, onClose, onDone }) {
               onClick={() => setChoice(c.key)}
               style={{
                 display: 'flex', alignItems: 'flex-start', gap: '10px', textAlign: 'left',
-                padding: '10px 12px', borderRadius: '8px', cursor: 'pointer',
-                border: `1px solid ${choice === c.key ? '#2563eb' : '#e5e7eb'}`,
-                background: choice === c.key ? '#eff6ff' : 'white',
+                padding: '10px 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                border: `1px solid ${choice === c.key ? 'var(--primary)' : 'var(--border)'}`,
+                background: choice === c.key ? 'var(--primary-light)' : 'white',
               }}
             >
-              <c.Icon size={16} style={{ flexShrink: 0, marginTop: '2px', color: choice === c.key ? '#2563eb' : '#6b7280' }} />
+              <c.Icon size={16} style={{ flexShrink: 0, marginTop: '2px', color: choice === c.key ? 'var(--primary)' : 'var(--text-muted)' }} />
               <span>
-                <span style={{ fontWeight: 600, fontSize: '14px' }}>{c.label}</span>
-                <span style={{ display: 'block', fontSize: '12px', color: '#6b7280' }}>{c.hint}</span>
+                <span style={{ fontWeight: 600, fontSize: 'var(--fs-md)' }}>{c.label}</span>
+                <span style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{c.hint}</span>
               </span>
             </button>
           ))}
@@ -111,11 +111,11 @@ function DispositionModal({ lead, onClose, onDone }) {
 
         {needsReason && (
           <div className="form-group" style={{ marginBottom: '10px' }}>
-            <label>Why? <span style={{ color: '#b91c1c' }}>*</span></label>
+            <label>Why? <span style={{ color: 'var(--danger-text)' }}>*</span></label>
             <select className="form-select" value={reason} onChange={(e) => setReason(e.target.value)}>
               {deadReasons.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '4px' }}>
               Missing an option? Admin → field options, <code>dead_reason</code>.
             </div>
           </div>
@@ -123,7 +123,7 @@ function DispositionModal({ lead, onClose, onDone }) {
 
         {needsDate && (
           <div className="form-group" style={{ marginBottom: '10px' }}>
-            <label>Come back on <span style={{ color: '#b91c1c' }}>*</span></label>
+            <label>Come back on <span style={{ color: 'var(--danger-text)' }}>*</span></label>
             <input type="date" className="form-input" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
         )}

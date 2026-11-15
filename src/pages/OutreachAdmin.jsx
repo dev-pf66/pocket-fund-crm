@@ -37,11 +37,11 @@ const addDays    = istAddDays
 const formatShort = fmtDate
 
 function FitStars({ score }) {
-  if (!score) return <span style={{ color: '#9ca3af', fontSize: '13px' }}>—</span>
+  if (!score) return <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>—</span>
   return (
     <span>
       {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} style={{ color: i < score ? '#f59e0b' : '#d1d5db', fontSize: '14px' }}>★</span>
+        <span key={i} style={{ color: i < score ? 'var(--warning-text)' : 'var(--gray-300)', fontSize: 'var(--fs-md)' }}>★</span>
       ))}
     </span>
   )
@@ -71,10 +71,10 @@ function ProgressRing({ value, goal, size = 96, stroke = 8, color = '#2563eb' })
         position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center'
       }}>
-        <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: 'var(--text)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
           {value}
         </div>
-        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
           {hasGoal(goal) ? `/ ${goal}` : 'logged'}
         </div>
       </div>
@@ -183,8 +183,8 @@ function DailyChart({ rows, days, goal = DAILY_GOAL, showDetails }) {
             const isToday = d.date === today
             return (
               <div key={d.date} style={{
-                flex: 1, textAlign: 'center', fontSize: '10px',
-                color: isToday ? '#1d4ed8' : '#6b7280',
+                flex: 1, textAlign: 'center', fontSize: 'var(--fs-xs)',
+                color: isToday ? 'var(--primary-strong)' : 'var(--text-muted)',
                 fontWeight: isToday ? 600 : 400,
                 fontVariantNumeric: 'tabular-nums',
                 visibility: show ? 'visible' : 'hidden'
@@ -199,7 +199,7 @@ function DailyChart({ rows, days, goal = DAILY_GOAL, showDetails }) {
       {showDetails && (
         <div style={{
           marginTop: '14px', padding: '14px',
-          background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px'
+          background: '#fafafa', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)'
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '14px' }}>
             <BreakdownStat label="Sent in range" value={breakdown.total} />
@@ -216,7 +216,7 @@ function DailyChart({ rows, days, goal = DAILY_GOAL, showDetails }) {
             />
           </div>
           <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
               Platform split
             </div>
             <PlatformBars types={breakdown.types} total={breakdown.total} />
@@ -230,14 +230,14 @@ function DailyChart({ rows, days, goal = DAILY_GOAL, showDetails }) {
 function BreakdownStat({ label, value, sub }) {
   return (
     <div>
-      <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+      <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
         {label}
       </div>
-      <div style={{ fontSize: '18px', fontWeight: 700, color: '#111827', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </div>
       {sub && (
-        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>
           {sub}
         </div>
       )}
@@ -255,12 +255,12 @@ function PlatformBars({ types, total }) {
         const pct = total > 0 ? Math.round((count / total) * 100) : 0
         return (
           <div key={p} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 60px', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '12px', color: '#374151' }}>{PLATFORM_LABELS[p]}</span>
-            <div style={{ height: '8px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden' }}>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-2)' }}>{PLATFORM_LABELS[p]}</span>
+            <div style={{ height: '8px', background: 'var(--border)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', background: colors[p], transition: 'width 0.3s ease' }} />
             </div>
-            <span style={{ fontSize: '12px', color: '#6b7280', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-              {count} <span style={{ color: '#9ca3af' }}>({pct}%)</span>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+              {count} <span style={{ color: 'var(--text-muted)' }}>({pct}%)</span>
             </span>
           </div>
         )
@@ -275,11 +275,11 @@ function WeeklyBar({ value, goal }) {
   return (
     <div>
       <div style={{
-        height: '10px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden'
+        height: '10px', background: 'var(--border)', borderRadius: 'var(--radius-pill)', overflow: 'hidden'
       }}>
         <div style={{
           width: `${pct}%`, height: '100%',
-          background: hit ? '#16a34a' : 'linear-gradient(90deg, #3b82f6, #2563eb)',
+          background: hit ? 'var(--success)' : 'linear-gradient(90deg, #3b82f6, var(--primary))',
           transition: 'width 0.4s ease'
         }} />
       </div>
@@ -316,7 +316,7 @@ function Nudge({ todayCount, streak, bestDay, dailyGoal = DAILY_GOAL }) {
   }[tone]
   return (
     <div style={{
-      padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 500,
+      padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--fs-base)', fontWeight: 500,
       background: styles.bg, color: styles.fg, border: `1px solid ${styles.border}`
     }}>
       {text}
@@ -333,16 +333,16 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
         marginBottom: '18px', flexWrap: 'wrap', gap: '10px'
       }}>
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Today's Progress
           </div>
-          <div style={{ fontSize: '18px', fontWeight: 600, color: '#111827', marginTop: '2px' }}>
+          <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginTop: '2px' }}>
             {personName}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 12px', borderRadius: '999px', background: streak > 0 ? '#fff7ed' : '#f3f4f6', border: `1px solid ${streak > 0 ? '#fed7aa' : '#e5e7eb'}` }}>
-          <Flame size={16} style={{ color: streak > 0 ? '#ea580c' : '#9ca3af' }} />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: streak > 0 ? '#9a3412' : '#6b7280' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 12px', borderRadius: 'var(--radius-pill)', background: streak > 0 ? '#fff7ed' : 'var(--gray-100)', border: `1px solid ${streak > 0 ? '#fed7aa' : 'var(--border)'}` }}>
+          <Flame size={16} style={{ color: streak > 0 ? '#ea580c' : 'var(--text-muted)' }} />
+          <span style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: streak > 0 ? '#9a3412' : 'var(--text-muted)' }}>
             {streak} day{streak === 1 ? '' : 's'} streak
           </span>
         </div>
@@ -359,11 +359,11 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 This Week
               </span>
-              <span style={{ fontSize: '13px', color: '#111827', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                {thisWeekCount} <span style={{ color: '#6b7280', fontWeight: 500 }}>/ {weeklyGoal}</span>
+              <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                {thisWeekCount} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>/ {weeklyGoal}</span>
               </span>
             </div>
             <WeeklyBar value={thisWeekCount} goal={weeklyGoal} />
@@ -398,16 +398,16 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
           marginBottom: '10px', flexWrap: 'wrap', gap: '8px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BarChart2 size={14} style={{ color: '#6b7280' }} />
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <BarChart2 size={14} style={{ color: 'var(--text-muted)' }} />
+            <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Daily outreach · last {chartRange} days
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
               display: 'inline-flex',
-              border: '1px solid #e5e7eb',
-              borderRadius: '999px',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-pill)',
               overflow: 'hidden',
               background: 'white'
             }}>
@@ -419,10 +419,10 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
                     onClick={() => onChartRangeChange(n)}
                     style={{
                       padding: '4px 10px',
-                      fontSize: '12px',
+                      fontSize: 'var(--fs-sm)',
                       fontWeight: active ? 600 : 500,
-                      color: active ? '#1d4ed8' : '#6b7280',
-                      background: active ? '#eff6ff' : 'transparent',
+                      color: active ? 'var(--primary-strong)' : 'var(--text-muted)',
+                      background: active ? 'var(--primary-light)' : 'transparent',
                       border: 'none',
                       cursor: 'pointer',
                       fontVariantNumeric: 'tabular-nums'
@@ -437,12 +437,12 @@ function AnalystDashboard({ personName, metrics, chartRows, chartRange, onChartR
               onClick={onToggleChartDetails}
               style={{
                 padding: '4px 10px',
-                fontSize: '12px',
+                fontSize: 'var(--fs-sm)',
                 fontWeight: 500,
-                color: showChartDetails ? '#1d4ed8' : '#6b7280',
-                background: showChartDetails ? '#eff6ff' : 'white',
-                border: `1px solid ${showChartDetails ? '#bfdbfe' : '#e5e7eb'}`,
-                borderRadius: '999px',
+                color: showChartDetails ? 'var(--primary-strong)' : 'var(--text-muted)',
+                background: showChartDetails ? 'var(--primary-light)' : 'white',
+                border: `1px solid ${showChartDetails ? 'var(--primary-border-soft)' : 'var(--border)'}`,
+                borderRadius: 'var(--radius-pill)',
                 cursor: 'pointer'
               }}
             >
@@ -467,16 +467,16 @@ function MobileEntryCard({
       onClick={onToggleExpand}
       style={{
         padding: '14px 16px',
-        borderBottom: '1px solid #f3f4f6',
+        borderBottom: '1px solid var(--gray-100)',
         cursor: 'pointer',
         background: expanded ? '#fafafa' : 'white'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
-        <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
           {formatDate(entry.outreach_date)}
         </div>
-        <span className="badge badge-secondary" style={{ fontSize: '10px' }}>
+        <span className="badge badge-secondary" style={{ fontSize: 'var(--fs-xs)' }}>
           {PLATFORM_LABELS[entry.outreach_type] || entry.outreach_type || '—'}
         </span>
       </div>
@@ -488,7 +488,7 @@ function MobileEntryCard({
             disabled={promoting}
             style={{
               background: 'none', border: 'none', padding: 0, textAlign: 'left',
-              color: '#1d4ed8', fontWeight: 600, fontSize: '15px',
+              color: 'var(--primary-strong)', fontWeight: 600, fontSize: '15px',
               cursor: promoting ? 'wait' : 'pointer', opacity: promoting ? 0.6 : 1
             }}
           >
@@ -500,7 +500,7 @@ function MobileEntryCard({
             disabled={promoting}
             style={{
               background: 'none', border: 'none', padding: 0, textAlign: 'left',
-              color: '#1d4ed8', fontWeight: 600, fontSize: '15px',
+              color: 'var(--primary-strong)', fontWeight: 600, fontSize: '15px',
               borderBottom: '1px dashed #93c5fd',
               cursor: promoting ? 'wait' : 'pointer', opacity: promoting ? 0.6 : 1
             }}
@@ -511,9 +511,9 @@ function MobileEntryCard({
           <button
             onClick={onAddContact}
             style={{
-              background: 'none', border: '1px dashed #d1d5db', borderRadius: '6px',
+              background: 'none', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius)',
               padding: '4px 10px', textAlign: 'left',
-              color: '#6b7280', fontWeight: 500, fontSize: '13px',
+              color: 'var(--text-muted)', fontWeight: 500, fontSize: 'var(--fs-base)',
               cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px'
             }}
           >
@@ -521,22 +521,22 @@ function MobileEntryCard({
           </button>
         )}
         {(entry.firm_name || entry.lead?.firm_name) && (
-          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '2px' }}>
             {entry.firm_name || entry.lead.firm_name}
           </div>
         )}
       </div>
 
       <div style={{
-        fontSize: '13px', color: '#4b5563', marginBottom: '10px',
+        fontSize: 'var(--fs-base)', color: 'var(--gray-600)', marginBottom: '10px',
         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
         overflow: 'hidden'
       }}>
-        {entry.message_content || entry.notes || <em style={{ color: '#9ca3af' }}>No message</em>}
+        {entry.message_content || entry.notes || <em style={{ color: 'var(--text-muted)' }}>No message</em>}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-        <div style={{ fontSize: '12px', color: '#6b7280' }}>
+        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
           {entry.logged_by_person?.name || '—'}
           {entry.fit_score && <> · <FitStars score={entry.fit_score} /></>}
         </div>
@@ -546,23 +546,23 @@ function MobileEntryCard({
             disabled={toggling}
             style={{
               background: 'none',
-              border: isReply(entry.status) ? '1px solid #bbf7d0' : '1px dashed #e5e7eb',
-              borderRadius: '999px',
+              border: isReply(entry.status) ? '1px solid var(--success-border)' : '1px dashed var(--border)',
+              borderRadius: 'var(--radius-pill)',
               padding: '4px 10px',
-              fontSize: '11px',
+              fontSize: 'var(--fs-xs)',
               fontWeight: isReply(entry.status) ? 600 : 400,
-              color: isReply(entry.status) ? '#15803d' : '#9ca3af',
+              color: isReply(entry.status) ? 'var(--success-text)' : 'var(--text-muted)',
               cursor: toggling ? 'wait' : 'pointer'
             }}
           >
             {isReply(entry.status) ? <><Check size={11} /> Responded</> : 'Mark responded'}
           </button>
-          {expanded ? <ChevronUp size={16} color="#6b7280" /> : <ChevronDown size={16} color="#6b7280" />}
+          {expanded ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
         </div>
       </div>
 
       {expanded && (
-        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {entry.message_content && (
             <div>
               <div style={metaLabelStyle}>Message</div>
@@ -628,18 +628,18 @@ function StatTile({ icon, label, value, sub }) {
   return (
     <div style={{
       padding: '12px 14px',
-      border: '1px solid #e5e7eb',
-      borderRadius: '8px',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
       background: '#fafafa'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
         {icon}
         {label}
       </div>
-      <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </div>
-      <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>
+      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '3px' }}>
         {sub}
       </div>
     </div>
@@ -728,7 +728,7 @@ function LeadEditCard({ entry, currentPersonId, onSaved }) {
 
   if (loading) {
     return (
-      <div style={{ padding: '14px', color: '#6b7280', fontSize: '13px' }}>Loading lead…</div>
+      <div style={{ padding: '14px', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>Loading lead…</div>
     )
   }
   if (!lead) return null
@@ -736,9 +736,9 @@ function LeadEditCard({ entry, currentPersonId, onSaved }) {
   const inputStyle = {
     width: '100%',
     padding: '6px 10px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '4px',
-    fontSize: '13px',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: 'var(--fs-base)',
     background: 'white'
   }
 
@@ -746,12 +746,12 @@ function LeadEditCard({ entry, currentPersonId, onSaved }) {
     <div style={{
       marginTop: '12px',
       background: 'white',
-      border: '1px solid #e5e7eb',
-      borderRadius: '8px',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
       padding: '14px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Lead info
         </div>
         <button
@@ -1121,7 +1121,7 @@ function OutreachAdmin() {
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
             <Target size={24} /> Log
           </h1>
-          <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+          <p style={{ color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
             {isAdmin
               ? 'Daily targets, streaks, and outreach history (admin can view any teammate)'
               : 'Your daily targets, streaks, and outreach history'}
@@ -1132,7 +1132,7 @@ function OutreachAdmin() {
       {/* Admin-only team switcher */}
       {isAdmin && (
         <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
             Viewing
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1204,13 +1204,13 @@ function OutreachAdmin() {
       {/* Filters */}
       <div className="card" style={{ padding: '16px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <Filter size={16} style={{ color: '#6b7280' }} />
+          <Filter size={16} style={{ color: 'var(--text-muted)' }} />
 
           <select
             value={filters.platform}
             onChange={e => setFilters(f => ({ ...f, platform: e.target.value }))}
             className="form-control"
-            style={{ width: 'auto', fontSize: '13px' }}
+            style={{ width: 'auto', fontSize: 'var(--fs-base)' }}
           >
             <option value="">All Platforms</option>
             {PLATFORMS.map(p => (
@@ -1222,7 +1222,7 @@ function OutreachAdmin() {
             value={filters.days_back}
             onChange={e => setFilters(f => ({ ...f, days_back: e.target.value }))}
             className="form-control"
-            style={{ width: 'auto', fontSize: '13px' }}
+            style={{ width: 'auto', fontSize: 'var(--fs-base)' }}
           >
             <option value="">All Time</option>
             <option value="7">Last 7 days</option>
@@ -1235,17 +1235,17 @@ function OutreachAdmin() {
             value={filters.has_response}
             onChange={e => setFilters(f => ({ ...f, has_response: e.target.value }))}
             className="form-control"
-            style={{ width: 'auto', fontSize: '13px' }}
+            style={{ width: 'auto', fontSize: 'var(--fs-base)' }}
           >
             <option value="">All (response or not)</option>
             <option value="yes">Got response</option>
             <option value="no">No response</option>
           </select>
 
-          <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
-            <strong style={{ color: '#111827', fontWeight: 600 }}>{totalCount}</strong> shown
+          <div style={{ marginLeft: 'auto', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
+            <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{totalCount}</strong> shown
             {totalCount > 0 && (
-              <> · <strong style={{ color: '#15803d', fontWeight: 600 }}>{withResponse}</strong> replied
+              <> · <strong style={{ color: 'var(--success-text)', fontWeight: 600 }}>{withResponse}</strong> replied
                 ({Math.round((withResponse / totalCount) * 100)}%)
               </>
             )}
@@ -1314,12 +1314,12 @@ function OutreachAdmin() {
       {/* Table (desktop) / card list (mobile) */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
             <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
             Loading outreach logs…
           </div>
         ) : visibleEntries.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
             No outreach entries found.
           </div>
         ) : isMobile ? (
@@ -1359,7 +1359,7 @@ function OutreachAdmin() {
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+              <tr style={{ background: 'var(--surface-subtle)', borderBottom: '1px solid var(--border)' }}>
                 <th style={thStyle}>Date</th>
                 <th style={thStyle}>Lead (Company)</th>
                 <th style={thStyle}>Platform</th>
@@ -1374,7 +1374,7 @@ function OutreachAdmin() {
               {visibleEntries.map(entry => (
                 <Fragment key={entry.id}>
                   <tr
-                    style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
+                    style={{ borderBottom: '1px solid var(--gray-100)', cursor: 'pointer' }}
                     onClick={() => toggleExpand(entry.id)}
                   >
                     <td style={tdStyle}>{formatDate(entry.outreach_date)}</td>
@@ -1389,7 +1389,7 @@ function OutreachAdmin() {
                             border: 'none',
                             padding: 0,
                             textAlign: 'left',
-                            color: '#1d4ed8',
+                            color: 'var(--primary-strong)',
                             fontWeight: 500,
                             cursor: promotingId === entry.id ? 'wait' : 'pointer',
                             opacity: promotingId === entry.id ? 0.6 : 1
@@ -1397,7 +1397,7 @@ function OutreachAdmin() {
                         >
                           {entry.lead_name || entry.lead.name}
                           {(entry.firm_name || entry.lead.firm_name) && (
-                            <span style={{ display: 'block', fontSize: '12px', color: '#6b7280', fontWeight: '400' }}>
+                            <span style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontWeight: '400' }}>
                               {entry.firm_name || entry.lead.firm_name}
                             </span>
                           )}
@@ -1412,7 +1412,7 @@ function OutreachAdmin() {
                             border: 'none',
                             padding: 0,
                             textAlign: 'left',
-                            color: '#1d4ed8',
+                            color: 'var(--primary-strong)',
                             fontWeight: 500,
                             cursor: promotingId === entry.id ? 'wait' : 'pointer',
                             borderBottom: '1px dashed #93c5fd',
@@ -1421,7 +1421,7 @@ function OutreachAdmin() {
                         >
                           {entry.lead_name}
                           {entry.firm_name && (
-                            <span style={{ display: 'block', fontSize: '12px', color: '#6b7280', fontWeight: 400, borderBottom: 'none' }}>
+                            <span style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontWeight: 400, borderBottom: 'none' }}>
                               {entry.firm_name}
                             </span>
                           )}
@@ -1432,12 +1432,12 @@ function OutreachAdmin() {
                           title="Create a contact card for this outreach entry"
                           style={{
                             background: 'none',
-                            border: '1px dashed #d1d5db',
-                            borderRadius: '6px',
+                            border: '1px dashed var(--border-strong)',
+                            borderRadius: 'var(--radius)',
                             padding: '4px 10px',
-                            color: '#6b7280',
+                            color: 'var(--text-muted)',
                             fontWeight: 500,
-                            fontSize: '13px',
+                            fontSize: 'var(--fs-base)',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -1449,7 +1449,7 @@ function OutreachAdmin() {
                       )}
                     </td>
                     <td style={tdStyle}>
-                      <span className="badge badge-secondary" style={{ fontSize: '11px' }}>
+                      <span className="badge badge-secondary" style={{ fontSize: 'var(--fs-xs)' }}>
                         {PLATFORM_LABELS[entry.outreach_type] || entry.outreach_type || '—'}
                       </span>
                     </td>
@@ -1460,10 +1460,10 @@ function OutreachAdmin() {
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
-                        fontSize: '13px',
-                        color: '#4b5563'
+                        fontSize: 'var(--fs-base)',
+                        color: 'var(--gray-600)'
                       }}>
-                        {entry.message_content || entry.notes || <em style={{ color: '#9ca3af' }}>No message</em>}
+                        {entry.message_content || entry.notes || <em style={{ color: 'var(--text-muted)' }}>No message</em>}
                       </span>
                     </td>
                     <td style={tdStyle}><FitStars score={entry.fit_score} /></td>
@@ -1474,12 +1474,12 @@ function OutreachAdmin() {
                         title={isReply(entry.status) ? 'Click to mark as no response' : 'Click to mark as responded'}
                         style={{
                           background: 'none',
-                          border: isReply(entry.status) ? '1px solid #bbf7d0' : '1px dashed #e5e7eb',
-                          borderRadius: '999px',
+                          border: isReply(entry.status) ? '1px solid var(--success-border)' : '1px dashed var(--border)',
+                          borderRadius: 'var(--radius-pill)',
                           padding: '3px 10px',
-                          fontSize: '12px',
+                          fontSize: 'var(--fs-sm)',
                           fontWeight: isReply(entry.status) ? 600 : 400,
-                          color: isReply(entry.status) ? '#15803d' : '#9ca3af',
+                          color: isReply(entry.status) ? 'var(--success-text)' : 'var(--text-muted)',
                           cursor: togglingId === entry.id ? 'wait' : 'pointer'
                         }}
                       >
@@ -1492,20 +1492,20 @@ function OutreachAdmin() {
                   </tr>
 
                   {expandedId === entry.id && (
-                    <tr key={`${entry.id}-expanded`} style={{ background: '#fafafa', borderBottom: '1px solid #e5e7eb' }}>
+                    <tr key={`${entry.id}-expanded`} style={{ background: '#fafafa', borderBottom: '1px solid var(--border)' }}>
                       <td colSpan={8} style={{ padding: '16px 20px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                           {entry.message_content && (
                             <div>
-                              <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '6px' }}>
+                              <div style={{ fontSize: 'var(--fs-xs)', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
                                 Message Content
                               </div>
                               <div style={{
                                 background: 'white',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '6px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--radius)',
                                 padding: '12px',
-                                fontSize: '13px',
+                                fontSize: 'var(--fs-base)',
                                 lineHeight: '1.6',
                                 whiteSpace: 'pre-wrap',
                                 maxHeight: '200px',
@@ -1666,16 +1666,16 @@ function OutreachQueueSection({ leads, batchStats, loading, pendingId, collapsed
     <div className="card" style={{ marginBottom: '20px', padding: 0, overflow: 'hidden' }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 18px', borderBottom: grouped.length > 0 ? '1px solid #e5e7eb' : 'none',
-        background: '#f9fafb'
+        padding: '14px 18px', borderBottom: grouped.length > 0 ? '1px solid var(--border)' : 'none',
+        background: 'var(--surface-subtle)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Inbox size={16} style={{ color: '#6b7280' }} />
-          <span style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>Outreach Queue</span>
+          <Inbox size={16} style={{ color: 'var(--text-muted)' }} />
+          <span style={{ fontWeight: 600, fontSize: 'var(--fs-md)', color: 'var(--text)' }}>Outreach Queue</span>
           {!loading && leads.length > 0 && (
             <span style={{
-              fontSize: '11px', fontWeight: 600, color: '#1d4ed8',
-              background: '#eff6ff', borderRadius: '999px', padding: '2px 8px'
+              fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--primary-strong)',
+              background: 'var(--primary-light)', borderRadius: 'var(--radius-pill)', padding: '2px 8px'
             }}>
               {leads.length} remaining
             </span>
@@ -1687,11 +1687,11 @@ function OutreachQueueSection({ leads, batchStats, loading, pendingId, collapsed
       </div>
 
       {loading ? (
-        <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
           Loading queue…
         </div>
       ) : grouped.length === 0 ? (
-        <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
           Queue is empty — paste a list of LinkedIn URLs to get started.
         </div>
       ) : (
@@ -1726,7 +1726,7 @@ function QueueBatchGroup({ group, stats, collapsed, onToggle, pendingId, onMark,
   const pct = total > 0 ? Math.round((contacted / total) * 100) : 0
 
   return (
-    <div style={{ borderBottom: '1px solid #f3f4f6' }}>
+    <div style={{ borderBottom: '1px solid var(--gray-100)' }}>
       <button
         onClick={onToggle}
         style={{
@@ -1735,23 +1735,23 @@ function QueueBatchGroup({ group, stats, collapsed, onToggle, pendingId, onMark,
           cursor: 'pointer', textAlign: 'left'
         }}
       >
-        {collapsed ? <ChevronRight size={14} style={{ color: '#6b7280' }} /> : <ChevronDown size={14} style={{ color: '#6b7280' }} />}
+        {collapsed ? <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontWeight: 500, color: '#374151', fontSize: '13px' }}>{title}</span>
+          <span style={{ fontWeight: 500, color: 'var(--text-2)', fontSize: 'var(--fs-base)' }}>{title}</span>
           {!isUnbatched && stats && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
-              <div style={{ width: '120px', height: '5px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden', display: 'inline-block', verticalAlign: 'middle' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: '#16a34a' }} />
+              <div style={{ width: '120px', height: '5px', background: 'var(--border)', borderRadius: 'var(--radius-pill)', overflow: 'hidden', display: 'inline-block', verticalAlign: 'middle' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: 'var(--success)' }} />
               </div>
-              <span style={{ fontSize: '11px', color: '#6b7280' }}>{contacted}/{total}</span>
+              <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{contacted}/{total}</span>
             </div>
           )}
         </div>
-        <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>{remaining} left</span>
+        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{remaining} left</span>
       </button>
 
       {!collapsed && (
-        <div style={{ borderTop: '1px solid #f3f4f6' }}>
+        <div style={{ borderTop: '1px solid var(--gray-100)' }}>
           {group.leads.map(lead => (
             <QueueLeadRow
               key={lead.id}
@@ -1773,17 +1773,17 @@ function QueueLeadRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '10px',
-      padding: '10px 18px', borderBottom: '1px solid #f9fafb',
+      padding: '10px 18px', borderBottom: '1px solid var(--surface-subtle)',
       opacity: busy ? 0.5 : 1, background: 'white'
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>{lead.name || 'Unknown'}</div>
+        <div style={{ fontWeight: 500, color: 'var(--text)', fontSize: 'var(--fs-base)' }}>{lead.name || 'Unknown'}</div>
         {lead.linkedin_url && (
           <a
             href={lead.linkedin_url}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: '11px', color: '#2563eb', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}
+            style={{ fontSize: 'var(--fs-xs)', color: 'var(--primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}
           >
             <ExternalLink size={10} />
             {lead.linkedin_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
@@ -1796,7 +1796,7 @@ function QueueLeadRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
         onChange={e => setFirm(e.target.value)}
         onBlur={() => onFirmUpdate(lead, firm.trim())}
         placeholder="Firm…"
-        style={{ width: '160px', padding: '5px 8px', fontSize: '12px', border: '1px solid #e5e7eb', borderRadius: '4px' }}
+        style={{ width: '160px', padding: '5px 8px', fontSize: 'var(--fs-sm)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
       />
       <button
         className="btn btn-sm btn-primary"
@@ -1811,7 +1811,7 @@ function QueueLeadRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
         onClick={onDelete}
         disabled={busy}
         title="Remove from queue"
-        style={{ color: '#dc2626', padding: '5px 8px' }}
+        style={{ color: 'var(--danger)', padding: '5px 8px' }}
       >
         <Trash2 size={13} />
       </button>
@@ -1874,7 +1874,7 @@ function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
       <div className="modal modal-large" onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h2 style={{ margin: 0 }}>Add leads in bulk</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
             <X size={20} />
           </button>
         </div>
@@ -1896,11 +1896,11 @@ function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
                     type="button"
                     onClick={() => toggleAssignee(p.id)}
                     style={{
-                      padding: '5px 12px', borderRadius: '999px',
-                      border: selected ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
-                      background: selected ? '#eff6ff' : 'white',
-                      color: selected ? '#1d4ed8' : '#374151',
-                      fontSize: '12px', fontWeight: selected ? 600 : 500, cursor: 'pointer'
+                      padding: '5px 12px', borderRadius: 'var(--radius-pill)',
+                      border: selected ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+                      background: selected ? 'var(--primary-light)' : 'white',
+                      color: selected ? 'var(--primary-strong)' : 'var(--text-2)',
+                      fontSize: 'var(--fs-sm)', fontWeight: selected ? 600 : 500, cursor: 'pointer'
                     }}
                   >
                     {p.name}{p.id === personId ? ' (me)' : ''}
@@ -1908,7 +1908,7 @@ function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
                 )
               })}
             </div>
-            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '6px' }}>
               {assigneeIds.length === 0 ? 'Pick at least one analyst.'
                 : assigneeIds.length === 1 ? "All leads will go to this analyst's queue."
                 : `Leads will be split evenly across ${assigneeIds.length} analysts.`}
@@ -1923,14 +1923,14 @@ function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
             onChange={e => setText(e.target.value)}
             placeholder={'Paste one URL per line, or upload a CSV/TXT file.\n\nhttps://linkedin.com/in/john-smith\nhttps://linkedin.com/in/jane-doe\n…'}
             rows={10}
-            style={{ fontFamily: 'monospace', fontSize: '13px' }}
+            style={{ fontFamily: 'monospace', fontSize: 'var(--fs-base)' }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()}>
               <Upload size={14} /> Upload CSV / TXT
             </button>
             <input ref={fileRef} type="file" accept=".csv,.txt,text/csv,text/plain" onChange={handleFile} style={{ display: 'none' }} />
-            <span style={{ fontSize: '12px', color: urls.length > 0 ? '#16a34a' : '#6b7280' }}>
+            <span style={{ fontSize: 'var(--fs-sm)', color: urls.length > 0 ? 'var(--success-text)' : 'var(--text-muted)' }}>
               {urls.length > 0 ? `${urls.length} LinkedIn URL${urls.length === 1 ? '' : 's'} detected` : 'No LinkedIn URLs detected yet'}
             </span>
           </div>
@@ -1955,11 +1955,11 @@ function ViewPill({ active, onClick, children }) {
       onClick={onClick}
       style={{
         padding: '6px 14px',
-        borderRadius: '999px',
-        border: active ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
-        background: active ? '#eff6ff' : 'white',
-        color: active ? '#1d4ed8' : '#111827',
-        fontSize: '13px',
+        borderRadius: 'var(--radius-pill)',
+        border: active ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+        background: active ? 'var(--primary-light)' : 'white',
+        color: active ? 'var(--primary-strong)' : 'var(--text)',
+        fontSize: 'var(--fs-base)',
         fontWeight: active ? 600 : 500,
         cursor: 'pointer',
         transition: 'border-color 0.12s, background 0.12s'
@@ -1973,33 +1973,33 @@ function ViewPill({ active, onClick, children }) {
 const thStyle = {
   padding: '10px 16px',
   textAlign: 'left',
-  fontSize: '12px',
+  fontSize: 'var(--fs-sm)',
   fontWeight: '600',
-  color: '#6b7280',
+  color: 'var(--text-muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.05em'
 }
 
 const tdStyle = {
   padding: '12px 16px',
-  fontSize: '14px',
+  fontSize: 'var(--fs-md)',
   verticalAlign: 'middle'
 }
 
 const metaLabelStyle = {
-  fontSize: '11px',
+  fontSize: 'var(--fs-xs)',
   fontWeight: '600',
-  color: '#6b7280',
+  color: 'var(--text-muted)',
   textTransform: 'uppercase',
   marginBottom: '4px'
 }
 
 const metaValueStyle = {
-  fontSize: '13px',
-  color: '#374151',
+  fontSize: 'var(--fs-base)',
+  color: 'var(--text-2)',
   background: 'white',
-  border: '1px solid #e5e7eb',
-  borderRadius: '4px',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-sm)',
   padding: '6px 10px'
 }
 

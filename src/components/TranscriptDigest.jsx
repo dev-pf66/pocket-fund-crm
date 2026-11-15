@@ -35,7 +35,7 @@ function Chip({ children, tone = 'neutral' }) {
   const c = SENTIMENT_COLOR[tone] || SENTIMENT_COLOR.neutral
   return (
     <span style={{
-      padding: '1px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 600,
+      padding: '1px 8px', borderRadius: 'var(--radius-pill)', fontSize: 'var(--fs-xs)', fontWeight: 600,
       color: c.fg, background: c.bg, border: `1px solid ${c.bd}`, whiteSpace: 'nowrap'
     }}>{children}</span>
   )
@@ -44,7 +44,7 @@ function Chip({ children, tone = 'neutral' }) {
 const Stars = ({ score }) => (
   <span title={`Fit ${score}/5`} style={{ letterSpacing: '1px' }}>
     {[1, 2, 3, 4, 5].map(i => (
-      <span key={i} style={{ color: i <= score ? '#f59e0b' : '#d1d5db' }}>★</span>
+      <span key={i} style={{ color: i <= score ? 'var(--warning-text)' : 'var(--gray-300)' }}>★</span>
     ))}
   </span>
 )
@@ -67,10 +67,10 @@ function TranscriptDigest({ transcripts = [] }) {
     <div className="card" style={{ padding: '14px 16px', marginBottom: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
         <Sparkles size={16} color="#7c3aed" />
-        <strong style={{ fontSize: '14px' }}>
+        <strong style={{ fontSize: 'var(--fs-md)' }}>
           {ordered.length} call{ordered.length === 1 ? '' : 's'} on record
         </strong>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>
+        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
           latest {latest.call_date ? fmtDate(String(latest.call_date).slice(0, 10)) : 'undated'}
         </span>
         {a?.sentiment && <Chip tone={String(a.sentiment).toLowerCase()}>{a.sentiment}</Chip>}
@@ -78,15 +78,15 @@ function TranscriptDigest({ transcripts = [] }) {
       </div>
 
       {a?.summary ? (
-        <div style={{ fontSize: '14px', lineHeight: 1.5, color: '#1f2937' }}>{a.summary}</div>
+        <div style={{ fontSize: 'var(--fs-md)', lineHeight: 1.5, color: 'var(--text)' }}>{a.summary}</div>
       ) : (
-        <div style={{ fontSize: '13px', color: '#92400e' }}>
+        <div style={{ fontSize: 'var(--fs-base)', color: 'var(--warning-text-strong)' }}>
           The most recent call has no analysis yet — run it from Call Transcripts below.
         </div>
       )}
 
       {a?.next_step && (
-        <div style={{ marginTop: '8px', fontSize: '13px', color: '#1f2937' }}>
+        <div style={{ marginTop: '8px', fontSize: 'var(--fs-base)', color: 'var(--text)' }}>
           <strong>Next step:</strong> {a.next_step}
         </div>
       )}
@@ -98,7 +98,7 @@ function TranscriptDigest({ transcripts = [] }) {
             style={{
               marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px',
               background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              fontSize: '13px', color: '#2563eb', fontWeight: 500
+              fontSize: 'var(--fs-base)', color: 'var(--primary)', fontWeight: 500
             }}
           >
             {openAll ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -108,17 +108,17 @@ function TranscriptDigest({ transcripts = [] }) {
           {openAll && (
             <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {earlier.map(t => (
-                <div key={t.id} style={{ borderLeft: '2px solid #e5e7eb', paddingLeft: '10px' }}>
+                <div key={t.id} style={{ borderLeft: '2px solid var(--border)', paddingLeft: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>
+                    <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-2)' }}>
                       {t.call_date ? fmtDate(String(t.call_date).slice(0, 10)) : 'Undated'}
                     </span>
-                    {t.title && <span style={{ fontSize: '12px', color: '#6b7280' }}>{t.title}</span>}
+                    {t.title && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{t.title}</span>}
                     {t.ai_analysis?.sentiment && (
                       <Chip tone={String(t.ai_analysis.sentiment).toLowerCase()}>{t.ai_analysis.sentiment}</Chip>
                     )}
                   </div>
-                  <div style={{ fontSize: '13px', color: t.ai_analysis?.summary ? '#374151' : '#92400e', marginTop: '3px' }}>
+                  <div style={{ fontSize: 'var(--fs-base)', color: t.ai_analysis?.summary ? 'var(--text-2)' : 'var(--warning-text-strong)', marginTop: '3px' }}>
                     {t.ai_analysis?.summary || 'Not analysed yet.'}
                   </div>
                 </div>
@@ -129,7 +129,7 @@ function TranscriptDigest({ transcripts = [] }) {
       )}
 
       {analysedCount < ordered.length && (
-        <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>
+        <div style={{ marginTop: '10px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
           {ordered.length - analysedCount} of {ordered.length} transcripts have no analysis yet.
           Generating one calls Claude, so it stays a deliberate click in Call Transcripts below.
         </div>

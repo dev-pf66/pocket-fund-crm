@@ -22,7 +22,7 @@ function StatBox({ label, value, color }) {
   return (
     <div style={{ textAlign: 'center' }}>
       <div style={{ fontSize: '22px', fontWeight: '700', color: color || 'var(--primary)' }}>{value}</div>
-      <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>{label}</div>
+      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--gray-500)', marginTop: '2px' }}>{label}</div>
     </div>
   )
 }
@@ -274,7 +274,7 @@ function Analytics() {
                 key={tw.label}
                 onClick={() => setTimeWin(tw)}
                 className={timeWin.label === tw.label ? 'btn btn-primary' : 'btn btn-secondary'}
-                style={{ padding: '6px 14px', fontSize: '13px' }}
+                style={{ padding: '6px 14px', fontSize: 'var(--fs-base)' }}
               >
                 {tw.label}
               </button>
@@ -298,13 +298,13 @@ function Analytics() {
                   width: '36px', height: '36px', borderRadius: '50%',
                   background: 'var(--primary)', color: 'white',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: '600', fontSize: '14px', flexShrink: 0
+                  fontWeight: '600', fontSize: 'var(--fs-md)', flexShrink: 0
                 }}>
                   {person.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?'}
                 </div>
                 <div>
                   <div style={{ fontWeight: '600', fontSize: '15px' }}>{person.name}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{timeWin.label}</div>
+                  <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--gray-500)' }}>{timeWin.label}</div>
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -329,16 +329,16 @@ function Analytics() {
           <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Send size={18} /> Weekly Outreach
           </h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+          <p style={{ color: 'var(--gray-500)', fontSize: 'var(--fs-md)', marginBottom: '20px' }}>
             Outreach logged per person per week
           </p>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-md)' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--gray-200)' }}>
                   <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', whiteSpace: 'nowrap' }}>Person</th>
                   {weekKeys.map(wk => (
-                    <th key={wk} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--gray-600)' }}>
+                    <th key={wk} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', whiteSpace: 'nowrap', fontSize: 'var(--fs-sm)', color: 'var(--gray-600)' }}>
                       w/{fmtDate(wk)}
                     </th>
                   ))}
@@ -358,9 +358,9 @@ function Analytics() {
                           <td key={wk} style={{ padding: '10px 12px', textAlign: 'center' }}>
                             <span style={{
                               display: 'inline-block', minWidth: '28px',
-                              padding: '2px 8px', borderRadius: '12px', fontSize: '13px',
-                              background: count >= 50 ? '#dcfce7' : count >= 20 ? '#fef9c3' : count > 0 ? 'var(--gray-100)' : 'transparent',
-                              color: count >= 50 ? '#166534' : count >= 20 ? '#713f12' : 'inherit',
+                              padding: '2px 8px', borderRadius: '12px', fontSize: 'var(--fs-base)',
+                              background: count >= 50 ? 'var(--success-bg-strong)' : count >= 20 ? '#fef9c3' : count > 0 ? 'var(--gray-100)' : 'transparent',
+                              color: count >= 50 ? 'var(--success-text-strong)' : count >= 20 ? '#713f12' : 'inherit',
                               fontWeight: count > 0 ? '600' : '400'
                             }}>
                               {count || '—'}
@@ -387,7 +387,7 @@ function Analytics() {
           <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <MessageSquare size={18} /> Reply Rate
           </h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+          <p style={{ color: 'var(--gray-500)', fontSize: 'var(--fs-md)', marginBottom: '20px' }}>
             Replies received / outreach sent
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -397,19 +397,19 @@ function Analytics() {
               const rateColor = rate >= 10 ? 'var(--success)' : rate >= 5 ? '#f59e0b' : 'var(--gray-600)'
               return (
                 <div key={person.id}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: 'var(--fs-md)' }}>
                     <span style={{ fontWeight: '500' }}>{person.name}</span>
                     <span style={{ fontWeight: '700', color: rateColor }}>
                       {Math.round(rate)}%{' '}
-                      <span style={{ fontWeight: '400', color: 'var(--gray-500)', fontSize: '12px' }}>
+                      <span style={{ fontWeight: '400', color: 'var(--gray-500)', fontSize: 'var(--fs-sm)' }}>
                         ({st.replies}/{st.total})
                       </span>
                     </span>
                   </div>
-                  <div style={{ height: '8px', background: 'var(--gray-200)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '8px', background: 'var(--gray-200)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
                     <div style={{
-                      width: `${Math.min(100, rate)}%`, height: '100%', borderRadius: '4px',
-                      background: rate >= 10 ? 'var(--success)' : rate >= 5 ? '#f59e0b' : 'var(--primary)',
+                      width: `${Math.min(100, rate)}%`, height: '100%', borderRadius: 'var(--radius-sm)',
+                      background: rate >= 10 ? 'var(--success)' : rate >= 5 ? 'var(--warning)' : 'var(--primary)',
                       transition: 'width 0.4s ease'
                     }} />
                   </div>
@@ -427,17 +427,17 @@ function Analytics() {
           <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Calendar size={18} /> Meetings Booked
           </h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+          <p style={{ color: 'var(--gray-500)', fontSize: 'var(--fs-md)', marginBottom: '20px' }}>
             Calls & meetings logged
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--primary)' }}>{totalMeetings}</div>
-              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>{timeWin.label}</div>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--gray-500)', marginTop: '4px' }}>{timeWin.label}</div>
             </div>
-            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--success)' }}>{annualProjection}</div>
-              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Annual run rate</div>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--gray-500)', marginTop: '4px' }}>Annual run rate</div>
             </div>
           </div>
           {meetingWeekKeys.length > 0 && (
@@ -445,8 +445,8 @@ function Analytics() {
               {meetingWeekKeys.map(wk => {
                 const count = meetingsByWeek[wk] || 0
                 return (
-                  <div key={wk} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
-                    <div style={{ width: '64px', color: 'var(--gray-500)', flexShrink: 0, fontSize: '12px' }}>
+                  <div key={wk} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: 'var(--fs-base)' }}>
+                    <div style={{ width: '64px', color: 'var(--gray-500)', flexShrink: 0, fontSize: 'var(--fs-sm)' }}>
                       {fmtDate(wk)}
                     </div>
                     <div style={{ flex: 1, height: '14px', background: 'var(--gray-100)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -474,7 +474,7 @@ function Analytics() {
           <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Tag size={18} /> Source Quality
           </h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+          <p style={{ color: 'var(--gray-500)', fontSize: 'var(--fs-md)', marginBottom: '20px' }}>
             Reply rate by lead source — which lists are worth it
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -482,18 +482,18 @@ function Analytics() {
               const rate = s.total > 0 ? Math.round((s.replies / s.total) * 100) : 0
               return (
                 <div key={s.source}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: 'var(--fs-md)' }}>
                     <span style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{s.source}</span>
                     <span style={{ fontWeight: '700', color: replyRateColor(rate, s.total) }}>
                       {rate}%{' '}
-                      <span style={{ fontWeight: '400', color: 'var(--gray-500)', fontSize: '12px' }}>
+                      <span style={{ fontWeight: '400', color: 'var(--gray-500)', fontSize: 'var(--fs-sm)' }}>
                         ({s.replies}/{s.total})
                       </span>
                     </span>
                   </div>
-                  <div style={{ height: '8px', background: 'var(--gray-200)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '8px', background: 'var(--gray-200)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
                     <div style={{
-                      width: `${Math.min(100, rate * 4)}%`, height: '100%', borderRadius: '4px',
+                      width: `${Math.min(100, rate * 4)}%`, height: '100%', borderRadius: 'var(--radius-sm)',
                       background: replyRateColor(rate, s.total) === 'inherit' ? 'var(--gray-300)' : replyRateColor(rate, s.total),
                       transition: 'width 0.4s ease'
                     }} />
@@ -502,7 +502,7 @@ function Analytics() {
               )
             })}
             {sourceStats.length > 8 && (
-              <div style={{ fontSize: '12px', color: 'var(--gray-400)' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
                 + {sourceStats.length - 8} smaller sources hidden
               </div>
             )}
@@ -517,34 +517,34 @@ function Analytics() {
           <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Zap size={18} /> Speed &amp; Follow-Through
           </h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+          <p style={{ color: 'var(--gray-500)', fontSize: 'var(--fs-md)', marginBottom: '20px' }}>
             Leads created in this window: how fast the first touch lands, and who gets a second one
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--primary)' }}>
                 {touchMetrics.medianFirstTouch != null ? `${touchMetrics.medianFirstTouch}d` : '—'}
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Median time to first touch</div>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--gray-500)', marginTop: '4px' }}>Median time to first touch</div>
             </div>
-            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: touchMetrics.followUpRate == null ? 'var(--gray-400)' : touchMetrics.followUpRate >= 50 ? 'var(--success)' : '#f59e0b' }}>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: touchMetrics.followUpRate == null ? 'var(--gray-400)' : touchMetrics.followUpRate >= 50 ? 'var(--success)' : 'var(--warning-text)' }}>
                 {touchMetrics.followUpRate != null ? `${touchMetrics.followUpRate}%` : '—'}
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Touched leads with a 2nd touch</div>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--gray-500)', marginTop: '4px' }}>Touched leads with a 2nd touch</div>
             </div>
-            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+            <div style={{ textAlign: 'center', padding: '16px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ fontSize: '32px', fontWeight: '700' }}>{touchMetrics.created}</div>
-              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '4px' }}>Leads created</div>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--gray-500)', marginTop: '4px' }}>Leads created</div>
             </div>
-            <div style={{ textAlign: 'center', padding: '16px', background: touchMetrics.untouched > 0 ? '#fef3c7' : 'var(--gray-50)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: touchMetrics.untouched > 0 ? '#b45309' : 'var(--success)' }}>
+            <div style={{ textAlign: 'center', padding: '16px', background: touchMetrics.untouched > 0 ? 'var(--warning-bg-strong)' : 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ fontSize: '32px', fontWeight: '700', color: touchMetrics.untouched > 0 ? 'var(--warning-text)' : 'var(--success)' }}>
                 {touchMetrics.untouched}
               </div>
-              <div style={{ fontSize: '13px', color: touchMetrics.untouched > 0 ? '#b45309' : 'var(--gray-500)', marginTop: '4px' }}>Never touched</div>
+              <div style={{ fontSize: 'var(--fs-base)', color: touchMetrics.untouched > 0 ? 'var(--warning-text)' : 'var(--gray-500)', marginTop: '4px' }}>Never touched</div>
             </div>
           </div>
-          <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--gray-400)' }}>
+          <div style={{ marginTop: '12px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
             Touches = outreach entries linked to the lead. Untouched leads sit in someone's queue.
           </div>
         </div>
@@ -557,7 +557,7 @@ function Analytics() {
             <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sparkles size={18} /> Message Insights
             </h2>
-            <p style={{ color: 'var(--gray-500)', fontSize: '14px', margin: 0 }}>
+            <p style={{ color: 'var(--gray-500)', fontSize: 'var(--fs-md)', margin: 0 }}>
               AI analysis of which outreach messages get replies — uses the current window and person filter.
             </p>
           </div>
@@ -572,42 +572,42 @@ function Analytics() {
         </div>
 
         {insightError && (
-          <div style={{ padding: '12px 16px', background: '#fee2e2', borderRadius: '8px', color: '#991b1b', fontSize: '14px', marginTop: '16px' }}>
+          <div style={{ padding: '12px 16px', background: 'var(--danger-bg-strong)', borderRadius: 'var(--radius-md)', color: 'var(--danger-text-strong)', fontSize: 'var(--fs-md)', marginTop: '16px' }}>
             {insightError}
           </div>
         )}
 
         {insight && !insightLoading && (
           <div style={{ marginTop: '20px' }}>
-            <div style={{ padding: '12px 16px', background: 'var(--gray-50)', borderRadius: '8px', marginBottom: '16px', fontSize: '14px', color: 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ padding: '12px 16px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: 'var(--fs-md)', color: 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span>{insight.summary}</span>
               {insight.low_data && (
-                <span style={{ flexShrink: 0, fontSize: '12px', color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: '4px' }}>
+                <span style={{ flexShrink: 0, fontSize: 'var(--fs-sm)', color: 'var(--warning-text-strong)', background: 'var(--warning-bg-strong)', padding: '2px 8px', borderRadius: 'var(--radius-sm)' }}>
                   Small sample
                 </span>
               )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ textAlign: 'center', padding: '14px', background: '#dcfce7', borderRadius: '8px' }}>
-                <div style={{ fontSize: '28px', fontWeight: '700', color: '#166534' }}>{insight.avg_words_replied}</div>
-                <div style={{ fontSize: '12px', color: '#166534', marginTop: '3px' }}>avg words — got reply</div>
+              <div style={{ textAlign: 'center', padding: '14px', background: 'var(--success-bg-strong)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--success-text-strong)' }}>{insight.avg_words_replied}</div>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--success-text-strong)', marginTop: '3px' }}>avg words — got reply</div>
               </div>
-              <div style={{ textAlign: 'center', padding: '14px', background: '#fee2e2', borderRadius: '8px' }}>
-                <div style={{ fontSize: '28px', fontWeight: '700', color: '#991b1b' }}>{insight.avg_words_not_replied}</div>
-                <div style={{ fontSize: '12px', color: '#991b1b', marginTop: '3px' }}>avg words — no reply</div>
+              <div style={{ textAlign: 'center', padding: '14px', background: 'var(--danger-bg-strong)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--danger-text-strong)' }}>{insight.avg_words_not_replied}</div>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger-text-strong)', marginTop: '3px' }}>avg words — no reply</div>
               </div>
             </div>
 
             {insight.observations.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {insight.observations.map((obs, i) => (
-                  <div key={i} style={{ padding: '12px 16px', border: '1px solid var(--gray-200)', borderRadius: '8px' }}>
-                    <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: obs.evidence ? '4px' : 0 }}>
+                  <div key={i} style={{ padding: '12px 16px', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ fontWeight: '600', fontSize: 'var(--fs-md)', marginBottom: obs.evidence ? '4px' : 0 }}>
                       {obs.insight}
                     </div>
                     {obs.evidence && (
-                      <div style={{ fontSize: '13px', color: 'var(--gray-500)', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: 'var(--fs-base)', color: 'var(--gray-500)', fontStyle: 'italic' }}>
                         e.g. "{obs.evidence}"
                       </div>
                     )}
@@ -616,14 +616,14 @@ function Analytics() {
               </div>
             )}
 
-            <div style={{ marginTop: '14px', fontSize: '12px', color: 'var(--gray-400)' }}>
+            <div style={{ marginTop: '14px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
               Based on {insight.total_analyzed} messages with text ({insight.replied_count} replied) · {new Date(insight.analyzed_at).toLocaleString()}
             </div>
           </div>
         )}
 
         {!insight && !insightLoading && !insightError && (
-          <div style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-400)', fontSize: '14px' }}>
+          <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
             Click "Run Analysis" to surface patterns in your outreach messages for the selected window.
           </div>
         )}
@@ -635,7 +635,7 @@ function Analytics() {
           <h2 style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <TrendingUp size={18} /> Daily Activity — {visiblePeople[0].name}
           </h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '16px' }}>
+          <p style={{ color: 'var(--gray-500)', fontSize: 'var(--fs-md)', marginBottom: '16px' }}>
             Each square = one day. Darker = more outreach.
           </p>
           {(() => {
@@ -656,7 +656,7 @@ function Analytics() {
                       style={{
                         width: days <= 30 ? '26px' : '18px',
                         height: days <= 30 ? '26px' : '18px',
-                        borderRadius: '4px',
+                        borderRadius: 'var(--radius-sm)',
                         background: colors[intensity],
                         cursor: 'default',
                         flexShrink: 0

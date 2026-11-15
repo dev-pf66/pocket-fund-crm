@@ -233,7 +233,7 @@ Supports markdown:
 ```
 code block
 ```"
-                style={{ fontFamily: 'monospace', fontSize: '14px' }}
+                style={{ fontFamily: 'monospace', fontSize: 'var(--fs-md)' }}
               />
               <small style={{ color: 'var(--gray-600)', display: 'block', marginTop: '8px' }}>
                 Use # for headers, ** for bold, - for lists, ``` for code blocks
@@ -285,12 +285,12 @@ code block
                     <td style={{ padding: '12px 8px' }}>{article.order_index}</td>
                     <td style={{ padding: '12px 8px' }}>
                       {article.is_published ? (
-                        <span style={{ color: 'var(--success)', fontSize: '14px' }}>✓ Published</span>
+                        <span style={{ color: 'var(--success)', fontSize: 'var(--fs-md)' }}>✓ Published</span>
                       ) : (
-                        <span style={{ color: 'var(--gray-500)', fontSize: '14px' }}>✗ Draft</span>
+                        <span style={{ color: 'var(--gray-500)', fontSize: 'var(--fs-md)' }}>✗ Draft</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--gray-600)' }}>
+                    <td style={{ padding: '12px 8px', fontSize: 'var(--fs-md)', color: 'var(--gray-600)' }}>
                       {new Date(article.updated_at).toLocaleDateString()}
                     </td>
                     <td style={{ padding: '12px 8px' }}>

@@ -235,7 +235,7 @@ function ImportLeads() {
       {step === 1 && (
         <div className="card import-card">
           <div className="upload-zone" onClick={() => document.getElementById('csv-upload').click()}>
-            <Upload size={48} color="#9ca3af" />
+            <Upload size={48} color="var(--text-muted)" />
             <h3>Upload CSV File</h3>
             <p>Click to browse or drag and drop</p>
             <input
@@ -288,7 +288,7 @@ function ImportLeads() {
           </div>
 
           {Object.values(mapping).includes('phone') && (
-            <div style={{ marginTop: '20px', padding: '14px', background: 'var(--gray-50, #f9fafb)', borderRadius: '8px' }}>
+            <div style={{ marginTop: '20px', padding: '14px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
               <label className="form-label" style={{ display: 'block', marginBottom: '6px' }}>
                 Country for numbers with no country code
               </label>
@@ -303,7 +303,7 @@ function ImportLeads() {
                 ))}
                 <option value="">Don&apos;t guess — leave as typed</option>
               </select>
-              <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--gray-600, #6b7280)' }}>
+              <p style={{ margin: '8px 0 0', fontSize: 'var(--fs-base)', color: 'var(--gray-600)' }}>
                 Phones are stored as +1XXXXXXXXXX so the Cold Calls dial button works.
                 A number that already starts with + or 00 is kept as-is; anything that
                 can&apos;t be resolved is imported unchanged and flagged in the preview.
@@ -335,14 +335,14 @@ function ImportLeads() {
               className="card"
               style={{
                 marginBottom: '16px', padding: '12px 14px',
-                borderLeft: `4px solid ${phoneSummary.unresolved > 0 ? '#f59e0b' : '#16a34a'}`
+                borderLeft: `4px solid ${phoneSummary.unresolved > 0 ? 'var(--warning)' : 'var(--success)'}`
               }}
             >
               <strong>Phone numbers:</strong>{' '}
               {phoneSummary.reformatted} reformatted to E.164,{' '}
               {phoneSummary.alreadyValid} already valid
               {phoneSummary.unresolved > 0 && (
-                <span style={{ color: '#b45309' }}>
+                <span style={{ color: 'var(--warning-text)' }}>
                   , <strong>{phoneSummary.unresolved} couldn&apos;t be resolved</strong> — imported
                   as typed and marked below. Those won&apos;t dial reliably.
                 </span>
@@ -370,12 +370,12 @@ function ImportLeads() {
                     <td>
                       {lead.phone || '-'}
                       {lead._phone?.changed && (
-                        <div style={{ fontSize: '11px', color: 'var(--gray-500, #9ca3af)' }}>
+                        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--gray-500)' }}>
                           was {lead._phone.original}
                         </div>
                       )}
                       {lead._phone && !lead._phone.ok && (
-                        <div style={{ fontSize: '11px', color: '#b45309' }}>
+                        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--warning-text)' }}>
                           ⚠ {lead._phone.reason}
                         </div>
                       )}
@@ -420,7 +420,7 @@ function ImportLeads() {
           <div className="import-results">
             {results.failed === 0 ? (
               <>
-                <Check size={64} color="#22c55e" />
+                <Check size={64} color="var(--success-text)" />
                 <h2>Import Complete! ✓</h2>
                 <p>
                   Successfully imported {results.success} leads
@@ -429,7 +429,7 @@ function ImportLeads() {
               </>
             ) : (
               <>
-                <AlertCircle size={64} color="#f59e0b" />
+                <AlertCircle size={64} color="var(--warning-text)" />
                 <h2>Import Finished</h2>
                 <p>
                   ✓ {results.success} succeeded<br />

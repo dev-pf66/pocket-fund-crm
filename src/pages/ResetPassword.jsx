@@ -54,7 +54,7 @@ function ResetPassword() {
         <p>Enter your new password below</p>
 
         {!ready ? (
-          <p style={{ color: '#9ca3af', marginTop: '1rem' }}>
+          <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>
             Waiting for recovery link... if nothing happens, request a new link from the login page.
           </p>
         ) : (

@@ -385,10 +385,10 @@ function Investors() {
           style={{
             padding: '10px 16px', marginBottom: '12px', display: 'flex',
             alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe'
+            flexWrap: 'wrap', background: 'var(--primary-light)', border: '1px solid var(--primary-border-soft)'
           }}
         >
-          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--fs-md)', color: 'var(--primary-text)', fontWeight: 500 }}>
             {selectedVisibleIds.length} investor{selectedVisibleIds.length === 1 ? '' : 's'} selected
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -441,7 +441,7 @@ function Investors() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-400)' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
                     {investors.length === 0 ? 'No investors yet. Add your first investor contact above.' : 'No investors match your filters.'}
                   </td>
                 </tr>
@@ -461,7 +461,7 @@ function Investors() {
                     <td><span className="badge">{inv.investor_type}</span></td>
                     <td>{formatCheckSize(inv.check_size_min, inv.check_size_max)}</td>
                     <td><span className={`status-badge investor-status-${inv.status}`}>{formatStatusLabel(inv.status)}</span></td>
-                    <td style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{peopleById[inv.created_by]?.name || '—'}</td>
+                    <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--gray-500)' }}>{peopleById[inv.created_by]?.name || '—'}</td>
                     <td>{inv.updated_at ? new Date(inv.updated_at).toLocaleDateString() : '—'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '4px' }}>

@@ -77,10 +77,10 @@ function StalenessSettings() {
 
   return (
     <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
-      <h3 style={{ margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: 600 }}>
+      <h3 style={{ margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-lg)', fontWeight: 600 }}>
         <Clock size={18} /> When a lead counts as stale
       </h3>
-      <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+      <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', marginBottom: '16px' }}>
         These drive the staleness colours on the Pipeline board and the marks on Today.
         They had no editor until now — the values below were set in February 2026 and
         could only be changed in the database. The right-hand column shows what each
@@ -96,8 +96,8 @@ function StalenessSettings() {
           return (
             <div key={f.key} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <div style={{ minWidth: '260px', flex: '1 1 260px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#111827' }}>{f.label}</label>
-                <div style={{ fontSize: '12px', color: '#6b7280' }}>{f.hint}</div>
+                <label style={{ display: 'block', fontSize: 'var(--fs-base)', fontWeight: 500, color: 'var(--text)' }}>{f.label}</label>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{f.hint}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <input
@@ -107,16 +107,16 @@ function StalenessSettings() {
                   value={draft[f.key]}
                   onChange={(e) => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
                 />
-                <span style={{ fontSize: '13px', color: '#6b7280' }}>days</span>
+                <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>days</span>
               </div>
-              <div style={{ minWidth: '210px', fontSize: '12px', color: pct > 60 ? '#b91c1c' : '#374151' }}>
+              <div style={{ minWidth: '210px', fontSize: 'var(--fs-sm)', color: pct > 60 ? 'var(--danger-text)' : 'var(--text-2)' }}>
                 {after == null ? '—' : (
                   <>
                     flags <strong>{after.stale}</strong> of {after.total} ({pct}%)
                     {changed && before && (
-                      <span style={{ color: '#6b7280' }}> · was {before.stale}</span>
+                      <span style={{ color: 'var(--text-muted)' }}> · was {before.stale}</span>
                     )}
-                    {pct > 60 && <div style={{ color: '#b91c1c' }}>most of this stage — the colour stops meaning anything</div>}
+                    {pct > 60 && <div style={{ color: 'var(--danger-text)' }}>most of this stage — the colour stops meaning anything</div>}
                   </>
                 )}
               </div>
@@ -129,10 +129,10 @@ function StalenessSettings() {
         <button className="btn btn-primary" onClick={handleSave} disabled={!dirty || saving}>
           <Save size={14} /> {saving ? 'Saving…' : 'Save thresholds'}
         </button>
-        {dirty && <span style={{ fontSize: '12px', color: '#92400e' }}>Unsaved changes</span>}
+        {dirty && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--warning-text-strong)' }}>Unsaved changes</span>}
         {/* Who, not just when (migration 057) — this row changes the colouring for
             the whole team, so "why is everything red this morning" needs an answer. */}
-        <span style={{ fontSize: '12px', color: '#9ca3af', marginLeft: 'auto' }}>
+        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginLeft: 'auto' }}>
           Last changed {saved.updated_at ? new Date(saved.updated_at).toLocaleDateString() : 'never'}
           {saved.updated_by
             ? ` by ${(people || []).find(p => p.id === saved.updated_by)?.name || `person ${saved.updated_by}`}`

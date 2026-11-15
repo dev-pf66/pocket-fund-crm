@@ -108,11 +108,11 @@ function CategoryChips({ value, onChange, available, onAddCustom, disabled = fal
             disabled={disabled}
             style={{
               padding: '4px 10px',
-              borderRadius: '999px',
-              border: selected ? `1.5px solid ${color}` : '1px solid #e5e7eb',
+              borderRadius: 'var(--radius-pill)',
+              border: selected ? `1.5px solid ${color}` : '1px solid var(--border)',
               background: selected ? color + '22' : 'white',
-              color: selected ? color : '#6b7280',
-              fontSize: '12px',
+              color: selected ? color : 'var(--text-muted)',
+              fontSize: 'var(--fs-sm)',
               fontWeight: selected ? 600 : 500,
               cursor: disabled ? 'not-allowed' : 'pointer',
               opacity: disabled ? 0.6 : 1
@@ -137,10 +137,10 @@ function CategoryChips({ value, onChange, available, onAddCustom, disabled = fal
           maxLength={50}
           style={{
             padding: '4px 10px',
-            borderRadius: '999px',
-            border: '1px dashed #9ca3af',
+            borderRadius: 'var(--radius-pill)',
+            border: '1px dashed var(--gray-400)',
             background: 'white',
-            fontSize: '12px',
+            fontSize: 'var(--fs-sm)',
             outline: 'none',
             minWidth: '120px'
           }}
@@ -152,11 +152,11 @@ function CategoryChips({ value, onChange, available, onAddCustom, disabled = fal
           disabled={disabled}
           style={{
             padding: '4px 10px',
-            borderRadius: '999px',
-            border: '1px dashed #9ca3af',
+            borderRadius: 'var(--radius-pill)',
+            border: '1px dashed var(--gray-400)',
             background: 'white',
-            color: '#6b7280',
-            fontSize: '12px',
+            color: 'var(--text-muted)',
+            fontSize: 'var(--fs-sm)',
             fontWeight: 500,
             cursor: disabled ? 'not-allowed' : 'pointer'
           }}
@@ -431,7 +431,7 @@ function PartnersBoard() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <h1 style={{ margin: 0 }}>Partners</h1>
-          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>Shared team pipeline for partnership outreach</p>
+          <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>Shared team pipeline for partnership outreach</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
           <Plus size={16} /> Add Partner
@@ -451,7 +451,7 @@ function PartnersBoard() {
             value={quickUrl}
             onChange={e => setQuickUrl(e.target.value)}
             className="form-control"
-            style={{ flex: 1, fontSize: '13px' }}
+            style={{ flex: 1, fontSize: 'var(--fs-base)' }}
             disabled={quickAdding}
           />
           <button
@@ -463,7 +463,7 @@ function PartnersBoard() {
           </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Categories
           </span>
           <CategoryChips
@@ -478,14 +478,14 @@ function PartnersBoard() {
 
       <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+          <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
             placeholder="Search by name, handle, or notes..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="form-control"
-            style={{ paddingLeft: '34px', fontSize: '13px' }}
+            style={{ paddingLeft: '34px', fontSize: 'var(--fs-base)' }}
           />
         </div>
 
@@ -493,7 +493,7 @@ function PartnersBoard() {
           value={categoryFilter}
           onChange={e => setCategoryFilter(e.target.value)}
           className="form-control"
-          style={{ width: 'auto', fontSize: '13px' }}
+          style={{ width: 'auto', fontSize: 'var(--fs-base)' }}
         >
           <option value="all">All Categories</option>
           {availableCategories.map(key => (
@@ -505,8 +505,8 @@ function PartnersBoard() {
           {filteredPartners.length > 0 && filteredPartners.every(p => selectedIds.has(p.id)) ? 'Deselect all' : 'Select all shown'}
         </button>
 
-        <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
-          <strong style={{ color: '#111827' }}>{filteredPartners.length}</strong> shown
+        <div style={{ marginLeft: 'auto', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
+          <strong style={{ color: 'var(--text)' }}>{filteredPartners.length}</strong> shown
         </div>
       </div>
 
@@ -516,11 +516,11 @@ function PartnersBoard() {
           style={{
             padding: '10px 16px', marginBottom: '16px', display: 'flex',
             alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            flexWrap: 'wrap', background: 'var(--primary-light)', border: '1px solid var(--primary-border-soft)',
             position: 'sticky', top: '8px', zIndex: 5
           }}
         >
-          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--fs-md)', color: 'var(--primary-text)', fontWeight: 500 }}>
             {selectedIds.size} partner{selectedIds.size === 1 ? '' : 's'} selected
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -546,14 +546,14 @@ function PartnersBoard() {
           style={{
             background: '#fff7ed',
             border: '1px solid #fed7aa',
-            borderRadius: '8px',
+            borderRadius: 'var(--radius-md)',
             padding: '12px 14px',
             marginBottom: '16px'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <AlertCircle size={16} style={{ color: '#c2410c' }} />
-            <strong style={{ color: '#9a3412', fontSize: '13px' }}>
+            <strong style={{ color: '#9a3412', fontSize: 'var(--fs-base)' }}>
               {dueFollowUps.length} follow-up{dueFollowUps.length === 1 ? '' : 's'} due
             </strong>
             <button
@@ -562,9 +562,9 @@ function PartnersBoard() {
                 background: showOnlyDue ? '#c2410c' : 'white',
                 color: showOnlyDue ? 'white' : '#c2410c',
                 border: '1px solid #c2410c',
-                borderRadius: '999px',
+                borderRadius: 'var(--radius-pill)',
                 padding: '3px 10px',
-                fontSize: '11px',
+                fontSize: 'var(--fs-xs)',
                 fontWeight: 600,
                 cursor: 'pointer'
               }}
@@ -578,7 +578,7 @@ function PartnersBoard() {
                 background: 'none',
                 border: 'none',
                 color: '#9a3412',
-                fontSize: '12px',
+                fontSize: 'var(--fs-sm)',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -601,14 +601,14 @@ function PartnersBoard() {
                       display: 'flex', alignItems: 'center', gap: '10px',
                       padding: '6px 10px', textAlign: 'left',
                       background: 'white', border: '1px solid #fed7aa',
-                      borderRadius: '6px', cursor: 'pointer'
+                      borderRadius: 'var(--radius)', cursor: 'pointer'
                     }}
                   >
-                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#111827' }}>{p.name}</span>
+                    <span style={{ fontWeight: 600, fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{p.name}</span>
                     {status && (
                       <span style={{
-                        fontSize: '10px', fontWeight: 600,
-                        padding: '2px 6px', borderRadius: '999px',
+                        fontSize: 'var(--fs-xs)', fontWeight: 600,
+                        padding: '2px 6px', borderRadius: 'var(--radius-pill)',
                         background: status.color + '22', color: status.color
                       }}>
                         {status.label}
@@ -623,7 +623,7 @@ function PartnersBoard() {
       )}
 
       {loading ? (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
           Loading partners…
         </div>
@@ -656,16 +656,16 @@ function PartnersBoard() {
                 onDrop={e => handleDrop(e, stage.key)}
                 style={{
                   flex: '0 0 280px',
-                  background: '#f9fafb',
-                  borderRadius: '8px',
+                  background: 'var(--surface-subtle)',
+                  borderRadius: 'var(--radius-md)',
                   padding: '12px',
                   minHeight: '300px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                   <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }}></span>
-                  <strong style={{ fontSize: '13px', color: '#111827' }}>{stage.label}</strong>
-                  <span style={{ fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+                  <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -682,7 +682,7 @@ function PartnersBoard() {
                     />
                   ))}
                   {items.length === 0 && (
-                    <div style={{ padding: '16px', textAlign: 'center', color: '#9ca3af', fontSize: '12px' }}>
+                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
                       Drag a partner here
                     </div>
                   )}
@@ -736,8 +736,8 @@ function PartnerCard({ partner, creator, onEdit, onDelete, onDragStart, selected
       onClick={onEdit}
       style={{
         background: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '6px',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
         padding: '10px 12px',
         cursor: 'grab',
         boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
@@ -756,39 +756,39 @@ function PartnerCard({ partner, creator, onEdit, onDelete, onDragStart, selected
               style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'pointer' }}
             />
           )}
-          <div style={{ fontWeight: 600, fontSize: '13px', color: '#111827', lineHeight: 1.3 }}>
+          <div style={{ fontWeight: 600, fontSize: 'var(--fs-base)', color: 'var(--text)', lineHeight: 1.3 }}>
             {partner.name}
           </div>
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
           title="Delete"
-          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '2px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
         >
           <Trash2 size={12} />
         </button>
       </div>
 
       {partner.handle && (
-        <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>{partner.handle}</div>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '4px' }}>{partner.handle}</div>
       )}
 
       {(partner.company_name || partner.industry) && (
-        <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '4px' }}>
           {[partner.company_name, partner.industry].filter(Boolean).join(' · ')}
         </div>
       )}
 
       {creator?.name && (
-        <div style={{ fontSize: '10px', color: '#9ca3af', fontStyle: 'italic', marginBottom: '4px' }}>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '4px' }}>
           Added by {creator.name}
         </div>
       )}
 
       {followUp && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px',
-          fontSize: '10px', fontWeight: 600,
-          padding: '2px 6px', borderRadius: '999px',
+          fontSize: 'var(--fs-xs)', fontWeight: 600,
+          padding: '2px 6px', borderRadius: 'var(--radius-pill)',
           background: followUp.color + '22', color: followUp.color
         }}>
           <Calendar size={10} />
@@ -801,10 +801,10 @@ function PartnerCard({ partner, creator, onEdit, onDelete, onDragStart, selected
           <span
             key={c.key}
             style={{
-              fontSize: '10px',
+              fontSize: 'var(--fs-xs)',
               fontWeight: 600,
               padding: '2px 6px',
-              borderRadius: '999px',
+              borderRadius: 'var(--radius-pill)',
               background: c.color + '22',
               color: c.color
             }}
@@ -813,7 +813,7 @@ function PartnerCard({ partner, creator, onEdit, onDelete, onDragStart, selected
           </span>
         ))}
         {partner.audience_size && (
-          <span style={{ fontSize: '10px', color: '#6b7280', marginLeft: '2px' }}>{partner.audience_size}</span>
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginLeft: '2px' }}>{partner.audience_size}</span>
         )}
         <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
           {partner.linkedin_url && (
@@ -834,7 +834,7 @@ function PartnerCard({ partner, creator, onEdit, onDelete, onDragStart, selected
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              style={{ color: '#6b7280' }}
+              style={{ color: 'var(--text-muted)' }}
               title={partner.url}
             >
               <ExternalLink size={11} />
@@ -860,8 +860,8 @@ function MobilePartnerList({ stages, partnersInStage, onEdit, onDelete, onMove }
           <div key={stage.key}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '0 4px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }} />
-              <strong style={{ fontSize: '13px', color: '#111827' }}>{stage.label}</strong>
-              <span style={{ fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+              <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
+              <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {items.map(p => (
@@ -894,33 +894,33 @@ function MobilePartnerCard({ partner, stages, onEdit, onDelete, onMove }) {
       onClick={onEdit}
       style={{
         background: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)',
         padding: '12px 14px',
         boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '6px' }}>
-        <div style={{ fontWeight: 600, fontSize: '15px', color: '#111827', lineHeight: 1.3 }}>
+        <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text)', lineHeight: 1.3 }}>
           {partner.name}
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
           title="Delete"
-          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
         >
           <Trash2 size={14} />
         </button>
       </div>
 
       {partner.handle && (
-        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>{partner.handle}</div>
+        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '6px' }}>{partner.handle}</div>
       )}
 
       {followUp && (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '8px',
-          fontSize: '11px', fontWeight: 600,
-          padding: '3px 8px', borderRadius: '999px',
+          fontSize: 'var(--fs-xs)', fontWeight: 600,
+          padding: '3px 8px', borderRadius: 'var(--radius-pill)',
           background: followUp.color + '22', color: followUp.color
         }}>
           <Calendar size={11} />
@@ -933,10 +933,10 @@ function MobilePartnerCard({ partner, stages, onEdit, onDelete, onMove }) {
           <span
             key={c.key}
             style={{
-              fontSize: '11px',
+              fontSize: 'var(--fs-xs)',
               fontWeight: 600,
               padding: '2px 8px',
-              borderRadius: '999px',
+              borderRadius: 'var(--radius-pill)',
               background: c.color + '22',
               color: c.color
             }}
@@ -945,7 +945,7 @@ function MobilePartnerCard({ partner, stages, onEdit, onDelete, onMove }) {
           </span>
         ))}
         {partner.audience_size && (
-          <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '4px' }}>{partner.audience_size}</span>
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginLeft: '4px' }}>{partner.audience_size}</span>
         )}
       </div>
 
@@ -954,7 +954,7 @@ function MobilePartnerCard({ partner, stages, onEdit, onDelete, onMove }) {
           value={partner.stage}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => { e.stopPropagation(); onMove(e.target.value) }}
-          style={{ flex: 1, fontSize: '12px', padding: '6px 8px' }}
+          style={{ flex: 1, fontSize: 'var(--fs-sm)', padding: '6px 8px' }}
         >
           {stages.map(s => (
             <option key={s.key} value={s.key}>Move to: {s.label}</option>
@@ -966,7 +966,7 @@ function MobilePartnerCard({ partner, stages, onEdit, onDelete, onMove }) {
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            style={{ color: '#6b7280', padding: '6px' }}
+            style={{ color: 'var(--text-muted)', padding: '6px' }}
           >
             <ExternalLink size={14} />
           </a>

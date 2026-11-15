@@ -49,9 +49,9 @@ const filterSectionStyle = {
 }
 
 const filterSectionLabelStyle = {
-  fontSize: '11px',
+  fontSize: 'var(--fs-xs)',
   fontWeight: 700,
-  color: '#9ca3af',
+  color: 'var(--text-muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
   marginBottom: '8px'
@@ -1087,15 +1087,15 @@ function LeadsBoard() {
             flexWrap: 'wrap',
             padding: '8px 14px',
             margin: '0 0 12px',
-            background: '#f9fafb',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            fontSize: '13px',
-            color: '#4b5563'
+            background: 'var(--surface-subtle)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--fs-base)',
+            color: 'var(--gray-600)'
           }}
         >
           <span>
-            <strong style={{ color: '#111827', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+            <strong style={{ color: 'var(--text)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
               {filteredLeadCount}
             </strong>
             {' of '}
@@ -1104,9 +1104,9 @@ function LeadsBoard() {
           </span>
           {(activeFilterCount > 0 || searchQuery) && (
             <span style={{
-              fontSize: '11px', fontWeight: 600,
-              padding: '2px 8px', borderRadius: '999px',
-              background: '#eff6ff', color: '#1d4ed8'
+              fontSize: 'var(--fs-xs)', fontWeight: 600,
+              padding: '2px 8px', borderRadius: 'var(--radius-pill)',
+              background: 'var(--primary-light)', color: 'var(--primary-strong)'
             }}>
               {activeFilterCount + (searchQuery ? 1 : 0)} filter{(activeFilterCount + (searchQuery ? 1 : 0)) === 1 ? '' : 's'} active
             </span>
@@ -1126,8 +1126,8 @@ function LeadsBoard() {
                 marginLeft: 'auto',
                 background: 'none',
                 border: 'none',
-                color: '#1d4ed8',
-                fontSize: '12px',
+                color: 'var(--primary-strong)',
+                fontSize: 'var(--fs-sm)',
                 fontWeight: 600,
                 cursor: 'pointer',
                 padding: '2px 6px'
@@ -1146,11 +1146,11 @@ function LeadsBoard() {
           style={{
             padding: '10px 16px', marginBottom: '12px', display: 'flex',
             alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            flexWrap: 'wrap', background: 'var(--primary-light)', border: '1px solid var(--primary-border-soft)',
             position: 'sticky', top: '8px', zIndex: 5
           }}
         >
-          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--fs-md)', color: 'var(--primary-text)', fontWeight: 500 }}>
             {selectedIds.size} lead{selectedIds.size === 1 ? '' : 's'} selected
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -1185,7 +1185,7 @@ function LeadsBoard() {
             <button className="btn btn-sm btn-secondary" onClick={handleBulkTouch} disabled={bulkBusy}>
               <Check size={14} /> Mark touched
             </button>
-            <button className="btn btn-sm btn-secondary" onClick={handleBulkMarkDead} disabled={bulkBusy} style={{ color: '#b91c1c' }}>
+            <button className="btn btn-sm btn-secondary" onClick={handleBulkMarkDead} disabled={bulkBusy} style={{ color: 'var(--danger-text)' }}>
               <XCircle size={14} /> Mark dead
             </button>
             <button className="btn btn-sm btn-secondary" onClick={() => setSelectedIds(new Set())} disabled={bulkBusy}>
@@ -1208,7 +1208,7 @@ function LeadsBoard() {
             >
               <div className="crm-column-header" style={{ borderTopColor: stage.color }}>
                 <h3>{stage.label}</h3>
-                <span className="count-badge" style={{ background: stage.color }}>
+                <span className="count-badge" style={{ background: stage.color, color: 'var(--text)' }}>
                   {stageLeads.length}
                 </span>
               </div>
@@ -1268,7 +1268,7 @@ function LeadsBoard() {
         <div className="save-search-dialog-overlay" onClick={() => setShowSaveDialog(false)}>
           <div className="save-search-dialog" onClick={(e) => e.stopPropagation()}>
             <h3>Save Current Search</h3>
-            <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '12px' }}>
+            <p style={{ fontSize: 'var(--fs-base)', color: 'var(--gray-500)', marginBottom: '12px' }}>
               Save your current filters to quickly reuse them later.
             </p>
             <input

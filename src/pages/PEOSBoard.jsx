@@ -393,7 +393,7 @@ function PEOSBoard() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <h1 style={{ margin: 0 }}>PE OS</h1>
-          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>
+          <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
             {isAdmin
               ? 'Demo calls for the PE OS product (admin can view any teammate)'
               : 'Demo calls for the PE OS product'}
@@ -407,7 +407,7 @@ function PEOSBoard() {
       {/* Admin-only team switcher. Matches the Outreach Log pattern. */}
       {isAdmin && (
         <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
             Viewing
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -430,14 +430,14 @@ function PEOSBoard() {
 
       <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+          <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
             placeholder="Search by lead, firm, use case, feedback…"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="form-control"
-            style={{ paddingLeft: '34px', fontSize: '13px' }}
+            style={{ paddingLeft: '34px', fontSize: 'var(--fs-base)' }}
           />
         </div>
 
@@ -445,7 +445,7 @@ function PEOSBoard() {
           value={dateFilter}
           onChange={e => setDateFilter(e.target.value)}
           className="form-control"
-          style={{ width: 'auto', fontSize: '13px' }}
+          style={{ width: 'auto', fontSize: 'var(--fs-base)' }}
           title="Filter demos by date"
         >
           {DATE_PRESETS.map(p => (
@@ -460,16 +460,16 @@ function PEOSBoard() {
               value={customFrom}
               onChange={e => setCustomFrom(e.target.value)}
               className="form-control"
-              style={{ width: 'auto', fontSize: '13px' }}
+              style={{ width: 'auto', fontSize: 'var(--fs-base)' }}
               title="From date"
             />
-            <span style={{ color: '#9ca3af', fontSize: '12px' }}>–</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>–</span>
             <input
               type="date"
               value={customTo}
               onChange={e => setCustomTo(e.target.value)}
               className="form-control"
-              style={{ width: 'auto', fontSize: '13px' }}
+              style={{ width: 'auto', fontSize: 'var(--fs-base)' }}
               title="To date"
             />
           </div>
@@ -489,8 +489,8 @@ function PEOSBoard() {
           {filteredDemos.length > 0 && filteredDemos.every(d => selectedIds.has(d.id)) ? 'Deselect all' : 'Select all shown'}
         </button>
 
-        <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
-          <strong style={{ color: '#111827' }}>{filteredDemos.length}</strong> shown
+        <div style={{ marginLeft: 'auto', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
+          <strong style={{ color: 'var(--text)' }}>{filteredDemos.length}</strong> shown
         </div>
       </div>
 
@@ -500,11 +500,11 @@ function PEOSBoard() {
           style={{
             padding: '10px 16px', marginBottom: '16px', display: 'flex',
             alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            flexWrap: 'wrap', background: 'var(--primary-light)', border: '1px solid var(--primary-border-soft)',
             position: 'sticky', top: '8px', zIndex: 5
           }}
         >
-          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--fs-md)', color: 'var(--primary-text)', fontWeight: 500 }}>
             {selectedIds.size} demo{selectedIds.size === 1 ? '' : 's'} selected
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -526,7 +526,7 @@ function PEOSBoard() {
       )}
 
       {loading ? (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
           Loading demos…
         </div>
@@ -550,16 +550,16 @@ function PEOSBoard() {
                 onDrop={e => handleDrop(e, stage.key)}
                 style={{
                   flex: '0 0 280px',
-                  background: '#f9fafb',
-                  borderRadius: '8px',
+                  background: 'var(--surface-subtle)',
+                  borderRadius: 'var(--radius-md)',
                   padding: '12px',
                   minHeight: '300px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                   <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }}></span>
-                  <strong style={{ fontSize: '13px', color: '#111827' }}>{stage.label}</strong>
-                  <span style={{ fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+                  <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -576,7 +576,7 @@ function PEOSBoard() {
                     />
                   ))}
                   {items.length === 0 && (
-                    <div style={{ padding: '16px', textAlign: 'center', color: '#9ca3af', fontSize: '12px' }}>
+                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
                       Drag a demo here
                     </div>
                   )}
@@ -624,8 +624,8 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
       onClick={onEdit}
       style={{
         background: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '6px',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
         padding: '10px 12px',
         cursor: 'grab',
         boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
@@ -648,26 +648,26 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
             <Link
               to={`/leads/${demo.lead.id}`}
               onClick={(e) => e.stopPropagation()}
-              style={{ color: '#1d4ed8', fontWeight: 600, fontSize: '13px', textDecoration: 'none', lineHeight: 1.3 }}
+              style={{ color: 'var(--primary-strong)', fontWeight: 600, fontSize: 'var(--fs-base)', textDecoration: 'none', lineHeight: 1.3 }}
             >
               {demo.lead.name}
             </Link>
           ) : demo.contact_name ? (
-            <div style={{ color: '#111827', fontWeight: 600, fontSize: '13px', lineHeight: 1.3 }}>{demo.contact_name}</div>
+            <div style={{ color: 'var(--text)', fontWeight: 600, fontSize: 'var(--fs-base)', lineHeight: 1.3 }}>{demo.contact_name}</div>
           ) : (
-            <div style={{ color: '#9ca3af', fontWeight: 600, fontSize: '13px' }}>No lead linked</div>
+            <div style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: 'var(--fs-base)' }}>No lead linked</div>
           )}
           {(demo.contact_firm || demo.lead?.firm_name) && (
-            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{demo.contact_firm || demo.lead.firm_name}</div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>{demo.contact_firm || demo.lead.firm_name}</div>
           )}
           {(demo.designation || (demo.contact_name && demo.lead && demo.contact_name !== demo.lead.name)) && (
-            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>
               {[demo.contact_name && demo.lead && demo.contact_name !== demo.lead.name ? demo.contact_name : null, demo.designation]
                 .filter(Boolean).join(' · ')}
             </div>
           )}
           {showCreator && demo.created_by_person?.name && (
-            <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px', fontStyle: 'italic' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px', fontStyle: 'italic' }}>
               by {demo.created_by_person.name}
             </div>
           )}
@@ -675,7 +675,7 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
           title="Delete"
-          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '2px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
         >
           <Trash2 size={12} />
         </button>
@@ -683,11 +683,11 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
         {demo.demo_datetime ? (
-          <span style={{ fontSize: '11px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <Calendar size={11} /> {fmtDateTimeIST(demo.demo_datetime)}
           </span>
         ) : demo.demo_date ? (
-          <span style={{ fontSize: '11px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <Calendar size={11} /> {fmtDate(demo.demo_date)}
           </span>
         ) : null}
@@ -698,7 +698,7 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
             title="Open calendar invite"
-            style={{ color: '#1d4ed8', display: 'inline-flex' }}
+            style={{ color: 'var(--primary-strong)', display: 'inline-flex' }}
           >
             <ExternalLink size={11} />
           </a>
@@ -707,8 +707,8 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
           <span
             title={`Keenness: ${KEENNESS_OPTIONS.find(o => o.value === demo.keenness)?.label || demo.keenness}/5`}
             style={{
-              fontSize: '10px', fontWeight: 600,
-              padding: '1px 6px', borderRadius: '999px',
+              fontSize: 'var(--fs-xs)', fontWeight: 600,
+              padding: '1px 6px', borderRadius: 'var(--radius-pill)',
               background: keennessColor(demo.keenness) + '22',
               color: keennessColor(demo.keenness)
             }}
@@ -722,8 +722,8 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
           <span
             title={`Decision timeline: ${DECISION_TIMELINE_BY_VALUE[demo.decision_timeline].label}`}
             style={{
-              fontSize: '10px', fontWeight: 600,
-              padding: '1px 6px', borderRadius: '999px',
+              fontSize: 'var(--fs-xs)', fontWeight: 600,
+              padding: '1px 6px', borderRadius: 'var(--radius-pill)',
               background: DECISION_TIMELINE_BY_VALUE[demo.decision_timeline].color + '22',
               color: DECISION_TIMELINE_BY_VALUE[demo.decision_timeline].color
             }}
@@ -733,9 +733,9 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
         )}
         {demo.firm_size && (
           <span style={{
-            fontSize: '10px', color: '#6b7280',
-            padding: '1px 6px', borderRadius: '999px',
-            background: '#f3f4f6'
+            fontSize: 'var(--fs-xs)', color: 'var(--text-muted)',
+            padding: '1px 6px', borderRadius: 'var(--radius-pill)',
+            background: 'var(--gray-100)'
           }}>
             {demo.firm_size}
           </span>
@@ -744,7 +744,7 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
 
       {demo.use_case && (
         <div style={{
-          fontSize: '11px', color: '#4b5563', marginTop: '6px',
+          fontSize: 'var(--fs-xs)', color: 'var(--gray-600)', marginTop: '6px',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
         }}>
           {demo.use_case}
@@ -764,8 +764,8 @@ function MobileDemoList({ stages, demosInStage, showCreator = false, onEdit, onD
           <div key={stage.key}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '0 4px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }} />
-              <strong style={{ fontSize: '13px', color: '#111827' }}>{stage.label}</strong>
-              <span style={{ fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+              <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
+              <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {items.map(d => (
@@ -793,8 +793,8 @@ function MobileDemoCard({ demo, stages, showCreator = false, onEdit, onDelete, o
       onClick={onEdit}
       style={{
         background: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)',
         padding: '12px 14px',
         boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
       }}
@@ -805,26 +805,26 @@ function MobileDemoCard({ demo, stages, showCreator = false, onEdit, onDelete, o
             <Link
               to={`/leads/${demo.lead.id}`}
               onClick={(e) => e.stopPropagation()}
-              style={{ color: '#1d4ed8', fontWeight: 600, fontSize: '15px', textDecoration: 'none' }}
+              style={{ color: 'var(--primary-strong)', fontWeight: 600, fontSize: '15px', textDecoration: 'none' }}
             >
               {demo.lead.name}
             </Link>
           ) : demo.contact_name ? (
-            <span style={{ color: '#111827', fontWeight: 600, fontSize: '15px' }}>{demo.contact_name}</span>
+            <span style={{ color: 'var(--text)', fontWeight: 600, fontSize: '15px' }}>{demo.contact_name}</span>
           ) : (
-            <span style={{ color: '#9ca3af', fontWeight: 600, fontSize: '15px' }}>No lead linked</span>
+            <span style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '15px' }}>No lead linked</span>
           )}
           {(demo.contact_firm || demo.lead?.firm_name) && (
-            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{demo.contact_firm || demo.lead.firm_name}</div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '2px' }}>{demo.contact_firm || demo.lead.firm_name}</div>
           )}
           {(demo.designation || (demo.contact_name && demo.lead && demo.contact_name !== demo.lead.name)) && (
-            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '2px' }}>
               {[demo.contact_name && demo.lead && demo.contact_name !== demo.lead.name ? demo.contact_name : null, demo.designation]
                 .filter(Boolean).join(' · ')}
             </div>
           )}
           {showCreator && demo.created_by_person?.name && (
-            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px', fontStyle: 'italic' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px', fontStyle: 'italic' }}>
               by {demo.created_by_person.name}
             </div>
           )}
@@ -832,7 +832,7 @@ function MobileDemoCard({ demo, stages, showCreator = false, onEdit, onDelete, o
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
           title="Delete"
-          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
         >
           <Trash2 size={14} />
         </button>
@@ -840,18 +840,18 @@ function MobileDemoCard({ demo, stages, showCreator = false, onEdit, onDelete, o
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
         {demo.demo_datetime ? (
-          <span style={{ fontSize: '12px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <Calendar size={12} /> {fmtDateTimeIST(demo.demo_datetime)}
           </span>
         ) : demo.demo_date ? (
-          <span style={{ fontSize: '12px', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <Calendar size={12} /> {fmtDate(demo.demo_date)}
           </span>
         ) : null}
         {demo.keenness && (
           <span style={{
-            fontSize: '11px', fontWeight: 600,
-            padding: '2px 8px', borderRadius: '999px',
+            fontSize: 'var(--fs-xs)', fontWeight: 600,
+            padding: '2px 8px', borderRadius: 'var(--radius-pill)',
             background: keennessColor(demo.keenness) + '22',
             color: keennessColor(demo.keenness)
           }}>
@@ -859,14 +859,14 @@ function MobileDemoCard({ demo, stages, showCreator = false, onEdit, onDelete, o
           </span>
         )}
         {demo.firm_size && (
-          <span style={{ fontSize: '11px', color: '#6b7280', padding: '2px 8px', borderRadius: '999px', background: '#f3f4f6' }}>
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: 'var(--radius-pill)', background: 'var(--gray-100)' }}>
             {demo.firm_size}
           </span>
         )}
       </div>
       {demo.use_case && (
         <div style={{
-          fontSize: '12px', color: '#4b5563', marginBottom: '10px',
+          fontSize: 'var(--fs-sm)', color: 'var(--gray-600)', marginBottom: '10px',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
         }}>
           {demo.use_case}
@@ -877,7 +877,7 @@ function MobileDemoCard({ demo, stages, showCreator = false, onEdit, onDelete, o
         value={demo.stage}
         onClick={(e) => e.stopPropagation()}
         onChange={(e) => { e.stopPropagation(); onStageChange(e.target.value) }}
-        style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+        style={{ width: '100%', fontSize: 'var(--fs-sm)', padding: '6px 8px' }}
       >
         {stages.map(s => (
           <option key={s.key} value={s.key}>Move to: {s.label}</option>
@@ -1043,7 +1043,7 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
       <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h2 style={{ margin: 0 }}>{isEdit ? 'Edit Demo' : 'Add Demo'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
             <X size={20} />
           </button>
         </div>
@@ -1053,27 +1053,27 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
           {isEdit ? (
             <div className="form-group">
               <label>Lead</label>
-              <div style={{ padding: '8px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+              <div style={{ padding: '8px 12px', background: 'var(--surface-subtle)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                 {demo.lead ? (
-                  <Link to={`/leads/${demo.lead.id}`} style={{ fontWeight: 600, color: '#1d4ed8' }}>
+                  <Link to={`/leads/${demo.lead.id}`} style={{ fontWeight: 600, color: 'var(--primary-strong)' }}>
                     {demo.lead.name}{demo.lead.firm_name ? ` — ${demo.lead.firm_name}` : ''}
                   </Link>
-                ) : <span style={{ color: '#9ca3af' }}>No lead linked</span>}
+                ) : <span style={{ color: 'var(--text-muted)' }}>No lead linked</span>}
               </div>
             </div>
           ) : (
             <div className="form-group">
               <label>Lead *</label>
               {pickedLead ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--primary-light)', border: '1px solid var(--primary-border-soft)', borderRadius: 'var(--radius)' }}>
                   <div>
                     <strong>{pickedLead.name}</strong>
-                    {pickedLead.firm_name && <span style={{ color: '#6b7280', marginLeft: '8px' }}>{pickedLead.firm_name}</span>}
+                    {pickedLead.firm_name && <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>{pickedLead.firm_name}</span>}
                   </div>
                   <button
                     type="button"
                     onClick={() => { setPickedLead(null); update('lead_id', null) }}
-                    style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
                     title="Change lead"
                   >
                     <X size={16} />
@@ -1088,7 +1088,7 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
                       placeholder="Paste LinkedIn URL to add a new lead…"
                       value={linkedinUrl}
                       onChange={e => setLinkedinUrl(e.target.value)}
-                      style={{ flex: 1, fontSize: '13px' }}
+                      style={{ flex: 1, fontSize: 'var(--fs-base)' }}
                       disabled={resolvingUrl}
                     />
                     <button
@@ -1101,18 +1101,18 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
                     </button>
                   </div>
                   <div style={{ position: 'relative', marginBottom: '6px' }}>
-                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                     <input
                       type="text"
                       placeholder="…or search existing leads"
                       value={leadSearch}
                       onChange={e => setLeadSearch(e.target.value)}
-                      style={{ width: '100%', paddingLeft: '32px', fontSize: '13px' }}
+                      style={{ width: '100%', paddingLeft: '32px', fontSize: 'var(--fs-base)' }}
                     />
                   </div>
-                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                     {filteredLeads.length === 0 ? (
-                      <div style={{ padding: '14px', textAlign: 'center', color: '#9ca3af', fontSize: '12px' }}>
+                      <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
                         {leads.length === 0 ? 'No leads yet — paste a LinkedIn URL above to add one.' : 'No matches'}
                       </div>
                     ) : (
@@ -1124,12 +1124,12 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
                           style={{
                             display: 'block', width: '100%', textAlign: 'left',
                             padding: '8px 12px', background: 'white', border: 'none',
-                            borderBottom: '1px solid #f3f4f6', cursor: 'pointer'
+                            borderBottom: '1px solid var(--gray-100)', cursor: 'pointer'
                           }}
                         >
-                          <div style={{ fontSize: '13px', fontWeight: 500, color: '#111827' }}>{l.name}</div>
+                          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 500, color: 'var(--text)' }}>{l.name}</div>
                           {l.firm_name && (
-                            <div style={{ fontSize: '11px', color: '#6b7280' }}>{l.firm_name}</div>
+                            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{l.firm_name}</div>
                           )}
                         </button>
                       ))
@@ -1188,7 +1188,7 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
                 value={form.demo_datetime_local}
                 onChange={e => update('demo_datetime_local', e.target.value)}
               />
-              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Times are stored and shown in IST. Leave blank if you only know the date.
               </div>
             </div>
@@ -1263,11 +1263,11 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
                     }}
                     style={{
                       padding: '4px 10px',
-                      borderRadius: '999px',
-                      border: selected ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
-                      background: selected ? '#eff6ff' : 'white',
-                      color: selected ? '#1d4ed8' : '#374151',
-                      fontSize: '12px',
+                      borderRadius: 'var(--radius-pill)',
+                      border: selected ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+                      background: selected ? 'var(--primary-light)' : 'white',
+                      color: selected ? 'var(--primary-strong)' : 'var(--text-2)',
+                      fontSize: 'var(--fs-sm)',
                       fontWeight: selected ? 600 : 500,
                       cursor: 'pointer'
                     }}
@@ -1277,7 +1277,7 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
                 )
               })}
             </div>
-            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '6px' }}>
               Pick everything they mentioned — multi-select.
             </div>
           </div>
@@ -1370,7 +1370,7 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
               onChange={e => update('transcript', e.target.value)}
               placeholder="Paste full transcript or a link to one"
               rows={5}
-              style={{ fontFamily: 'monospace', fontSize: '12px' }}
+              style={{ fontFamily: 'monospace', fontSize: 'var(--fs-sm)' }}
             />
           </div>
 
@@ -1407,11 +1407,11 @@ function ViewPill({ active, onClick, children }) {
       onClick={onClick}
       style={{
         padding: '6px 14px',
-        borderRadius: '999px',
-        border: active ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
-        background: active ? '#eff6ff' : 'white',
-        color: active ? '#1d4ed8' : '#111827',
-        fontSize: '13px',
+        borderRadius: 'var(--radius-pill)',
+        border: active ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+        background: active ? 'var(--primary-light)' : 'white',
+        color: active ? 'var(--primary-strong)' : 'var(--text)',
+        fontSize: 'var(--fs-base)',
         fontWeight: active ? 600 : 500,
         cursor: 'pointer',
         transition: 'border-color 0.12s, background 0.12s'
