@@ -115,7 +115,7 @@ const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, 
         )}
 
         {addedByName && (
-          <div style={{ fontSize: '10px', color: '#9ca3af', fontStyle: 'italic' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontStyle: 'italic' }}>
             Added by {addedByName}
           </div>
         )}
@@ -128,30 +128,30 @@ const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, 
               channels you have available, instead of a heavy "Has Email"
               flag. Muted when missing. */}
           <span title={lead.email ? `Email: ${lead.email}` : 'No email on file'}
-                style={{ color: lead.email ? '#16a34a' : '#d1d5db', display: 'inline-flex' }}>
+                style={{ color: lead.email ? 'var(--success-text)' : 'var(--gray-300)', display: 'inline-flex' }}>
             <AtSign size={12} />
           </span>
           <span title={lead.phone ? `Phone: ${lead.phone}` : 'No phone on file'}
-                style={{ color: lead.phone ? '#16a34a' : '#d1d5db', display: 'inline-flex' }}>
+                style={{ color: lead.phone ? 'var(--success-text)' : 'var(--gray-300)', display: 'inline-flex' }}>
             <Phone size={12} />
           </span>
           <span title={lead.linkedin_url ? lead.linkedin_url : 'No LinkedIn on file'}
-                style={{ color: lead.linkedin_url ? '#0a66c2' : '#d1d5db', display: 'inline-flex' }}>
+                style={{ color: lead.linkedin_url ? '#0a66c2' : 'var(--gray-300)', display: 'inline-flex' }}>
             <Linkedin size={12} />
           </span>
         </div>
 
         {lead.needs_sample_deals && (
-          <div className="lead-flag" style={{ fontSize: '11px' }}>
+          <div className="lead-flag" style={{ fontSize: 'var(--fs-xs)' }}>
             📋 Needs samples
           </div>
         )}
 
         {lead.next_follow_up_date && (
           <div className="lead-flag" style={{
-            fontSize: '11px',
-            color: urgency?.color === '#dc2626' ? '#dc2626'
-                 : urgency?.color === '#d97706' ? '#d97706'
+            fontSize: 'var(--fs-xs)',
+            color: urgency?.color === '#dc2626' ? 'var(--danger)'
+                 : urgency?.color === '#d97706' ? 'var(--warning-text)'
                  : undefined
           }}>
             📅 Follow up: {new Date(lead.next_follow_up_date).toLocaleDateString()}
@@ -159,7 +159,7 @@ const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, 
         )}
 
         {lead.reach_out_later_date && (
-          <div className="lead-flag" style={{ fontSize: '11px' }}>
+          <div className="lead-flag" style={{ fontSize: 'var(--fs-xs)' }}>
             🔔 Reach out: {new Date(lead.reach_out_later_date).toLocaleDateString()}
           </div>
         )}

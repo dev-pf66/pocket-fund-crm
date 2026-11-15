@@ -41,12 +41,12 @@ function LeadHealthFlag({ lead, hasTranscript = null, onUpdated }) {
       className="card"
       style={{
         padding: '12px 16px', marginBottom: '16px',
-        background: '#fffbeb', border: '1px solid #fde68a',
+        background: 'var(--warning-bg)', border: '1px solid var(--warning-border)',
         display: 'flex', flexDirection: 'column', gap: '8px'
       }}
     >
       {missing.length > 0 && (
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '14px', color: '#92400e' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: 'var(--fs-md)', color: 'var(--warning-text-strong)' }}>
           <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
           <span>
             <strong>Missing info</strong> for a lead at this stage:{' '}
@@ -57,7 +57,7 @@ function LeadHealthFlag({ lead, hasTranscript = null, onUpdated }) {
       )}
 
       {stale && (
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '14px', color: '#92400e' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: 'var(--fs-md)', color: 'var(--warning-text-strong)' }}>
           <Clock size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
           <span>
             <strong>No update in {staleDays} days</strong> and nothing scheduled — {daysOverClock(lead)} days
@@ -70,7 +70,7 @@ function LeadHealthFlag({ lead, hasTranscript = null, onUpdated }) {
               onClick={() => setShowDisposition(true)}
               style={{
                 background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                color: '#92400e', fontWeight: 700, textDecoration: 'underline'
+                color: 'var(--warning-text-strong)', fontWeight: 700, textDecoration: 'underline'
               }}
             >
               Say what is happening
@@ -88,7 +88,7 @@ function LeadHealthFlag({ lead, hasTranscript = null, onUpdated }) {
       )}
 
       {needsTranscript && (
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '14px', color: '#92400e' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: 'var(--fs-md)', color: 'var(--warning-text-strong)' }}>
           <FileText size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
           <span>
             <strong>No transcript</strong> on a lead that has reached the meeting stage. Paste one

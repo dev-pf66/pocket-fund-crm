@@ -52,6 +52,67 @@
   --radius-md: 8px;
   --radius-lg: 10px;
   --radius-xl: 14px;
+
+  /* ── Semantic tokens (Nov 2026, UI batch 2) ─────────────────────────────
+     Components use THESE, not raw hex. The JSX carried ~1,150 hex literals in
+     a different grey family (Tailwind gray) from the scale above (slate); a
+     codemod moved ~890 JSX + ~130 CSS literals onto these. What visibly moved:
+       - Tailwind greys -> the slate scale (near-identical lightness);
+       - light grey TEXT (#9ca3af/#94a3b8, 2.5:1) -> --text-muted (4.8:1);
+       - bright accents used as TEXT darkened to pass AA: #3b82f6 -> #2563eb,
+         #ef4444 -> #dc2626, #22c55e/#16a34a -> #15803d, #f59e0b/#d97706 -> #b45309;
+       - 9-10px type -> 11px (--fs-xs is the floor);
+       - stage chips, column counts, the palette pill, the callback badge and
+         .btn-success re-coloured for contrast.
+     Fills (backgrounds, borders, dots) keep their exact existing values. */
+  --text: var(--gray-900);
+  --text-2: var(--gray-700);
+  --text-muted: var(--gray-500);   /* 4.76:1 on white — the floor for small text */
+
+  --primary-strong: #1d4ed8;       /* deeper blue for TEXT; --primary-hover stays the hover fill */
+  --primary-text: #1e40af;
+  --primary-bg-strong: #dbeafe;
+  --primary-border-soft: #bfdbfe;
+
+  /* --danger means overdue / stale / destructive-confirm. Never decoration. */
+  --danger-strong: #b91c1c;        /* fill: danger button hover */
+  --danger-text: var(--danger-strong);
+  --danger-text-strong: #991b1b;
+  --danger-bg: #fef2f2;
+  --danger-bg-strong: #fee2e2;
+  --danger-border: #fecaca;
+
+  --warning-text: #b45309;         /* --warning (#f59e0b) is a fill; as text it is 2.1:1 */
+  --warning-text-strong: #92400e;
+  --warning-bg: #fffbeb;
+  --warning-bg-strong: #fef3c7;
+  --warning-border: #fde68a;
+
+  --success-strong: #15803d;       /* fill: success button (white on --success was 3.3:1) */
+  --success-text: var(--success-strong);
+  --success-text-strong: #166534;
+  --success-bg: #f0fdf4;
+  --success-bg-strong: #dcfce7;
+  --success-border: #bbf7d0;
+
+  /* Type scale — 13px base for a dense working tool. 11px is the floor. */
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+
+  --radius-pill: 999px;
+
+  /* Spacing scale — defined for new work; existing paddings not migrated yet. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
 }
 
 body {
@@ -129,13 +190,13 @@ input, select, textarea {
   color: var(--gray-600);
   padding: 0.4375rem 0.625rem;
   border-radius: var(--radius);
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 
 .sidebar a svg {
-  color: var(--gray-400);
+  color: var(--text-muted);
   flex-shrink: 0;
   transition: color 0.12s ease;
 }
@@ -213,7 +274,7 @@ input, select, textarea {
   height: 34px;
   border-radius: var(--radius);
   font-weight: 500;
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   letter-spacing: -0.005em;
   border: 1px solid transparent;
   transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
@@ -248,12 +309,12 @@ input, select, textarea {
 }
 
 .btn-success {
-  background: var(--success);
+  background: var(--success-strong); /* white on --success was 3.3:1 */
   color: white;
 }
 
 .btn-success:hover {
-  background: #15803d;
+  background: var(--success-text-strong);
 }
 
 .btn-danger {
@@ -262,13 +323,13 @@ input, select, textarea {
 }
 
 .btn-danger:hover {
-  background: #b91c1c;
+  background: var(--danger-strong);
 }
 
 .btn-sm {
   height: 28px;
   padding: 0 0.625rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   border-radius: var(--radius-sm);
 }
 
@@ -284,7 +345,7 @@ input, select, textarea {
 
 .form-group label {
   display: block;
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--gray-700);
   margin-bottom: 0.375rem;
@@ -298,7 +359,7 @@ input, select, textarea {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   background: var(--surface);
   color: var(--gray-900);
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
@@ -306,7 +367,7 @@ input, select, textarea {
 
 .form-group input::placeholder,
 .form-group textarea::placeholder {
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .form-group input:focus,
@@ -327,7 +388,7 @@ input, select, textarea {
 .task-card {
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 1rem;
   margin-bottom: 0.75rem;
   transition: box-shadow 0.15s;
@@ -352,7 +413,7 @@ input, select, textarea {
 .task-meta {
   display: flex;
   gap: 0.75rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
   margin-bottom: 0.75rem;
 }
@@ -368,8 +429,8 @@ input, select, textarea {
   display: inline-flex;
   align-items: center;
   padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
-  font-size: 0.6875rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
   font-weight: 500;
   text-transform: capitalize;
   letter-spacing: 0.01em;
@@ -383,15 +444,15 @@ input, select, textarea {
 }
 
 .status-in_progress {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-color: #bfdbfe;
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  border-color: var(--primary-border-soft);
 }
 
 .status-done {
-  background: #f0fdf4;
-  color: #15803d;
-  border-color: #bbf7d0;
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
 }
 
 /* Priority Badge */
@@ -400,7 +461,7 @@ input, select, textarea {
   align-items: center;
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-sm);
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   font-weight: 500;
   letter-spacing: 0.01em;
   border: 1px solid transparent;
@@ -412,8 +473,8 @@ input, select, textarea {
 }
 
 .priority-medium {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warning-bg-strong);
+  color: var(--warning-text-strong);
 }
 
 .priority-high {
@@ -422,8 +483,8 @@ input, select, textarea {
 }
 
 .priority-urgent {
-  background: #fecaca;
-  color: #dc2626;
+  background: var(--danger-border);
+  color: var(--danger);
 }
 
 /* Filter Bar */
@@ -439,7 +500,7 @@ input, select, textarea {
   padding: 0.4375rem 0.625rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   background: var(--surface);
   color: var(--gray-900);
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
@@ -481,7 +542,7 @@ input, select, textarea {
 }
 
 .stat-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
   font-weight: 500;
   text-transform: uppercase;
@@ -490,7 +551,7 @@ input, select, textarea {
 }
 
 .stat-card.warning .stat-value {
-  color: var(--warning);
+  color: var(--warning-text);
 }
 
 .stat-card.danger .stat-value {
@@ -507,7 +568,7 @@ input, select, textarea {
   gap: 0.75rem;
   padding: 0.75rem 0;
   border-bottom: 1px solid var(--gray-100);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .activity-item:last-child {
@@ -530,8 +591,8 @@ input, select, textarea {
 }
 
 .activity-time {
-  color: var(--gray-400);
-  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
 }
 
 /* Team View */
@@ -543,13 +604,13 @@ input, select, textarea {
 
 .team-card {
   background: white;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 1.25rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .team-card h3 {
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
@@ -571,8 +632,8 @@ input, select, textarea {
   flex: 1;
   padding: 0.375rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
 }
 
 .notes-list {
@@ -582,7 +643,7 @@ input, select, textarea {
 }
 
 .note-item {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   padding: 0.5rem 0;
   color: var(--gray-600);
 }
@@ -598,23 +659,23 @@ input, select, textarea {
   gap: 0.5rem;
   padding: 1rem;
   background: var(--gray-700);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   margin-top: auto;
 }
 
 .person-selector label {
-  font-size: 0.75rem;
-  color: var(--gray-400);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
 .person-selector select {
   flex: 1;
   padding: 0.375rem 0.5rem;
   border: none;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   background: var(--gray-600);
   color: white;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 /* Modal */
@@ -690,7 +751,7 @@ input, select, textarea {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
 }
 
@@ -699,7 +760,7 @@ input, select, textarea {
   text-align: center;
   padding: 3rem 1.25rem;
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   background: var(--surface-subtle);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-md);
@@ -716,7 +777,7 @@ input, select, textarea {
 .empty-state p {
   margin: 0;
   color: var(--gray-500);
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
 }
 
 /* Loading */
@@ -726,7 +787,7 @@ input, select, textarea {
   justify-content: center;
   padding: 2.5rem 2rem;
   color: var(--gray-500);
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   gap: 0.75rem;
 }
 
@@ -788,14 +849,14 @@ input, select, textarea {
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.5rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   margin-bottom: 1.5rem;
 }
 
 .alert-danger {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text-strong);
 }
 
 .alert-icon {
@@ -855,12 +916,12 @@ input, select, textarea {
 }
 
 .overdue-meta {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
 }
 
 .overdue-days {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--danger);
   white-space: nowrap;
@@ -870,7 +931,7 @@ input, select, textarea {
   display: block;
   text-align: center;
   padding-top: 1rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 /* Workload Bars */
@@ -898,7 +959,7 @@ input, select, textarea {
 }
 
 .workload-count {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-500);
 }
 
@@ -909,14 +970,14 @@ input, select, textarea {
 .workload-bar-container {
   height: 0.75rem;
   background: var(--gray-100);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
 .workload-bar {
   height: 100%;
   background: var(--primary);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   position: relative;
   min-width: 4px;
   transition: width 0.3s ease;
@@ -940,7 +1001,7 @@ input, select, textarea {
 
 .calendar-main {
   background: white;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
 }
@@ -953,7 +1014,7 @@ input, select, textarea {
 }
 
 .calendar-header h2 {
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   font-weight: 600;
   margin: 0;
 }
@@ -967,7 +1028,7 @@ input, select, textarea {
 
 .calendar-weekday {
   text-align: center;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--gray-500);
   padding: 0.5rem;
@@ -983,7 +1044,7 @@ input, select, textarea {
   aspect-ratio: 1;
   padding: 0.5rem;
   border: 1px solid var(--gray-100);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -1002,7 +1063,7 @@ input, select, textarea {
 
 .calendar-day.today {
   border-color: var(--primary);
-  background: #eff6ff;
+  background: var(--primary-light);
 }
 
 .calendar-day.selected {
@@ -1017,11 +1078,11 @@ input, select, textarea {
 }
 
 .calendar-day.past:not(.selected) {
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .day-number {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 500;
 }
 
@@ -1030,21 +1091,21 @@ input, select, textarea {
 }
 
 .task-count {
-  font-size: 0.625rem;
+  font-size: var(--fs-xs);
   padding: 0.125rem 0.375rem;
   background: var(--gray-100);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   display: inline-block;
 }
 
 .task-count.overdue {
-  background: #fecaca;
+  background: var(--danger-border);
   color: var(--danger);
 }
 
 .calendar-sidebar {
   background: white;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
 }
@@ -1065,7 +1126,7 @@ input, select, textarea {
 
 .calendar-task-item {
   padding: 0.75rem;
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   background: var(--gray-50);
   border-left: 3px solid var(--gray-300);
 }
@@ -1089,14 +1150,14 @@ input, select, textarea {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
   margin-bottom: 0.25rem;
 }
 
 .calendar-task-client {
-  font-size: 0.75rem;
-  color: var(--gray-400);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
 @media (max-width: 900px) {
@@ -1121,7 +1182,7 @@ input, select, textarea {
 /* Blocker Styles */
 .task-blocked {
   border-left: 4px solid var(--warning);
-  background: #fffbeb;
+  background: var(--warning-bg);
 }
 
 .blocker-banner {
@@ -1130,9 +1191,9 @@ input, select, textarea {
   gap: 0.75rem;
   padding: 0.75rem;
   margin: -1rem -1rem 1rem -1rem;
-  background: #fef3c7;
+  background: var(--warning-bg-strong);
   border-radius: 0.5rem 0.5rem 0 0;
-  border-bottom: 1px solid #fde68a;
+  border-bottom: 1px solid var(--warning-border);
 }
 
 .blocker-icon {
@@ -1145,14 +1206,14 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   flex-shrink: 0;
 }
 
 .blocker-text {
   flex: 1;
-  font-size: 0.875rem;
-  color: #92400e;
+  font-size: var(--fs-md);
+  color: var(--warning-text-strong);
 }
 
 .blocker-form {
@@ -1167,8 +1228,8 @@ input, select, textarea {
   flex: 1;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
 }
 
 .btn-warning {
@@ -1194,8 +1255,8 @@ input, select, textarea {
 }
 
 .no-comments {
-  color: var(--gray-400);
-  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
   text-align: center;
   padding: 1rem 0;
 }
@@ -1203,7 +1264,7 @@ input, select, textarea {
 .comment {
   padding: 0.75rem;
   background: var(--gray-50);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   margin-bottom: 0.5rem;
 }
 
@@ -1216,17 +1277,17 @@ input, select, textarea {
 
 .comment-author {
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-800);
 }
 
 .comment-time {
-  font-size: 0.75rem;
-  color: var(--gray-400);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
 .comment-content {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-700);
   line-height: 1.5;
 }
@@ -1245,8 +1306,8 @@ input, select, textarea {
   width: 100%;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
 }
 
 .comment-input:focus {
@@ -1257,16 +1318,16 @@ input, select, textarea {
 
 /* @Mention Styles */
 .mention {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--primary-bg-strong);
+  color: var(--primary-hover);
   padding: 0.125rem 0.25rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   font-weight: 500;
 }
 
 .mention-me {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warning-bg-strong);
+  color: var(--warning-text-strong);
 }
 
 .mention-suggestions {
@@ -1276,7 +1337,7 @@ input, select, textarea {
   right: 0;
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   margin-bottom: 0.25rem;
   z-index: 10;
@@ -1291,7 +1352,7 @@ input, select, textarea {
   text-align: left;
   border: none;
   background: none;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   cursor: pointer;
   color: var(--gray-700);
 }
@@ -1323,14 +1384,14 @@ input, select, textarea {
 }
 
 .subtasks-header h4 {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--gray-700);
   margin: 0;
 }
 
 .subtasks-progress {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
 }
 
@@ -1365,7 +1426,7 @@ input, select, textarea {
 
 .subtask-item.done .subtask-title {
   text-decoration: line-through;
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .subtask-main {
@@ -1390,7 +1451,7 @@ input, select, textarea {
 }
 
 .subtask-title {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-700);
 }
 
@@ -1401,11 +1462,11 @@ input, select, textarea {
 }
 
 .subtask-assignee {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
   background: var(--gray-100);
   padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
 }
 
 .btn-icon {
@@ -1413,12 +1474,12 @@ input, select, textarea {
   height: 1.5rem;
   border: none;
   background: var(--gray-100);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   color: var(--gray-600);
   transition: all 0.15s;
 }
@@ -1428,14 +1489,14 @@ input, select, textarea {
 }
 
 .btn-icon-danger:hover {
-  background: #fecaca;
+  background: var(--danger-border);
   color: var(--danger);
 }
 
 .btn-icon-sm {
   width: 1.25rem;
   height: 1.25rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .subtask-form {
@@ -1447,8 +1508,8 @@ input, select, textarea {
   flex: 1;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
 }
 
 /* Checklist Styles */
@@ -1457,7 +1518,7 @@ input, select, textarea {
   margin-left: 1.5rem;
   padding: 0.5rem;
   background: var(--gray-50);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
 }
 
 .checklist-list {
@@ -1474,7 +1535,7 @@ input, select, textarea {
 
 .checklist-item.done span {
   text-decoration: line-through;
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .checklist-checkbox {
@@ -1483,7 +1544,7 @@ input, select, textarea {
   gap: 0.5rem;
   flex: 1;
   cursor: pointer;
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   color: var(--gray-600);
 }
 
@@ -1502,8 +1563,8 @@ input, select, textarea {
   flex: 1;
   padding: 0.25rem 0.5rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.25rem;
-  font-size: 0.8125rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-base);
 }
 
 /* Kanban Board */
@@ -1524,7 +1585,7 @@ input, select, textarea {
 }
 
 .task-summary {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-500);
   font-weight: normal;
 }
@@ -1538,8 +1599,8 @@ input, select, textarea {
 .kanban-filters select {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
   background: white;
 }
 
@@ -1554,7 +1615,7 @@ input, select, textarea {
 
 .kanban-column {
   background: var(--gray-100);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1578,7 +1639,7 @@ input, select, textarea {
 
 .kanban-column-title {
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   color: var(--gray-700);
   text-transform: uppercase;
   letter-spacing: 0.025em;
@@ -1587,10 +1648,10 @@ input, select, textarea {
 .kanban-column-count {
   background: var(--gray-200);
   color: var(--gray-600);
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   min-width: 1.5rem;
   text-align: center;
 }
@@ -1619,18 +1680,18 @@ input, select, textarea {
 
 .kanban-empty {
   text-align: center;
-  color: var(--gray-400);
-  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
   padding: 2rem 0.5rem;
   border: 2px dashed var(--gray-200);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   margin: 0.5rem 0;
 }
 
 /* Kanban Card (compact) */
 .kanban-card {
   background: white;
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   cursor: pointer;
   transition: box-shadow 0.15s, transform 0.15s;
@@ -1644,7 +1705,7 @@ input, select, textarea {
 }
 
 .kanban-card-blocked {
-  background: #fffbeb;
+  background: var(--warning-bg);
 }
 
 .kanban-card-priority {
@@ -1659,7 +1720,7 @@ input, select, textarea {
 }
 
 .kanban-card-title {
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--gray-800);
   margin-bottom: 0.375rem;
@@ -1679,15 +1740,15 @@ input, select, textarea {
 }
 
 .kanban-card-client {
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   color: var(--gray-500);
   background: var(--gray-100);
   padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
 }
 
 .kanban-card-due {
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   color: var(--gray-500);
 }
 
@@ -1697,11 +1758,11 @@ input, select, textarea {
 }
 
 .kanban-card-blocker {
-  font-size: 0.6875rem;
-  color: #92400e;
-  background: #fef3c7;
+  font-size: var(--fs-xs);
+  color: var(--warning-text-strong);
+  background: var(--warning-bg-strong);
   padding: 0.25rem 0.375rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   margin-top: 0.375rem;
   display: -webkit-box;
   -webkit-line-clamp: 1;
@@ -1721,7 +1782,7 @@ input, select, textarea {
   border-radius: 50%;
   background: var(--primary);
   color: white;
-  font-size: 0.625rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -1801,8 +1862,8 @@ input, select, textarea {
   width: 100%;
   padding: 0.75rem 1rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.5rem;
-  font-size: 1rem;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-lg);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -1815,18 +1876,18 @@ input, select, textarea {
 .btn-full {
   width: 100%;
   padding: 0.75rem 1rem;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
 }
 
 .login-hint {
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   color: var(--gray-500);
   text-align: center;
   margin-top: 1rem;
 }
 
 .login-switch {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   text-align: center;
   margin-top: 1.5rem;
@@ -1846,22 +1907,22 @@ input, select, textarea {
 }
 
 .login-success-msg {
-  background: #dcfce7;
+  background: var(--success-bg-strong);
   border: 1px solid #86efac;
-  color: #166534;
+  color: var(--success-text-strong);
   padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
   margin-bottom: 1rem;
 }
 
 .login-error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text-strong);
   padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
   margin-bottom: 1rem;
 }
 
@@ -1883,7 +1944,7 @@ input, select, textarea {
 }
 
 .login-success h2 {
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   color: var(--gray-900);
   margin-bottom: 0.5rem;
 }
@@ -1948,7 +2009,7 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   flex-shrink: 0;
   letter-spacing: 0.01em;
 }
@@ -1961,7 +2022,7 @@ input, select, textarea {
 .user-name {
   display: block;
   font-weight: 500;
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   color: var(--gray-900);
   white-space: nowrap;
   overflow: hidden;
@@ -1970,7 +2031,7 @@ input, select, textarea {
 
 .user-email {
   display: block;
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   color: var(--gray-500);
   white-space: nowrap;
   overflow: hidden;
@@ -1983,8 +2044,8 @@ input, select, textarea {
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  color: var(--gray-400);
-  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2040,7 +2101,7 @@ input, select, textarea {
   color: white;
   border: none;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
   transition: transform 0.2s, background-color 0.2s;
   z-index: 100;
@@ -2084,7 +2145,7 @@ input, select, textarea {
   background: none;
   border: none;
   color: white;
-  font-size: 1.5rem;
+  font-size: var(--fs-2xl);
   line-height: 1;
   padding: 0;
   opacity: 0.7;
@@ -2105,7 +2166,7 @@ input, select, textarea {
 
 .chat-empty {
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .chat-empty ul {
@@ -2158,7 +2219,7 @@ input, select, textarea {
   flex: 1;
   padding: 0.625rem 0.875rem;
   border: 1px solid var(--gray-300);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
 }
 
@@ -2173,7 +2234,7 @@ input, select, textarea {
   background: var(--primary);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 500;
 }
 
@@ -2204,9 +2265,9 @@ input, select, textarea {
 .notification-bell-btn {
   background: none;
   border: none;
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   padding: 0.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   position: relative;
   transition: background-color 0.2s;
 }
@@ -2221,11 +2282,11 @@ input, select, textarea {
   right: 2px;
   background: var(--danger);
   color: white;
-  font-size: 0.65rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   min-width: 16px;
   height: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2297,15 +2358,15 @@ input, select, textarea {
 }
 
 .notification-unread {
-  background: #eff6ff;
+  background: var(--primary-light);
 }
 
 .notification-unread:hover {
-  background: #dbeafe;
+  background: var(--primary-bg-strong);
 }
 
 .notification-icon {
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   flex-shrink: 0;
 }
 
@@ -2316,7 +2377,7 @@ input, select, textarea {
 
 .notification-title {
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-800);
   margin-bottom: 0.125rem;
 }
@@ -2332,8 +2393,8 @@ input, select, textarea {
 }
 
 .notification-time {
-  font-size: 0.7rem;
-  color: var(--gray-400);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   margin-top: 0.25rem;
 }
 
@@ -2362,7 +2423,7 @@ input, select, textarea {
   color: var(--gray-600);
   padding: 0.125rem 0.5rem;
   border-radius: 12px;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 
@@ -2375,7 +2436,7 @@ input, select, textarea {
 .team-member-card {
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 1rem;
   display: flex;
   align-items: center;
@@ -2392,7 +2453,7 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .team-member-info {
@@ -2412,7 +2473,7 @@ input, select, textarea {
 .team-selector {
   padding: 0.375rem 0.5rem;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 0.8rem;
   background: white;
 }
@@ -2464,7 +2525,7 @@ input, select, textarea {
 
 .perma-task-card {
   background: white;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1.25rem;
   border-left: 4px solid var(--primary);
@@ -2482,19 +2543,19 @@ input, select, textarea {
 }
 
 .perma-task-icon {
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   flex-shrink: 0;
 }
 
 .perma-task-title {
   flex: 1;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--gray-900);
 }
 
 .perma-task-counter {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--gray-600);
   background: var(--gray-100);
@@ -2504,8 +2565,8 @@ input, select, textarea {
 }
 
 .perma-task-counter.completed {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--success-bg-strong);
+  color: var(--success-text-strong);
 }
 
 .progress-bar-fill {
@@ -2516,7 +2577,7 @@ input, select, textarea {
 }
 
 .perma-task-description {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   margin-bottom: 0.75rem;
   line-height: 1.4;
@@ -2527,7 +2588,7 @@ input, select, textarea {
   gap: 0.5rem;
   align-items: center;
   flex-wrap: wrap;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
   margin-bottom: 1rem;
 }
@@ -2535,7 +2596,7 @@ input, select, textarea {
 .target-label {
   background: var(--gray-100);
   padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   font-weight: 500;
 }
 
@@ -2566,25 +2627,25 @@ input, select, textarea {
 
 .perma-subtask-title {
   flex: 1;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-700);
   transition: all 0.2s;
 }
 
 .perma-subtask-title.done {
   text-decoration: line-through;
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .btn-icon-sm {
   width: 1.25rem;
   height: 1.25rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   border: none;
   background: transparent;
-  color: var(--gray-400);
+  color: var(--text-muted);
   cursor: pointer;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   transition: all 0.15s;
   display: flex;
   align-items: center;
@@ -2593,7 +2654,7 @@ input, select, textarea {
 }
 
 .btn-icon-sm:hover {
-  background: #fecaca;
+  background: var(--danger-border);
   color: var(--danger);
 }
 
@@ -2607,8 +2668,8 @@ input, select, textarea {
   flex: 1;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
 }
 
 .add-subtask-input:focus {
@@ -2622,9 +2683,9 @@ input, select, textarea {
   padding: 0.5rem;
   background: transparent;
   border: 1px dashed var(--gray-300);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   cursor: pointer;
   transition: all 0.2s;
   margin-top: 0.5rem;
@@ -2639,7 +2700,7 @@ input, select, textarea {
 .loading-text {
   text-align: center;
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   padding: 1rem 0;
 }
 
@@ -2659,7 +2720,7 @@ input, select, textarea {
 
 .stat-card {
   background: white;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   text-align: center;
@@ -2673,7 +2734,7 @@ input, select, textarea {
 }
 
 .stat-label {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   font-weight: 500;
 }
@@ -2715,19 +2776,19 @@ input, select, textarea {
 }
 
 .bar-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-600);
   font-weight: 500;
 }
 
 .bar-value {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--gray-800);
 }
 
 .bar-detail {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
 }
 
@@ -2743,7 +2804,7 @@ input, select, textarea {
 .data-table th {
   text-align: left;
   padding: 0.625rem 0.875rem;
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--gray-500);
   text-transform: uppercase;
@@ -2753,7 +2814,7 @@ input, select, textarea {
 
 .data-table td {
   padding: 0.75rem 0.875rem;
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   color: var(--gray-700);
   border-bottom: 1px solid var(--border);
 }
@@ -2790,12 +2851,12 @@ input, select, textarea {
   gap: 0.75rem;
   padding: 0.75rem;
   background: var(--gray-50);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   border-left: 3px solid var(--warning);
 }
 
 .bottleneck-icon {
-  font-size: 1.5rem;
+  font-size: var(--fs-2xl);
   flex-shrink: 0;
 }
 
@@ -2810,20 +2871,20 @@ input, select, textarea {
 }
 
 .bottleneck-meta {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   margin-bottom: 0.25rem;
 }
 
 .bottleneck-time {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
 }
 
 .empty-message {
   text-align: center;
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   padding: 2rem;
 }
 
@@ -2837,8 +2898,8 @@ input, select, textarea {
 .filter-select {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
 }
 
 .templates-grid {
@@ -2849,7 +2910,7 @@ input, select, textarea {
 
 .template-card {
   background: white;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1.25rem;
   border-left: 4px solid var(--primary);
@@ -2863,7 +2924,7 @@ input, select, textarea {
 }
 
 .template-card h3 {
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--gray-900);
   margin: 0;
@@ -2873,13 +2934,13 @@ input, select, textarea {
   background: var(--gray-100);
   color: var(--gray-700);
   padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 
 .template-description {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   margin-bottom: 1rem;
   line-height: 1.4;
@@ -2909,7 +2970,7 @@ input, select, textarea {
 }
 
 .section-header h3 {
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   margin: 0;
 }
@@ -2925,7 +2986,7 @@ input, select, textarea {
   gap: 0.75rem;
   padding: 1rem;
   background: var(--gray-50);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   border-left: 3px solid var(--primary);
 }
 
@@ -2939,7 +3000,7 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   flex-shrink: 0;
 }
 
@@ -2956,8 +3017,8 @@ input, select, textarea {
   width: 100%;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
 }
 
 .template-item-meta {
@@ -2974,7 +3035,7 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-700);
 }
 
@@ -2985,7 +3046,7 @@ input, select, textarea {
 /* Bulk Operations */
 .bulk-actions-bar {
   background: white;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1rem;
   margin-bottom: 1rem;
@@ -3010,7 +3071,7 @@ input, select, textarea {
   background: none;
   border: none;
   color: var(--primary);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   cursor: pointer;
   text-decoration: underline;
 }
@@ -3027,8 +3088,8 @@ input, select, textarea {
 .bulk-operations select {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
   background: white;
   cursor: pointer;
 }
@@ -3044,7 +3105,7 @@ input, select, textarea {
   left: 0.5rem;
   z-index: 10;
   background: white;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   padding: 0.25rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
@@ -3085,7 +3146,7 @@ input, select, textarea {
 }
 
 .summary-label {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   font-weight: 500;
 }
@@ -3102,13 +3163,13 @@ input, select, textarea {
 }
 
 .status-badge.status-in_progress {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--primary-bg-strong);
+  color: var(--primary-text);
 }
 
 .status-badge.status-done {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--success-bg-strong);
+  color: var(--success-text-strong);
 }
 
 /* Time Entry */
@@ -3131,7 +3192,7 @@ input, select, textarea {
 }
 
 .time-entries-header h3 {
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   margin: 0;
 }
@@ -3147,7 +3208,7 @@ input, select, textarea {
   gap: 0.75rem;
   padding: 0.75rem;
   background: var(--gray-50);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   margin-bottom: 0.5rem;
 }
 
@@ -3161,24 +3222,24 @@ input, select, textarea {
 .time-entry-hours {
   font-weight: 600;
   color: var(--primary);
-  font-size: 1rem;
+  font-size: var(--fs-lg);
 }
 
 .time-entry-date {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
 }
 
 .time-entry-person {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-500);
   background: var(--gray-100);
   padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
 }
 
 .time-entry-notes {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   margin-top: 0.5rem;
   padding-left: 0.75rem;
@@ -3188,7 +3249,7 @@ input, select, textarea {
 /* Resource Utilization */
 .util-subtitle {
   color: var(--gray-600);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   margin: 0;
 }
 
@@ -3223,7 +3284,7 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   flex-shrink: 0;
 }
 
@@ -3239,7 +3300,7 @@ input, select, textarea {
 }
 
 .util-status {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 500;
 }
 
@@ -3257,14 +3318,14 @@ input, select, textarea {
 }
 
 .util-hours-label {
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   color: var(--gray-500);
 }
 
 .util-progress-bar {
   height: 12px;
   background: var(--gray-100);
-  border-radius: 6px;
+  border-radius: var(--radius);
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
@@ -3272,12 +3333,12 @@ input, select, textarea {
 .util-progress-fill {
   height: 100%;
   transition: width 0.3s ease;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .util-percentage {
   text-align: right;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--gray-600);
   margin-bottom: 1rem;
@@ -3289,7 +3350,7 @@ input, select, textarea {
 }
 
 .util-breakdown h4 {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--gray-700);
   margin: 0 0 0.75rem 0;
@@ -3308,14 +3369,14 @@ input, select, textarea {
 }
 
 .util-client-name {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-700);
 }
 
 .util-client-hours {
   font-weight: 600;
   color: var(--primary);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 /* ============================================
@@ -3338,16 +3399,16 @@ input, select, textarea {
 .filter-group label {
   font-weight: 600;
   color: var(--gray-700);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .filter-group select {
   padding: 0.5rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   background: white;
   color: var(--gray-900);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .projects-grid {
@@ -3386,16 +3447,16 @@ input, select, textarea {
 }
 
 .project-client {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   margin: 0;
 }
 
 .project-deadline-badge {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background: var(--gray-100);
 }
 
@@ -3408,7 +3469,7 @@ input, select, textarea {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .project-completion-header span:first-child {
@@ -3418,13 +3479,13 @@ input, select, textarea {
 
 .project-completion-percent {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
 }
 
 .project-progress-bar {
   height: 8px;
   background: var(--gray-200);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
@@ -3432,11 +3493,11 @@ input, select, textarea {
 .project-progress-fill {
   height: 100%;
   transition: width 0.3s ease;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .project-tasks-count {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
   text-align: right;
 }
@@ -3457,13 +3518,13 @@ input, select, textarea {
 }
 
 .project-stat-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-600);
   margin-bottom: 0.25rem;
 }
 
 .project-stat-value {
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--gray-900);
 }
@@ -3473,7 +3534,7 @@ input, select, textarea {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .project-manager-label {
@@ -3501,18 +3562,18 @@ input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   border: 2px solid white;
 }
 
 .project-team-more {
   background: var(--gray-400);
-  font-size: 0.625rem;
+  font-size: var(--fs-xs);
 }
 
 .project-deadline {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   text-align: right;
 }
@@ -3532,7 +3593,7 @@ input, select, textarea {
 }
 
 .project-detail-section h3 {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--gray-600);
   margin: 0 0 0.5rem 0;
@@ -3560,12 +3621,12 @@ input, select, textarea {
   align-items: center;
   padding: 1rem;
   background: var(--gray-50);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   border: 1px solid var(--gray-200);
 }
 
 .project-metric-card.project-metric-danger {
-  background: #fef2f2;
+  background: var(--danger-bg);
   border-color: var(--danger);
 }
 
@@ -3577,7 +3638,7 @@ input, select, textarea {
 }
 
 .project-metric-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-600);
   text-align: center;
 }
@@ -3605,14 +3666,14 @@ input, select, textarea {
 }
 
 .project-progress-percent {
-  font-size: 1.5rem;
+  font-size: var(--fs-2xl);
   font-weight: 700;
 }
 
 .project-progress-bar-large {
   height: 16px;
   background: var(--gray-200);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
 }
 
@@ -3622,7 +3683,7 @@ input, select, textarea {
 }
 
 .project-team-section h3 {
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--gray-900);
   margin: 0 0 1rem 0;
@@ -3640,7 +3701,7 @@ input, select, textarea {
   gap: 0.75rem;
   padding: 0.5rem 1rem;
   background: var(--gray-50);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--gray-200);
 }
 
@@ -3653,14 +3714,14 @@ input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
 .project-team-member-name {
   font-weight: 600;
   color: var(--gray-900);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .project-tasks-controls {
@@ -3685,7 +3746,7 @@ input, select, textarea {
 .project-tasks-filters .btn,
 .project-tasks-view-toggle .btn {
   padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 /* ============================================
@@ -3697,7 +3758,7 @@ input, select, textarea {
 }
 
 .nav-section-header {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--gray-500);
   padding: 0.5rem 1rem;
@@ -3742,7 +3803,7 @@ input, select, textarea {
   padding: 1rem 2rem;
   background: white;
   border-bottom: 1px solid var(--gray-200);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   margin-bottom: 0;
 }
 
@@ -3753,7 +3814,7 @@ input, select, textarea {
 }
 
 .breadcrumb-separator {
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .breadcrumb-item {
@@ -3820,9 +3881,9 @@ input, select, textarea {
   background: var(--primary);
   color: white;
   border: none;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   cursor: pointer;
   transition: all 0.2s;
@@ -3880,7 +3941,7 @@ input, select, textarea {
   margin-bottom: 0.5rem;
   font-weight: 600;
   color: var(--gray-700);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .color-picker-wrapper {
@@ -3892,7 +3953,7 @@ input, select, textarea {
 .color-picker-button {
   width: 40px;
   height: 40px;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   border: 2px solid var(--gray-300);
   cursor: pointer;
   transition: all 0.2s;
@@ -3905,7 +3966,7 @@ input, select, textarea {
 
 .color-picker-value {
   font-family: monospace;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
 }
 
@@ -3916,7 +3977,7 @@ input, select, textarea {
   margin-top: 0.5rem;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
@@ -3933,7 +3994,7 @@ input, select, textarea {
 .color-preset {
   width: 32px;
   height: 32px;
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   border: 2px solid var(--gray-200);
   cursor: pointer;
   transition: all 0.2s;
@@ -3956,7 +4017,7 @@ input, select, textarea {
   width: 50px;
   height: 36px;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
@@ -3975,8 +4036,8 @@ input, select, textarea {
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3989,7 +4050,7 @@ input, select, textarea {
 /* Overdue indicator */
 .task-card.task-overdue {
   border-left-color: var(--danger) !important;
-  background: #fef2f2;
+  background: var(--danger-bg);
 }
 
 .task-card.task-overdue .task-title {
@@ -4003,8 +4064,8 @@ input, select, textarea {
   padding: 0.125rem 0.5rem;
   background: var(--danger);
   color: white;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
   font-weight: 700;
   animation: pulse 2s ease-in-out infinite;
 }
@@ -4034,8 +4095,8 @@ input, select, textarea {
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: white;
   white-space: nowrap;
@@ -4067,11 +4128,11 @@ input, select, textarea {
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   border: 1px dashed var(--gray-400);
   background: transparent;
   color: var(--gray-600);
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
@@ -4090,7 +4151,7 @@ input, select, textarea {
   margin-top: 0.5rem;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 0.5rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
@@ -4103,7 +4164,7 @@ input, select, textarea {
   padding: 1rem;
   text-align: center;
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .tag-option {
@@ -4115,7 +4176,7 @@ input, select, textarea {
   border: none;
   background: transparent;
   cursor: pointer;
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   transition: background 0.15s;
   text-align: left;
 }
@@ -4134,12 +4195,12 @@ input, select, textarea {
 .tag-option-name {
   font-weight: 600;
   color: var(--gray-900);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .tag-option-desc {
   color: var(--gray-600);
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   margin-left: auto;
   text-align: right;
 }
@@ -4198,7 +4259,7 @@ input, select, textarea {
 }
 
 .command-palette-header svg {
-  color: var(--gray-400);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -4206,20 +4267,20 @@ input, select, textarea {
   flex: 1;
   border: none;
   outline: none;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   color: var(--gray-900);
 }
 
 .command-palette-input::placeholder {
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .command-palette-hint {
   padding: 0.25rem 0.5rem;
   background: var(--gray-100);
   border: 1px solid var(--gray-300);
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--gray-600);
 }
@@ -4233,7 +4294,7 @@ input, select, textarea {
   padding: 2rem;
   text-align: center;
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .command-palette-item {
@@ -4261,7 +4322,7 @@ input, select, textarea {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   background: var(--gray-100);
   color: var(--gray-600);
   flex-shrink: 0;
@@ -4286,7 +4347,7 @@ input, select, textarea {
 }
 
 .command-palette-item-subtitle {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
   white-space: nowrap;
   overflow: hidden;
@@ -4294,7 +4355,7 @@ input, select, textarea {
 }
 
 .command-palette-item-arrow {
-  color: var(--gray-400);
+  color: var(--text-muted);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -4315,7 +4376,7 @@ input, select, textarea {
 .command-palette-shortcuts {
   display: flex;
   gap: 1.5rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-600);
 }
 
@@ -4323,7 +4384,7 @@ input, select, textarea {
   padding: 0.125rem 0.375rem;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   font-weight: 600;
   margin-right: 0.25rem;
 }
@@ -4335,7 +4396,7 @@ input, select, textarea {
 .saved-filters {
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 1rem;
 }
 
@@ -4347,7 +4408,7 @@ input, select, textarea {
 }
 
 .saved-filters-header h3 {
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--gray-900);
   margin: 0;
@@ -4363,7 +4424,7 @@ input, select, textarea {
   padding: 2rem 1rem;
   text-align: center;
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .saved-filter-item {
@@ -4373,7 +4434,7 @@ input, select, textarea {
   padding: 0.75rem;
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   transition: all 0.15s;
 }
 
@@ -4393,12 +4454,12 @@ input, select, textarea {
   gap: 0.5rem;
   font-weight: 600;
   color: var(--gray-900);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   margin-bottom: 0.25rem;
 }
 
 .saved-filter-desc {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-600);
 }
 
@@ -4437,7 +4498,7 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--gray-700);
   margin: 0 0 0.75rem 0;
@@ -4445,12 +4506,12 @@ input, select, textarea {
 
 .dependency-warning {
   display: inline-flex;
-  color: var(--warning);
+  color: var(--warning-text);
   animation: pulse 2s ease-in-out infinite;
 }
 
 .dependency-empty {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-500);
   margin-bottom: 0.5rem;
 }
@@ -4469,8 +4530,8 @@ input, select, textarea {
   padding: 0.5rem 0.75rem;
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
 }
 
 .dependency-status {
@@ -4499,7 +4560,7 @@ input, select, textarea {
 }
 
 .dependency-status-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-600);
   text-transform: capitalize;
 }
@@ -4513,7 +4574,7 @@ input, select, textarea {
 .search-input-wrapper svg {
   position: absolute;
   left: 0.75rem;
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .search-input-wrapper input {
@@ -4526,14 +4587,14 @@ input, select, textarea {
   overflow-y: auto;
   margin: 1rem 0;
   border: 1px solid var(--gray-200);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
 }
 
 .dependency-picker-empty {
   padding: 2rem;
   text-align: center;
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .dependency-picker-item {
@@ -4562,11 +4623,11 @@ input, select, textarea {
   flex: 1;
   font-weight: 500;
   color: var(--gray-900);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .dependency-picker-client {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-600);
 }
 
@@ -4614,7 +4675,7 @@ input, select, textarea {
 .template-item {
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 1rem;
   margin-bottom: 1rem;
 }
@@ -4629,7 +4690,7 @@ input, select, textarea {
 .template-item-number {
   font-weight: 700;
   color: var(--primary);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 /* ============================================
@@ -4655,7 +4716,7 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1.5rem;
+  font-size: var(--fs-2xl);
   color: var(--gray-900);
   margin: 0 0 1rem 0;
 }
@@ -4693,8 +4754,8 @@ input, select, textarea {
   padding: 0.25rem 0.5rem;
   background: var(--gray-100);
   border: 1px solid var(--gray-300);
-  border-radius: 0.25rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
   font-weight: 600;
   font-family: monospace;
   color: var(--gray-700);
@@ -4712,7 +4773,7 @@ input, select, textarea {
   align-items: center;
   padding: 0.75rem;
   background: var(--gray-50);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
 }
 
 .shortcut-item kbd {
@@ -4721,7 +4782,7 @@ input, select, textarea {
 
 .shortcut-item span {
   color: var(--gray-600);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 /* ============================================
@@ -4729,7 +4790,7 @@ input, select, textarea {
    ============================================ */
 
 .feedback-intro {
-  background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
   color: white;
   padding: 2rem;
   margin-bottom: 2rem;
@@ -4762,7 +4823,7 @@ input, select, textarea {
   padding: 0.75rem 1rem;
   border: 2px solid var(--gray-300);
   background: white;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s;
   font-weight: 500;
@@ -4775,7 +4836,7 @@ input, select, textarea {
 
 .feedback-type-btn.active {
   border-color: var(--primary);
-  background: #eff6ff;
+  background: var(--primary-light);
   color: var(--primary);
 }
 
@@ -4789,7 +4850,7 @@ input, select, textarea {
   padding: 1.5rem;
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
 }
 
 .feedback-item-header {
@@ -4803,12 +4864,12 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 
 .feedback-item-status {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -4828,15 +4889,15 @@ input, select, textarea {
 
 .feedback-admin-response {
   padding: 0.75rem;
-  background: #eff6ff;
+  background: var(--primary-light);
   border-left: 3px solid var(--primary);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   margin-bottom: 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .feedback-item-meta {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
 }
 
@@ -4852,12 +4913,12 @@ input, select, textarea {
   padding: 1.5rem;
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   text-align: center;
 }
 
 .stat-card.stat-danger {
-  background: #fef2f2;
+  background: var(--danger-bg);
   border-color: var(--danger);
 }
 
@@ -4873,7 +4934,7 @@ input, select, textarea {
 }
 
 .stat-label {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -4912,9 +4973,9 @@ input, select, textarea {
 .status-select {
   padding: 0.375rem 0.75rem;
   border: 1px solid var(--gray-300);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .feedback-review-description {
@@ -4926,7 +4987,7 @@ input, select, textarea {
 .feedback-review-meta {
   display: flex;
   gap: 2rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   padding: 0.75rem 0;
   border-top: 1px solid var(--gray-200);
@@ -4935,11 +4996,11 @@ input, select, textarea {
 
 .feedback-admin-notes-display {
   padding: 0.75rem;
-  background: #f0fdf4;
+  background: var(--success-bg);
   border-left: 3px solid var(--success);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   margin-bottom: 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .feedback-admin-notes-form {
@@ -4993,7 +5054,7 @@ input, select, textarea {
 
 .crm-column-header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 
@@ -5002,7 +5063,7 @@ input, select, textarea {
   color: white;
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 
@@ -5019,13 +5080,13 @@ input, select, textarea {
   text-align: center;
   color: var(--gray-500);
   padding: 2rem 1rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 /* Lead Card */
 .lead-card {
   background: white;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 1rem;
   margin-bottom: 0.75rem;
   cursor: pointer;
@@ -5047,7 +5108,7 @@ input, select, textarea {
 
 .lead-card-header h4 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   flex: 1;
 }
@@ -5059,7 +5120,7 @@ input, select, textarea {
 .lead-firm {
   margin: 0 0 0.5rem 0;
   color: var(--gray-600);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
 
 .lead-type-badge {
@@ -5068,13 +5129,13 @@ input, select, textarea {
   color: var(--primary);
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   margin-bottom: 0.5rem;
 }
 
 .lead-flag {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   margin-top: 0.25rem;
 }
@@ -5085,7 +5146,7 @@ input, select, textarea {
 }
 
 .lead-last-activity {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
 }
 
@@ -5093,7 +5154,7 @@ input, select, textarea {
 .staleness-badge {
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -5104,25 +5165,25 @@ input, select, textarea {
 }
 
 .staleness-yellow {
-  background: #fef3c7;
-  color: #d97706;
+  background: var(--warning-bg-strong);
+  color: var(--warning-text);
 }
 
 .staleness-red {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--danger-bg-strong);
+  color: var(--danger);
 }
 
 .staleness-gray {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--gray-100);
+  color: var(--text-muted);
 }
 
 /* Pipeline Bar */
 .pipeline-bar {
   display: flex;
   height: 60px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   margin-top: 1rem;
 }
@@ -5167,7 +5228,7 @@ input, select, textarea {
 
 .lead-info-item label {
   display: block;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   margin-bottom: 0.25rem;
 }
@@ -5203,12 +5264,12 @@ input, select, textarea {
   gap: 1rem;
   padding: 1rem;
   background: var(--gray-50);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border-left: 3px solid var(--primary);
 }
 
 .activity-icon {
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   flex-shrink: 0;
 }
 
@@ -5227,7 +5288,7 @@ input, select, textarea {
 }
 
 .activity-date {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-500);
 }
 
@@ -5238,7 +5299,7 @@ input, select, textarea {
 
 .samples-sent {
   margin-top: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--primary);
 }
 
@@ -5253,7 +5314,7 @@ input, select, textarea {
 .sample-deal-card {
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -5276,12 +5337,12 @@ input, select, textarea {
   color: var(--primary);
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 
 .deal-details {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-700);
 }
 
@@ -5321,7 +5382,7 @@ input, select, textarea {
   gap: 1rem;
   padding: 1rem;
   border: 2px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -5361,12 +5422,12 @@ input, select, textarea {
 .deal-preview .badges span {
   background: var(--gray-100);
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
 }
 
 .deal-preview p {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-600);
   margin: 0;
 }
@@ -5375,7 +5436,7 @@ input, select, textarea {
   text-align: center;
   padding: 0.5rem;
   background: var(--gray-50);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 500;
 }
 
@@ -5474,7 +5535,7 @@ input, select, textarea {
 .chat-terminal-btn {
   background: rgba(255,255,255,0.2);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 4px;
   color: white;
   display: flex;
@@ -5497,7 +5558,7 @@ input, select, textarea {
 .chat-message {
   margin-bottom: 12px;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   max-width: 85%;
   word-wrap: break-word;
   white-space: pre-wrap;
@@ -5524,15 +5585,15 @@ input, select, textarea {
 }
 
 .chat-message-error {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--danger-bg-strong);
+  color: var(--danger-text-strong);
   border-left: 3px solid #ef4444;
 }
 
 .typing-indicator {
   display: inline-block;
   animation: pulse 1.5s infinite;
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 @keyframes pulse {
@@ -5552,8 +5613,8 @@ input, select, textarea {
   flex: 1;
   padding: 10px 14px;
   border: 1px solid var(--gray-300);
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
   outline: none;
   transition: border-color 0.2s;
 }
@@ -5566,7 +5627,7 @@ input, select, textarea {
   padding: 10px 16px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: white;
   display: flex;
   align-items: center;
@@ -5587,7 +5648,7 @@ input, select, textarea {
 .quick-add-trigger {
   background: white;
   border: 2px dashed var(--gray-300);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-bottom: 12px;
   display: flex;
@@ -5607,7 +5668,7 @@ input, select, textarea {
 .quick-add-card {
   background: white;
   border: 2px solid var(--primary);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px;
   margin-bottom: 12px;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
@@ -5617,18 +5678,18 @@ input, select, textarea {
   width: 100%;
   border: none;
   outline: none;
-  font-size: 14px;
+  font-size: var(--fs-md);
   padding: 4px 0;
   color: var(--gray-900);
 }
 
 .quick-add-card input::placeholder {
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .quick-add-hint {
-  font-size: 11px;
-  color: var(--gray-400);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   margin-top: 6px;
 }
 
@@ -5646,7 +5707,7 @@ input, select, textarea {
 
 /* Shown instead of the input when the pasted profile is already a lead. */
 .quick-add-duplicate {
-  border-color: var(--warning, #f59e0b);
+  border-color: var(--warning);
   box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
 }
 
@@ -5654,14 +5715,14 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  color: var(--warning, #f59e0b);
+  font-size: var(--fs-sm);
+  color: var(--warning-text);
   margin-bottom: 6px;
 }
 
 .quick-add-duplicate-lead {
   display: block;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--gray-900);
   text-decoration: none;
@@ -5673,7 +5734,7 @@ input, select, textarea {
 }
 
 .quick-add-duplicate-meta {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
   margin-top: 2px;
 }
@@ -5700,7 +5761,7 @@ input, select, textarea {
 .quick-action-btn {
   background: var(--gray-100);
   border: 1px solid var(--gray-300);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 4px 6px;
   display: flex;
   align-items: center;
@@ -5731,7 +5792,7 @@ input, select, textarea {
   align-items: center;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 10px 14px;
   margin-bottom: 12px;
   gap: 10px;
@@ -5743,7 +5804,7 @@ input, select, textarea {
 }
 
 .search-box svg {
-  color: var(--gray-400);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -5751,12 +5812,12 @@ input, select, textarea {
   flex: 1;
   border: none;
   outline: none;
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--gray-900);
 }
 
 .search-box input::placeholder {
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .clear-search {
@@ -5791,7 +5852,7 @@ input, select, textarea {
   border-radius: 20px;
   background: white;
   color: var(--gray-700);
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -5826,7 +5887,7 @@ input, select, textarea {
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--gray-100);
   color: var(--gray-700);
   transition: background 0.2s;
@@ -5866,7 +5927,7 @@ input, select, textarea {
 }
 
 .info-item label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-transform: uppercase;
   color: var(--gray-500);
@@ -5882,7 +5943,7 @@ input, select, textarea {
   color: var(--gray-900);
   padding: 4px 8px;
   margin: -4px -8px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   cursor: text;
   min-height: 28px;
   transition: background 0.15s;
@@ -5895,12 +5956,12 @@ input, select, textarea {
 }
 
 .inline-field-display:focus {
-  outline: 2px solid var(--primary-200, #bfdbfe);
+  outline: 2px solid var(--primary-200, var(--primary-border-soft));
   outline-offset: 0;
 }
 
 .inline-field-empty {
-  color: var(--gray-400);
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -5910,8 +5971,8 @@ input, select, textarea {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--primary, #3b82f6);
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
   font-family: inherit;
   color: var(--gray-900);
   background: white;
@@ -5936,7 +5997,7 @@ input, select, textarea {
 .activity-form {
   background: var(--gray-50);
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin-bottom: 24px;
 }
 
@@ -5986,36 +6047,36 @@ input, select, textarea {
 }
 
 .activity-date {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
 }
 
 .activity-notes {
   color: var(--gray-700);
-  font-size: 14px;
+  font-size: var(--fs-md);
   white-space: pre-wrap;
 }
 
 .btn-sm {
   padding: 6px 12px;
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 
 .btn-danger {
-  background: #dc2626;
+  background: var(--danger);
   color: white;
   border: none;
 }
 
 .btn-danger:hover {
-  background: #b91c1c;
+  background: var(--danger-strong);
 }
 
 /* Email Templates Page */
 .templates-info {
   background: var(--gray-100);
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin-bottom: 24px;
 }
 
@@ -6033,8 +6094,8 @@ input, select, textarea {
 .variables-list code {
   background: white;
   padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-base);
   color: var(--primary);
   border: 1px solid var(--gray-300);
 }
@@ -6065,7 +6126,7 @@ input, select, textarea {
 .template-card {
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px;
   transition: box-shadow 0.2s;
 }
@@ -6095,7 +6156,7 @@ input, select, textarea {
 .icon-btn {
   background: transparent;
   border: 1px solid var(--gray-300);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px;
   display: flex;
   align-items: center;
@@ -6111,7 +6172,7 @@ input, select, textarea {
 }
 
 .template-subject {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--gray-600);
   margin-bottom: 8px;
 }
@@ -6121,7 +6182,7 @@ input, select, textarea {
 }
 
 .template-body {
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--gray-700);
   white-space: pre-wrap;
   line-height: 1.6;
@@ -6129,14 +6190,14 @@ input, select, textarea {
   overflow-y: auto;
   background: var(--gray-50);
   padding: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 /* Sample Deals Page */
 .sample-deals-info {
   background: var(--gray-100);
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin-bottom: 24px;
   color: var(--gray-700);
 }
@@ -6154,7 +6215,7 @@ input, select, textarea {
 .sample-deal-card {
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 20px;
   transition: box-shadow 0.2s;
 }
@@ -6174,7 +6235,7 @@ input, select, textarea {
   color: var(--gray-900);
   margin: 0;
   flex: 1;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   line-height: 1.4;
 }
 
@@ -6193,28 +6254,28 @@ input, select, textarea {
 .tag {
   padding: 4px 10px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 
 .tag-client-type {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--primary-bg-strong);
+  color: var(--primary-text);
 }
 
 .tag-industry {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warning-bg-strong);
+  color: var(--warning-text-strong);
 }
 
 .tag-size {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--success-bg-strong);
+  color: var(--success-text-strong);
 }
 
 .sample-deal-description {
   color: var(--gray-600);
-  font-size: 14px;
+  font-size: var(--fs-md);
   line-height: 1.6;
   margin-bottom: 16px;
 }
@@ -6228,7 +6289,7 @@ input, select, textarea {
 .detail-section strong {
   display: block;
   color: var(--gray-700);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -6237,7 +6298,7 @@ input, select, textarea {
 
 .detail-section p {
   color: var(--gray-600);
-  font-size: 14px;
+  font-size: var(--fs-md);
   line-height: 1.6;
   white-space: pre-wrap;
 }
@@ -6277,7 +6338,7 @@ input, select, textarea {
   margin-top: 32px;
   padding: 20px;
   background: var(--gray-50);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .import-instructions h4 {
@@ -6308,7 +6369,7 @@ input, select, textarea {
   gap: 16px;
   padding: 12px;
   background: var(--gray-50);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .csv-column {
@@ -6322,28 +6383,28 @@ input, select, textarea {
 }
 
 .preview-value {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--gray-500);
   font-family: monospace;
 }
 
 .arrow {
-  color: var(--gray-400);
-  font-size: 20px;
+  color: var(--text-muted);
+  font-size: var(--fs-xl);
 }
 
 .mapping-row select {
   padding: 8px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: white;
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 
 .preview-table-container {
   overflow-x: auto;
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .preview-table {
@@ -6410,19 +6471,19 @@ input, select, textarea {
 .error-list {
   margin-top: 24px;
   padding: 16px;
-  background: #fef2f2;
-  border-radius: 8px;
+  background: var(--danger-bg);
+  border-radius: var(--radius-md);
   text-align: left;
 }
 
 .error-list h4 {
   margin: 0 0 12px;
-  color: #dc2626;
+  color: var(--danger);
 }
 
 .error-item {
-  font-size: 13px;
-  color: #991b1b;
+  font-size: var(--fs-base);
+  color: var(--danger-text-strong);
   padding: 4px 0;
   font-family: monospace;
 }
@@ -6456,7 +6517,7 @@ input, select, textarea {
 .funnel-bar {
   background: var(--color);
   padding: 20px 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
@@ -6469,11 +6530,11 @@ input, select, textarea {
 }
 
 .funnel-stage-name {
-  font-size: 16px;
+  font-size: var(--fs-lg);
 }
 
 .funnel-count {
-  font-size: 24px;
+  font-size: var(--fs-2xl);
 }
 
 .funnel-arrow {
@@ -6486,8 +6547,8 @@ input, select, textarea {
 
 .funnel-arrow::before {
   content: '↓';
-  font-size: 24px;
-  color: var(--gray-400);
+  font-size: var(--fs-2xl);
+  color: var(--text-muted);
 }
 
 .conversion-rate {
@@ -6495,7 +6556,7 @@ input, select, textarea {
   background: white;
   padding: 4px 12px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--primary);
   border: 2px solid var(--gray-200);
@@ -6505,7 +6566,7 @@ input, select, textarea {
   text-align: center;
   padding: 20px;
   background: var(--gray-50);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin-top: 24px;
   color: var(--gray-700);
 }
@@ -6533,7 +6594,7 @@ input, select, textarea {
 }
 
 .velocity-days {
-  font-size: 20px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--gray-900);
 }
@@ -6558,7 +6619,7 @@ input, select, textarea {
 .source-stats {
   display: flex;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--gray-600);
 }
 
@@ -6570,7 +6631,7 @@ input, select, textarea {
 .source-bar {
   height: 8px;
   background: var(--gray-200);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
@@ -6596,12 +6657,12 @@ input, select, textarea {
 .week-card {
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px;
 }
 
 .week-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-transform: uppercase;
   color: var(--gray-500);
@@ -6622,13 +6683,13 @@ input, select, textarea {
 }
 
 .week-stat-value {
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   color: var(--gray-900);
 }
 
 .week-stat-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--gray-600);
 }
 
@@ -6642,7 +6703,7 @@ input, select, textarea {
 .transcript-item {
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px;
 }
 
@@ -6656,21 +6717,21 @@ input, select, textarea {
 .transcript-header h4 {
   margin: 0 0 4px;
   color: var(--gray-900);
-  font-size: 16px;
+  font-size: var(--fs-lg);
 }
 
 .transcript-date {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--gray-500);
 }
 
 .transcript-content {
   background: white;
   padding: 16px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   white-space: pre-wrap;
   font-family: monospace;
-  font-size: 13px;
+  font-size: var(--fs-base);
   line-height: 1.6;
   color: var(--gray-700);
   max-height: 400px;
@@ -6683,17 +6744,17 @@ input, select, textarea {
   margin-top: 12px;
   padding: 14px 16px;
   background: #f8faff;
-  border: 1px solid #dbeafe;
-  border-radius: 8px;
+  border: 1px solid var(--primary-bg-strong);
+  border-radius: var(--radius-md);
 }
 
 .ai-analysis-header {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
-  color: #3b82f6;
+  color: var(--primary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 10px;
@@ -6703,32 +6764,32 @@ input, select, textarea {
   display: inline-block;
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
 .ai-sentiment--positive {
-  background: #dcfce7;
-  color: #15803d;
+  background: var(--success-bg-strong);
+  color: var(--success-text);
 }
 
 .ai-sentiment--neutral {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: var(--gray-100);
+  color: var(--gray-600);
 }
 
 .ai-sentiment--negative {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--danger-bg-strong);
+  color: var(--danger);
 }
 
 .ai-next-step {
-  background: #fffbeb;
-  border-left: 3px solid #f59e0b;
+  background: var(--warning-bg);
+  border-left: 3px solid var(--warning);
   padding: 8px 12px;
   border-radius: 0 4px 4px 0;
-  font-size: 13px;
-  color: #374151;
+  font-size: var(--fs-base);
+  color: var(--text-2);
 }
 
 /* ============================================================================
@@ -6847,13 +6908,13 @@ input, select, textarea {
 
   .btn-sm {
     padding: 8px 14px;
-    font-size: 13px;
+    font-size: var(--fs-base);
     min-height: 36px;
   }
 
   /* Table responsiveness */
   table {
-    font-size: 13px;
+    font-size: var(--fs-base);
   }
 
   th, td {
@@ -6910,7 +6971,7 @@ input, select, textarea {
   input[type="number"],
   textarea,
   select {
-    font-size: 16px; /* Prevents iOS zoom */
+    font-size: var(--fs-lg); /* Prevents iOS zoom */
     padding: 12px;
   }
 }
@@ -6944,13 +7005,13 @@ input, select, textarea {
 }
 
 .investor-status-contacted {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--primary-bg-strong);
+  color: var(--primary-text);
 }
 
 .investor-status-in_conversation {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warning-bg-strong);
+  color: var(--warning-text-strong);
 }
 
 .investor-status-committed {
@@ -6959,13 +7020,13 @@ input, select, textarea {
 }
 
 .investor-status-invested {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--success-bg-strong);
+  color: var(--success-text-strong);
 }
 
 .investor-status-passed {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--danger-bg-strong);
+  color: var(--danger-text-strong);
 }
 
 /* =============================================
@@ -6978,7 +7039,7 @@ input, select, textarea {
   justify-content: center;
   background: var(--primary);
   color: white;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   min-width: 18px;
   height: 18px;
@@ -7001,7 +7062,7 @@ input, select, textarea {
   margin-top: 4px;
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   min-width: 220px;
   z-index: 50;
@@ -7011,8 +7072,8 @@ input, select, textarea {
 .saved-search-empty {
   padding: 16px;
   text-align: center;
-  color: var(--gray-400);
-  font-size: 13px;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
 }
 
 .saved-search-item {
@@ -7031,7 +7092,7 @@ input, select, textarea {
   background: none;
   border: none;
   text-align: left;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--gray-700);
   cursor: pointer;
   transition: background 0.15s;
@@ -7046,7 +7107,7 @@ input, select, textarea {
   padding: 8px;
   background: none;
   border: none;
-  color: var(--gray-400);
+  color: var(--text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -7060,7 +7121,7 @@ input, select, textarea {
 .advanced-filters {
   background: white;
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-top: 12px;
 }
@@ -7078,7 +7139,7 @@ input, select, textarea {
 }
 
 .advanced-filter-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--gray-500);
   text-transform: uppercase;
@@ -7088,10 +7149,10 @@ input, select, textarea {
 .advanced-filter-select {
   padding: 7px 10px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: white;
   color: var(--gray-700);
-  font-size: 13px;
+  font-size: var(--fs-base);
   cursor: pointer;
   transition: border-color 0.2s;
 }
@@ -7111,8 +7172,8 @@ input, select, textarea {
   width: 100%;
   padding: 7px 8px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--radius);
+  font-size: var(--fs-base);
   color: var(--gray-700);
   text-align: center;
   transition: border-color 0.2s;
@@ -7124,14 +7185,14 @@ input, select, textarea {
 }
 
 .range-separator {
-  color: var(--gray-400);
-  font-size: 14px;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
   flex-shrink: 0;
 }
 
 .filter-chip.small {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .clear-all-filters {
@@ -7142,9 +7203,9 @@ input, select, textarea {
   padding: 6px 12px;
   background: var(--gray-100);
   border: 1px solid var(--gray-200);
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--gray-600);
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -7176,7 +7237,7 @@ input, select, textarea {
 
 .save-search-dialog h3 {
   margin-bottom: 4px;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   color: var(--gray-900);
 }
 
@@ -7184,8 +7245,8 @@ input, select, textarea {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
   margin-bottom: 16px;
   transition: border-color 0.2s;
 }
@@ -7202,32 +7263,32 @@ input, select, textarea {
 .enrichment-badge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 9999px;
-  font-size: 11px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.025em;
 }
 
 .enrichment-badge-pending {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warning-bg-strong);
+  color: var(--warning-text-strong);
 }
 
 .enrichment-badge-enriching {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--primary-bg-strong);
+  color: var(--primary-text);
   animation: enrichment-pulse 1.5s ease-in-out infinite;
 }
 
 .enrichment-badge-enriched {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--success-bg-strong);
+  color: var(--success-text-strong);
 }
 
 .enrichment-badge-failed {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--danger-bg-strong);
+  color: var(--danger-text-strong);
 }
 
 @keyframes enrichment-pulse {
@@ -7254,9 +7315,9 @@ input, select, textarea {
 .enrichment-results {
   margin-top: 12px;
   padding: 12px;
-  background: var(--gray-50, #f9fafb);
-  border: 1px solid var(--gray-200, #e5e7eb);
-  border-radius: 8px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -7269,16 +7330,16 @@ input, select, textarea {
 }
 
 .enrichment-field-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--gray-500, #6b7280);
+  color: var(--gray-500);
 }
 
 .enrichment-field-value {
-  font-size: 13px;
-  color: var(--gray-800, #1f2937);
+  font-size: var(--fs-base);
+  color: var(--gray-800);
   line-height: 1.4;
 }
 
@@ -7287,31 +7348,31 @@ input, select, textarea {
 }
 
 .enrichment-timestamp {
-  font-size: 11px;
-  color: var(--gray-400, #9ca3af);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   margin-top: 4px;
   padding-top: 8px;
-  border-top: 1px solid var(--gray-200, #e5e7eb);
+  border-top: 1px solid var(--gray-200);
 }
 
 .enrichment-failed {
   margin-top: 8px;
   padding: 8px 12px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 6px;
-  color: #991b1b;
-  font-size: 13px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius);
+  color: var(--danger-text-strong);
+  font-size: var(--fs-base);
 }
 
 .enrichment-loading {
   margin-top: 10px;
   padding: 10px 12px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 6px;
-  color: #1e40af;
-  font-size: 13px;
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border-soft);
+  border-radius: var(--radius);
+  color: var(--primary-text);
+  font-size: var(--fs-base);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -7338,7 +7399,7 @@ input, select, textarea {
   gap: 10px;
   padding: 12px 14px 12px 12px;
   border-radius: var(--radius-md);
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   line-height: 1.45;
   box-shadow: var(--shadow-lg);
@@ -7365,45 +7426,45 @@ input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   margin-top: 1px;
 }
 
 .toast-error {
-  background: #fef2f2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
+  background: var(--danger-bg);
+  color: var(--danger-text-strong);
+  border: 1px solid var(--danger-border);
 }
 .toast-error .toast-icon {
-  background: #dc2626;
+  background: var(--danger);
   color: white;
 }
 
 .toast-success {
-  background: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background: var(--success-bg);
+  color: var(--success-text-strong);
+  border: 1px solid var(--success-border);
 }
 .toast-success .toast-icon {
-  background: #16a34a;
+  background: var(--success);
   color: white;
 }
 
 .toast-warn {
-  background: #fffbeb;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: var(--warning-bg);
+  color: var(--warning-text-strong);
+  border: 1px solid var(--warning-border);
 }
 .toast-warn .toast-icon {
-  background: #f59e0b;
+  background: var(--warning);
   color: white;
 }
 
 .toast-info {
-  background: #eff6ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  background: var(--primary-light);
+  color: var(--primary-text);
+  border: 1px solid var(--primary-border-soft);
 }
 .toast-info .toast-icon {
   background: var(--primary);
@@ -7430,7 +7491,7 @@ input, select, textarea {
 }
 
 .detail-label {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--gray-500);
   text-transform: uppercase;
@@ -7462,7 +7523,7 @@ input, select, textarea {
 
 .card-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--gray-900);
 }
@@ -7471,8 +7532,8 @@ input, select, textarea {
 .badge {
   display: inline-block;
   padding: 2px 10px;
-  border-radius: 9999px;
-  font-size: 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
   font-weight: 500;
   background: var(--gray-100);
   color: var(--gray-700);
@@ -7481,7 +7542,7 @@ input, select, textarea {
 /* Form Controls */
 .form-label {
   display: block;
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--gray-700);
   margin-bottom: 4px;
@@ -7493,8 +7554,8 @@ input, select, textarea {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
   color: var(--gray-900);
   background: white;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -7511,7 +7572,7 @@ input, select, textarea {
 
 .form-input::placeholder,
 .form-textarea::placeholder {
-  color: var(--gray-400);
+  color: var(--text-muted);
 }
 
 .form-textarea {
@@ -7525,7 +7586,7 @@ input, select, textarea {
   align-items: center;
   justify-content: space-between;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
 }
 
@@ -7536,10 +7597,10 @@ input, select, textarea {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   border: none;
   background: transparent;
-  color: var(--gray-400);
+  color: var(--text-muted);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
@@ -7550,16 +7611,16 @@ input, select, textarea {
 }
 
 .dashboard-alerts {
-  border-color: #fecaca;
+  border-color: var(--danger-border);
   box-shadow: var(--shadow-xs), inset 3px 0 0 #ef4444;
 }
 
 .dashboard-ok {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
+  background: var(--success-bg);
+  border-color: var(--success-border);
 }
-.dashboard-ok h2 { color: #15803d; margin: 0 0 0.25rem; font-size: 0.9375rem; }
-.dashboard-ok p  { color: #16a34a; margin: 0; font-size: 0.8125rem; }
+.dashboard-ok h2 { color: var(--success-text); margin: 0 0 0.25rem; font-size: 0.9375rem; }
+.dashboard-ok p  { color: var(--success-text); margin: 0; font-size: var(--fs-base); }
 
 .dashboard-split {
   display: grid;
@@ -7588,7 +7649,7 @@ input, select, textarea {
   justify-content: center;
   color: white;
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   white-space: nowrap;
   overflow: hidden;
   min-width: 0;
@@ -7609,7 +7670,7 @@ input, select, textarea {
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-md);
   text-align: center;
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
 }
 .pipeline-legend {
   display: flex;
@@ -7621,7 +7682,7 @@ input, select, textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-700);
 }
 .pipeline-legend-dot {
@@ -7635,7 +7696,7 @@ input, select, textarea {
   color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
 }
 .pipeline-legend-count {
   font-weight: 600;
@@ -7651,13 +7712,13 @@ input, select, textarea {
   border: 1px solid;
   border-left-width: 3px;
 }
-.alert-section-urgent { background: #fef2f2; border-color: #fecaca; border-left-color: #ef4444; }
+.alert-section-urgent { background: var(--danger-bg); border-color: var(--danger-border); border-left-color: #ef4444; }
 .alert-section-warn   { background: #fff7ed; border-color: #fed7aa; border-left-color: #f97316; }
-.alert-section-info   { background: #eff6ff; border-color: #bfdbfe; border-left-color: #3b82f6; }
+.alert-section-info   { background: var(--primary-light); border-color: var(--primary-border-soft); border-left-color: #3b82f6; }
 
 .alert-section-title {
   margin: 0 0 0.5rem;
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -7665,9 +7726,9 @@ input, select, textarea {
   align-items: center;
   gap: 6px;
 }
-.alert-section-urgent .alert-section-title { color: #b91c1c; }
+.alert-section-urgent .alert-section-title { color: var(--danger-text); }
 .alert-section-warn   .alert-section-title { color: #c2410c; }
-.alert-section-info   .alert-section-title { color: #1d4ed8; }
+.alert-section-info   .alert-section-title { color: var(--primary-hover); }
 
 .alert-lead-list {
   list-style: none;
@@ -7683,7 +7744,7 @@ input, select, textarea {
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
   border-bottom: 1px solid rgba(15, 23, 42, 0.04);
 }
 .alert-lead-row:last-child { border-bottom: none; }
@@ -7694,13 +7755,13 @@ input, select, textarea {
 }
 .alert-lead-name:hover { text-decoration: underline; }
 .alert-lead-firm { color: var(--gray-600); }
-.alert-lead-firm::before { content: '•'; margin-right: 8px; color: var(--gray-400); }
+.alert-lead-firm::before { content: '•'; margin-right: 8px; color: var(--text-muted); }
 .alert-lead-stage {
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   background: var(--surface);
   color: var(--gray-700);
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   font-weight: 600;
@@ -7711,14 +7772,14 @@ input, select, textarea {
   align-items: center;
   gap: 4px;
   margin-left: auto;
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   color: var(--gray-500);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
 .alert-overflow {
   margin-top: 0.5rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
 }
 
@@ -7730,7 +7791,7 @@ input, select, textarea {
   margin-top: 0.875rem;
 }
 .stat-label {
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   color: var(--gray-500);
   display: flex;
   align-items: center;
@@ -7740,7 +7801,7 @@ input, select, textarea {
   letter-spacing: 0.06em;
   font-weight: 600;
 }
-.stat-icon { display: inline-flex; color: var(--gray-400); }
+.stat-icon { display: inline-flex; color: var(--text-muted); }
 .stat-value {
   font-size: 1.625rem;
   font-weight: 600;
@@ -7749,10 +7810,10 @@ input, select, textarea {
   letter-spacing: -0.015em;
   font-variant-numeric: tabular-nums;
 }
-.stat-value-good { color: #16a34a; }
-.stat-value-bad  { color: #dc2626; }
+.stat-value-good { color: var(--success-text); }
+.stat-value-bad  { color: var(--danger); }
 .stat-target {
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   color: var(--gray-500);
   margin-top: 4px;
   text-transform: uppercase;
@@ -7760,10 +7821,10 @@ input, select, textarea {
   font-weight: 500;
 }
 .stat-card-success {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
+  background: var(--success-bg);
+  border-color: var(--success-border);
 }
-.stat-card-success .stat-value { color: #16a34a; }
+.stat-card-success .stat-value { color: var(--success-text); }
 
 /* My Leads */
 .my-leads-count {
@@ -7775,7 +7836,7 @@ input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 .my-leads-unit {
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   color: var(--gray-500);
   font-weight: 500;
   margin-left: 6px;
@@ -7800,13 +7861,13 @@ input, select, textarea {
 .my-lead-row:hover { background: var(--gray-50); }
 .my-lead-name {
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   margin-bottom: 2px;
   color: var(--gray-900);
 }
-.my-lead-firm { font-size: 0.8125rem; color: var(--gray-600); }
+.my-lead-firm { font-size: var(--fs-base); color: var(--gray-600); }
 .my-lead-meta {
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   color: var(--gray-500);
   margin-top: 3px;
   text-transform: uppercase;
@@ -7828,7 +7889,7 @@ input, select, textarea {
   text-align: center;
   color: var(--primary);
   text-decoration: none;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -7847,7 +7908,7 @@ input, select, textarea {
 }
 .dashboard-card-header h2 { margin: 0; }
 .dashboard-date-label {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   color: var(--gray-500);
   font-weight: 500;
 }
@@ -7867,10 +7928,10 @@ input, select, textarea {
 }
 .person-outreach-card-me {
   border-color: var(--primary);
-  background: #eff6ff;
+  background: var(--primary-light);
 }
 .person-outreach-name {
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -7884,10 +7945,10 @@ input, select, textarea {
   text-overflow: ellipsis;
 }
 .person-outreach-you {
-  font-size: 0.625rem;
+  font-size: var(--fs-xs);
   background: var(--primary);
   color: white;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
   font-weight: 600;
   text-transform: uppercase;
@@ -7907,25 +7968,25 @@ input, select, textarea {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
-.person-outreach-count-hit { color: #16a34a; }
+.person-outreach-count-hit { color: var(--success-text); }
 .person-outreach-goal {
-  font-size: 0.8125rem;
-  color: var(--gray-400);
+  font-size: var(--fs-base);
+  color: var(--text-muted);
   font-weight: 500;
 }
 .person-outreach-bar-track {
   height: 5px;
   background: var(--gray-200);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
 }
 .person-outreach-bar-fill {
   height: 100%;
   background: var(--primary);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: width 0.3s ease;
 }
-.person-outreach-bar-hit { background: #16a34a; }
+.person-outreach-bar-hit { background: var(--success); }
 
 /* Week summary stat blocks */
 .week-summary-grid {
@@ -7954,9 +8015,9 @@ input, select, textarea {
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
-.week-stat-good { color: #16a34a; }
+.week-stat-good { color: var(--success-text); }
 .week-stat-label {
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   color: var(--gray-500);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -7970,7 +8031,7 @@ input, select, textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  font-size: 0.8125rem;
+  font-size: var(--fs-base);
 }
 .week-person-header,
 .week-person-row {
@@ -7982,7 +8043,7 @@ input, select, textarea {
 }
 .week-person-header {
   background: var(--surface-subtle);
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -8011,18 +8072,18 @@ input, select, textarea {
   padding: 2rem 1.5rem;
   text-align: center;
   color: var(--gray-500);
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
 }
-.empty-state svg { margin: 0 auto 12px; opacity: 0.35; color: var(--gray-400); }
+.empty-state svg { margin: 0 auto 12px; opacity: 0.35; color: var(--text-muted); }
 
 /* ── Sidebar nav groups ─────────────────────────────────────────────── */
 .nav-group + .nav-group { margin-top: 0.875rem; }
 .nav-group-label {
-  font-size: 0.625rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--gray-400);
+  color: var(--text-muted);
   padding: 0 0.625rem;
   margin-bottom: 0.25rem;
 }
@@ -8045,24 +8106,24 @@ input, select, textarea {
   border-top: 1px solid var(--border);
 }
 .today-outreach-row:first-child { border-top: none; }
-.today-outreach-row-me { background: #eff6ff; }
+.today-outreach-row-me { background: var(--primary-light); }
 .today-outreach-row .person-outreach-name {
   margin-bottom: 0;
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
 }
 .today-outreach-row-bar {
   height: 6px;
   background: var(--gray-200);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
 }
 .today-outreach-row-fill {
   height: 100%;
   background: var(--primary);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: width 0.3s ease;
 }
-.today-outreach-row-fill.hit { background: #16a34a; }
+.today-outreach-row-fill.hit { background: var(--success); }
 .today-outreach-row-count {
   font-size: 0.9375rem;
   font-weight: 700;
@@ -8073,23 +8134,25 @@ input, select, textarea {
   min-width: 52px;
   text-align: right;
 }
-.today-outreach-row-count.hit { color: #16a34a; }
-.today-outreach-row-count .goal { color: var(--gray-400); font-weight: 500; font-size: 0.8125rem; }
+.today-outreach-row-count.hit { color: var(--success-text); }
+.today-outreach-row-count .goal { color: var(--text-muted); font-weight: 500; font-size: var(--fs-base); }
 
 /* ── Stage chip — shared pipeline-stage pill ────────────────────────── */
 .stage-chip {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
   font-weight: 600;
   line-height: 1.4;
   text-transform: capitalize;
   white-space: nowrap;
-  background: color-mix(in srgb, var(--chip, #9ca3af) 14%, white);
-  color: color-mix(in srgb, var(--chip, #9ca3af) 78%, #1f2937);
-  border: 1px solid color-mix(in srgb, var(--chip, #9ca3af) 32%, white);
+  background: color-mix(in srgb, var(--chip, var(--gray-400)) 14%, white);
+  /* 45% stage colour into --text: >= 4.7:1 on every stage's tint. At 78% into
+     #1f2937 it was 2.3-4.1:1 — warm, client and responded chips failed AA. */
+  color: color-mix(in srgb, var(--chip, var(--gray-400)) 45%, var(--text));
+  border: 1px solid color-mix(in srgb, var(--chip, var(--gray-400)) 32%, white);
 }
 
 /* Add Lead form: an existing lead matches what's being typed. */
@@ -8097,18 +8160,18 @@ input, select, textarea {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  background: #fffbeb;
+  background: var(--warning-bg);
   border: 1px solid var(--warning);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--gray-700);
   line-height: 1.45;
 }
 
 .form-duplicate-warning svg {
-  color: var(--warning);
+  color: var(--warning-text);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -8119,7 +8182,7 @@ input, select, textarea {
 
 /* Enrichment: the endpoint summarises CRM fields, it does not read LinkedIn. */
 .enrichment-disclaimer {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--gray-500);
   margin-top: 6px;
   line-height: 1.4;
@@ -8127,17 +8190,17 @@ input, select, textarea {
 
 /* Leads carrying biography fields invented by the old enrichment prompt. */
 .enrichment-unverified {
-  background: #fef2f2;
+  background: var(--danger-bg);
   border: 1px solid var(--danger, #ef4444);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px;
   margin-top: 12px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--gray-700);
 }
 
 .enrichment-unverified strong {
-  color: var(--danger, #ef4444);
+  color: var(--danger);
   display: block;
   margin-bottom: 4px;
 }
@@ -8148,8 +8211,8 @@ input, select, textarea {
 }
 
 .enrichment-badge-unverified_ai {
-  background: #fef2f2;
-  color: var(--danger, #ef4444);
+  background: var(--danger-bg);
+  color: var(--danger);
   border: 1px solid var(--danger, #ef4444);
 }
 
@@ -8184,8 +8247,8 @@ input, select, textarea {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
   color: var(--gray-900);
   background: white;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -8209,8 +8272,8 @@ input, select, textarea {
 .btn-danger-quiet:hover:not(:disabled),
 .btn-danger-quiet:focus-visible {
   color: var(--danger);
-  border-color: #fecaca;
-  background: #fef2f2;
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
 }
 
 /* Holds a missing button's slot so action columns line up row to row. */
@@ -8264,7 +8327,7 @@ input, select, textarea {
   height: 28px;
   right: 2px;
   bottom: 2px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
 }
 .chat-terminal-bubble:hover {

@@ -157,8 +157,8 @@ function CommandPalette({ includePartners = false }) {
           overflow: 'hidden'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid #e5e7eb' }}>
-          <Search size={18} style={{ color: '#9ca3af', flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+          <Search size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input
             ref={inputRef}
             value={query}
@@ -167,13 +167,13 @@ function CommandPalette({ includePartners = false }) {
             placeholder="Search leads, investors, sellers…"
             style={{ flex: 1, border: 'none', outline: 'none', fontSize: '15px', background: 'transparent' }}
           />
-          <span style={{ fontSize: '11px', color: '#9ca3af', border: '1px solid #e5e7eb', borderRadius: '4px', padding: '2px 6px', flexShrink: 0 }}>esc</span>
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '2px 6px', flexShrink: 0 }}>esc</span>
         </div>
 
         <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
           {groups.map(group => (
             <div key={group.type}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px 4px', fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px 4px', fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {GROUP_META[group.type].icon} {GROUP_META[group.type].label}
               </div>
               {group.items.map(item => {
@@ -187,22 +187,22 @@ function CommandPalette({ includePartners = false }) {
                     style={{
                       display: 'flex', alignItems: 'center', gap: '10px',
                       padding: '9px 16px', cursor: 'pointer',
-                      background: active ? '#eff6ff' : 'transparent'
+                      background: active ? 'var(--primary-light)' : 'transparent'
                     }}
                   >
-                    <span style={{ fontWeight: 500, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ fontWeight: 500, fontSize: 'var(--fs-md)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {item.title}
                     </span>
                     {item.sub && (
-                      <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {item.sub}
                       </span>
                     )}
                     {stage && (
                       <span style={{
-                        marginLeft: 'auto', flexShrink: 0, fontSize: '11px', fontWeight: 600,
-                        padding: '2px 8px', borderRadius: '999px',
-                        background: `${stage.color}22`, color: stage.color
+                        marginLeft: 'auto', flexShrink: 0, fontSize: 'var(--fs-xs)', fontWeight: 600,
+                        padding: '2px 8px', borderRadius: 'var(--radius-pill)',
+                        background: `${stage.color}22`, color: `color-mix(in srgb, ${stage.color} 45%, var(--text))`
                       }}>
                         {stage.label}
                       </span>
@@ -213,12 +213,12 @@ function CommandPalette({ includePartners = false }) {
             </div>
           ))}
           {query.trim().length >= 2 && !searching && results.length === 0 && (
-            <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
               No matches for “{query.trim()}”
             </div>
           )}
           {query.trim().length < 2 && (
-            <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
               Type at least 2 characters — ↑↓ to navigate, Enter to open
             </div>
           )}

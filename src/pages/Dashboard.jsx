@@ -38,7 +38,7 @@ function summaryRangeBounds(key, today) {
 // Shared pill-row selector used by the summary and funnel cards.
 function RangePills({ options, value, onChange }) {
   return (
-    <div style={{ display: 'inline-flex', border: '1px solid #e5e7eb', borderRadius: '999px', overflow: 'hidden', background: 'white' }}>
+    <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', overflow: 'hidden', background: 'white' }}>
       {options.map(opt => {
         const active = value === opt.key
         return (
@@ -46,10 +46,10 @@ function RangePills({ options, value, onChange }) {
             key={opt.key}
             onClick={() => onChange(opt.key)}
             style={{
-              padding: '4px 10px', fontSize: '12px', border: 'none', cursor: 'pointer',
+              padding: '4px 10px', fontSize: 'var(--fs-sm)', border: 'none', cursor: 'pointer',
               fontWeight: active ? 600 : 500,
-              color: active ? '#1d4ed8' : '#6b7280',
-              background: active ? '#eff6ff' : 'transparent',
+              color: active ? 'var(--primary-strong)' : 'var(--text-muted)',
+              background: active ? 'var(--primary-light)' : 'transparent',
               whiteSpace: 'nowrap'
             }}
           >
@@ -306,7 +306,7 @@ function Dashboard() {
       {/* Alerts — secondary, at bottom */}
       {hasAlerts ? (
         <div className="card dashboard-card dashboard-alerts">
-          <h2><AlertCircle size={20} color="#ef4444" /> Action Required</h2>
+          <h2><AlertCircle size={20} color="var(--danger)" /> Action Required</h2>
 
           {activeStale.length > 0 && (
             <AlertSection
@@ -376,7 +376,7 @@ function MyWeekCard({ movement, prevMovement, comparableFrom, touchesThisWeek })
     return (
       <div className="card dashboard-card">
         <div className="dashboard-card-header"><h2><Target size={20} /> My Week</h2></div>
-        <div style={{ fontSize: '13px', color: '#6b7280' }}>Loading — or couldn't load. Refresh to retry.</div>
+        <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>Loading — or couldn't load. Refresh to retry.</div>
       </div>
     )
   }
@@ -398,7 +398,7 @@ function MyWeekCard({ movement, prevMovement, comparableFrom, touchesThisWeek })
     <div className="card dashboard-card">
       <div className="dashboard-card-header">
         <h2><Target size={20} /> My Week</h2>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>
+        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
           {touchesThisWeek} touch{touchesThisWeek === 1 ? '' : 'es'} logged
         </span>
       </div>
@@ -407,23 +407,23 @@ function MyWeekCard({ movement, prevMovement, comparableFrom, touchesThisWeek })
         {cells.map(c => (
           <div key={c.label} style={{ minWidth: '110px' }} title={c.hint}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-              <span style={{ fontSize: '26px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: c.value > 0 ? '#111827' : '#9ca3af' }}>
+              <span style={{ fontSize: '26px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: c.value > 0 ? 'var(--text)' : 'var(--text-muted)' }}>
                 {c.value}
               </span>
               <Delta curr={c.value} prev={c.prev} />
             </div>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{c.label}</div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '2px' }}>{c.label}</div>
           </div>
         ))}
       </div>
 
       {nothingMoved && (
-        <div style={{ marginTop: '12px', fontSize: '13px', color: '#6b7280' }}>
+        <div style={{ marginTop: '12px', fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
           Nothing moved yet this week — replies, stage changes and meetings show up here.
         </div>
       )}
       {movement.sampleFrom && (
-        <div style={{ marginTop: '10px', fontSize: '11px', color: '#9ca3af' }}>
+        <div style={{ marginTop: '10px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
           Stage movement tracked since {fmtDate(movement.sampleFrom)}.
         </div>
       )}
@@ -436,10 +436,10 @@ function MyWeekCard({ movement, prevMovement, comparableFrom, touchesThisWeek })
 function Delta({ curr, prev, suffix = '' }) {
   if (prev == null) return null
   const diff = curr - prev
-  if (diff === 0) return <span style={{ fontSize: '11px', color: '#9ca3af' }}>—</span>
+  if (diff === 0) return <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>—</span>
   const up = diff > 0
   return (
-    <span style={{ fontSize: '11px', fontWeight: 600, color: up ? '#16a34a' : '#dc2626' }}>
+    <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: up ? 'var(--success-text)' : 'var(--danger)' }}>
       {up ? '▲' : '▼'} {Math.abs(diff)}{suffix}
     </span>
   )
@@ -479,19 +479,19 @@ function FunnelCard({ funnel, weeks, onWeeksChange }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', marginBottom: '16px' }}>
         {tiles.map(t => (
-          <div key={t.label} style={{ padding: '12px 14px', background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.label}</div>
+          <div key={t.label} style={{ padding: '12px 14px', background: '#fafafa', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.label}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span style={{ fontSize: '20px', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{t.value}</span>
+              <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{t.value}</span>
               {t.delta}
             </div>
           </div>
         ))}
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
         <thead>
-          <tr style={{ borderBottom: '1px solid #e5e7eb', textAlign: 'left', color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <th style={{ padding: '6px 8px' }}>Week</th>
             <th style={{ padding: '6px 8px', width: '30%' }}>Outreach</th>
             <th style={{ padding: '6px 8px' }}>Replies</th>
@@ -503,22 +503,22 @@ function FunnelCard({ funnel, weeks, onWeeksChange }) {
         </thead>
         <tbody>
           {newestFirst.map((w, i) => (
-            <tr key={w.weekStart} style={{ borderBottom: '1px solid #f3f4f6', fontWeight: i === 0 ? 600 : 400, background: i === 0 ? '#eff6ff' : undefined }}>
+            <tr key={w.weekStart} style={{ borderBottom: '1px solid var(--gray-100)', fontWeight: i === 0 ? 600 : 400, background: i === 0 ? 'var(--primary-light)' : undefined }}>
               <td style={{ padding: '8px', whiteSpace: 'nowrap' }}>
-                {fmtDate(w.weekStart)}{i === 0 && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#1d4ed8', fontWeight: 600 }}>now</span>}
+                {fmtDate(w.weekStart)}{i === 0 && <span style={{ marginLeft: '6px', fontSize: 'var(--fs-xs)', color: 'var(--primary-strong)', fontWeight: 600 }}>now</span>}
               </td>
               <td style={{ padding: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ flex: 1, height: '8px', background: '#f3f4f6', borderRadius: '999px', overflow: 'hidden' }}>
+                  <div style={{ flex: 1, height: '8px', background: 'var(--gray-100)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
                     <div style={{ width: `${(w.outreach / maxOutreach) * 100}%`, height: '100%', background: '#60a5fa' }} />
                   </div>
                   <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: '32px', textAlign: 'right' }}>{w.outreach}</span>
                 </div>
               </td>
-              <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums' }}>{w.replies} <span style={{ color: '#6b7280' }}>({pct(w.replies, w.outreach)}%)</span></td>
+              <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums' }}>{w.replies} <span style={{ color: 'var(--text-muted)' }}>({pct(w.replies, w.outreach)}%)</span></td>
               <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums' }}>{w.meetings}</td>
               <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums' }}>{w.demos}</td>
-              <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums', color: w.signups > 0 ? '#16a34a' : undefined, fontWeight: w.signups > 0 ? 600 : undefined }}>{w.signups}</td>
+              <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums', color: w.signups > 0 ? 'var(--success-text)' : undefined, fontWeight: w.signups > 0 ? 600 : undefined }}>{w.signups}</td>
               <td style={{ padding: '8px', fontVariantNumeric: 'tabular-nums' }}>{pct(w.meetings + w.demos, w.outreach)}%</td>
             </tr>
           ))}

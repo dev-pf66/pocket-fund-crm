@@ -84,7 +84,7 @@ function Login({ redirectTo = '/dashboard' }) {
 
           {error && <div className="error-message">{error}</div>}
           {resetSent && (
-            <div className="error-message" style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0' }}>
+            <div className="error-message" style={{ background: 'var(--success-bg)', color: 'var(--success-text-strong)', borderColor: 'var(--success-border)' }}>
               Password reset link sent. Check your inbox.
             </div>
           )}
@@ -100,8 +100,8 @@ function Login({ redirectTo = '/dashboard' }) {
             style={{
               background: 'none',
               border: 'none',
-              color: '#3b82f6',
-              fontSize: '0.875rem',
+              color: 'var(--primary)',
+              fontSize: 'var(--fs-md)',
               marginTop: '0.75rem',
               cursor: 'pointer',
               textAlign: 'center',
@@ -113,8 +113,8 @@ function Login({ redirectTo = '/dashboard' }) {
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <span style={{ color: '#9ca3af' }}>Don't have an account? </span>
-          <Link to="/signup" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+          <span style={{ color: 'var(--text-muted)' }}>Don't have an account? </span>
+          <Link to="/signup" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
             Create one
           </Link>
         </div>
