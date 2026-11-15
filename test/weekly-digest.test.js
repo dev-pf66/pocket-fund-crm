@@ -156,3 +156,48 @@ describe('composeDigest', () => {
     expect(d.body).not.toContain('Nothing moved last week')
   })
 })
+
+// Nov 2026: the digest moved to the tracker's /plan page, which reads the
+// structured numbers (GET ?view=data). These pin what that page relies on.
+import { computeDigest } from '../api/weekly-digest.js'
+
+describe('computeDigest (the /plan page data)', () => {
+  const base = { people: PEOPLE, outreach: [], meetings: [], demos: [], today: TODAY }
+
+  it('reports a chosen week, normalised to its Monday', () => {
+    const d = computeDigest({ ...base, week: '2026-08-05' })
+    expect(d.week).toEqual({ start: '2026-08-03', end: '2026-08-09' })
+    expect(d.prev).toEqual({ start: '2026-07-27', end: '2026-08-02' })
+    expect(d.partial).toBe(false)
+  })
+
+  it('marks the current week as partial', () => {
+    const d = computeDigest({ ...base, week: TODAY })
+    expect(d.week.start).toBe('2026-08-17')
+    expect(d.partial).toBe(true)
+  })
+
+  it('matches the text digest row for row', () => {
+    const input = {
+      ...base,
+      outreach: [outreach('aum', LAST.mid, 'replied'), outreach('aum', LAST.mid), outreach('gaurav', PREV.mid)],
+    }
+    const d = computeDigest(input)
+    expect(d.team).toMatchObject({ outreach: 2, replies: 1, replyRate: 50, prevOutreach: 1 })
+    expect(d.active.map(r => r.name)).toEqual(['Aum'])
+    expect(d.quiet).toEqual(['Gaurav', 'Quiet Analyst'])
+    expect(composeDigest(input).body).toContain('Aum: 0 meetings held')
+  })
+
+  it('reports unclaimed rows separately, never in the team line', () => {
+    const d = computeDigest({ ...base, outreach: [outreach(null, LAST.mid), outreach('aum', LAST.mid)] })
+    expect(d.unattributed).toBe(1)
+    expect(d.team.outreach).toBe(1)
+  })
+
+  it('leaves the dev+localtest account out', () => {
+    const people = [...PEOPLE, { id: 'test', name: 'dev+localtest', email: 'dev+localtest@x.com', is_archived: false }]
+    const d = computeDigest({ ...base, people })
+    expect(d.quiet).not.toContain('dev+localtest')
+  })
+})

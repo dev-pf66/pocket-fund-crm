@@ -49,7 +49,8 @@ The key is stored in the `CRM_API_KEY` Vercel environment variable.
 | `DELETE` | [`/api/leads?resource=tags&lead_id=&tag_id=`](#delete-apileadsresourcetagslead_id123tag_id11) | API key | Unassign a tag from one lead |
 | `POST` | [`/api/mcp`](#remote-mcp-server) | API key (header) or OAuth (Supabase) | Remote MCP server — the HTTP API above, as MCP tools |
 | `POST` | [`/api/events/fire`](#post-apieventsfire) | Supabase JWT | Fire an internal app event (Task Tracker integration) |
-| `GET`/`POST` | [`/api/weekly-digest`](#cron-jobs-internal) | Cron secret | Per-analyst rollup posted to Sage (Mon 03:30 UTC) |
+| `GET`/`POST` | [`/api/weekly-digest`](#cron-jobs-internal) | Cron secret | Monday heartbeat + CallHippo watchdog (Mon 03:30 UTC) |
+| `GET` | [`/api/weekly-digest?view=data`](#cron-jobs-internal) | API key | Per-analyst week rollup as JSON (read by the tracker's /plan page) |
 | `POST` | [`/api/callhippo-sync`](#cron-jobs-internal) | Cron secret | Import CallHippo dials into `crm_outreach_log` (daily) |
 | `GET` | [`/api/health`](#cron-jobs-internal) | Cron secret | Missing-env + cron heartbeat report |
 
@@ -1010,7 +1011,26 @@ These are triggered automatically by Vercel Cron (`vercel.json`). They use `Auth
 
 **Schedule:** Monday 03:30 UTC = 9:00 IST (`30 3 * * 1`)
 
-Posts a per-analyst rollup of the past week's pipeline movement as a due-dated Sage task. Covers every non-archived person, zeros included. Idempotent per week via `crm_tt_mappings`; a failed run writes a `crm_cron_runs` heartbeat row and files its own high-priority Sage task.
+**Since Nov 2026 the digest is not filed as a Sage task.** It is read on the task tracker's Plan page (`/plan`) from `GET /api/weekly-digest?view=data` (below). The Monday cron still runs: it writes the `crm_cron_runs` heartbeat that `/api/health` reports, files one high-priority Sage task when the CallHippo watchdog fires (idempotent per week, `crm_tt_mappings` entity `weekly_digest_warning`), and a failed run still files its own task. `?dry_run=1` returns the text and the data without filing anything.
+
+#### GET /api/weekly-digest?view=data
+
+Auth: `x-api-key`. Optional `week=YYYY-MM-DD` (any day; normalised to its Monday; a future week is 400). Default: the last full Mon–Sun IST week. Read-only.
+
+```json
+{ "success": true, "data": {
+  "week": { "start": "2026-11-09", "end": "2026-11-15" }, "prev": { "start": "2026-11-02", "end": "2026-11-08" },
+  "partial": false,
+  "team": { "meetings": 2, "prevMeetings": 0, "replies": 1, "prevReplies": 3, "outreach": 105, "prevOutreach": 45, "replyRate": 1, "demos": 0, "signups": 0 },
+  "active": [ { "id": "…", "name": "Siddhant", "meetings": 1, "replies": 1, "outreach": 35, "replyRate": 3, "…": "same fields as team" } ],
+  "quiet": ["Aum", "Deep"],
+  "unattributed": 12,
+  "nothingMoved": false,
+  "warnings": []
+} }
+```
+
+Covers every non-archived person, zeros included (`quiet` names the ones with nothing logged); `dev+localtest` is excluded. `team` sums only the listed people; `unattributed` is outreach rows with no `logged_by` (unclaimed CallHippo dials), reported separately.
 
 ### POST /api/callhippo-sync
 
