@@ -555,19 +555,19 @@ function OutreachTracker() {
       </div>
 
       {/* Quick log: paste LinkedIn URL → creates lead (if new) + logs DM */}
-      <div className="card" style={{ marginBottom: '20px', padding: '16px', background: 'linear-gradient(to right, #eff6ff, #f0f9ff)', border: '1px solid #bfdbfe' }}>
+      <div className="card" style={{ marginBottom: '20px', padding: '16px', background: 'linear-gradient(to right, var(--primary-light), #f0f9ff)', border: '1px solid var(--primary-border-soft)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-          <Zap size={18} color="#1d4ed8" />
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#1e3a8a' }}>
+          <Zap size={18} color="var(--primary-hover)" />
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'var(--primary-text)' }}>
             Quick log a LinkedIn DM
           </h3>
-          <span style={{ fontSize: '12px', color: '#64748b' }}>
+          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
             Paste a profile URL — we'll create the lead and log it.
           </span>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <div style={{ position: 'relative', flex: 1 }}>
-            <Linkedin size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+            <Linkedin size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="url"
               value={quickUrl}
@@ -575,7 +575,7 @@ function OutreachTracker() {
               onKeyDown={(e) => { if (e.key === 'Enter') handleQuickLog() }}
               placeholder="https://linkedin.com/in/..."
               disabled={quickLogging}
-              style={{ width: '100%', padding: '10px 10px 10px 34px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', background: 'white' }}
+              style={{ width: '100%', padding: '10px 10px 10px 34px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', fontSize: 'var(--fs-md)', background: 'white' }}
             />
           </div>
           <button
@@ -588,24 +588,24 @@ function OutreachTracker() {
           </button>
         </div>
         {urlCheck.status === 'checking' && (
-          <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #6b7280', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+          <div style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid var(--gray-500)', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
             Checking database…
           </div>
         )}
         {urlCheck.status === 'found' && urlCheck.lead && (
-          <div style={{ marginTop: '8px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '5px 10px', color: '#92400e' }}>
+          <div style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 'var(--radius)', padding: '5px 10px', color: 'var(--warning-text-strong)' }}>
             <AlertTriangle size={13} style={{ flexShrink: 0 }} />
             <span>Already in DB — <strong>{urlCheck.lead.name}</strong>{urlCheck.lead.firm_name ? ` · ${urlCheck.lead.firm_name}` : ''}{urlCheck.lead.stage ? ` · Stage: ${urlCheck.lead.stage.replace(/_/g, ' ')}` : ''}</span>
             {urlCheck.lead.id && (
-              <a href={`/leads/${urlCheck.lead.id}`} target="_blank" rel="noreferrer" style={{ marginLeft: '4px', color: '#b45309' }}>
+              <a href={`/leads/${urlCheck.lead.id}`} target="_blank" rel="noreferrer" style={{ marginLeft: '4px', color: 'var(--warning-text)' }}>
                 <ExternalLink size={11} />
               </a>
             )}
           </div>
         )}
         {urlCheck.status === 'not_found' && (
-          <div style={{ marginTop: '8px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '5px 10px', color: '#166534' }}>
+          <div style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 'var(--radius)', padding: '5px 10px', color: 'var(--success-text-strong)' }}>
             <CheckCircle size={13} style={{ flexShrink: 0 }} />
             New lead — not in the database yet
           </div>
@@ -618,14 +618,14 @@ function OutreachTracker() {
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
             <Target size={20} color={goalMet ? 'var(--success)' : 'var(--primary)'} />
-            <h3 style={{ margin: 0, fontSize: '16px' }}>Today's Progress</h3>
+            <h3 style={{ margin: 0, fontSize: 'var(--fs-lg)' }}>Today's Progress</h3>
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: goalMet ? 'var(--success)' : 'var(--primary)' }}>
             {todayCount}
-            {hasGoal && <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/{myTarget}</span>}
+            {hasGoal && <span style={{ fontSize: '18px', color: 'var(--text-muted)' }}>/{myTarget}</span>}
           </div>
           {!hasGoal && (
-            <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '4px' }}>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '4px' }}>
               touches logged today — no target set
             </div>
           )}
@@ -634,7 +634,7 @@ function OutreachTracker() {
               width: '100%',
               height: '8px',
               background: 'var(--gray-200)',
-              borderRadius: '4px',
+              borderRadius: 'var(--radius-sm)',
               overflow: 'hidden',
               marginTop: '12px'
             }}>
@@ -647,7 +647,7 @@ function OutreachTracker() {
             </div>
           )}
           {goalMet && (
-            <div style={{ marginTop: '8px', color: 'var(--success)', fontSize: '14px', fontWeight: '600' }}>
+            <div style={{ marginTop: '8px', color: 'var(--success)', fontSize: 'var(--fs-md)', fontWeight: '600' }}>
               🎉 Goal Met!
             </div>
           )}
@@ -657,17 +657,17 @@ function OutreachTracker() {
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
             <TrendingUp size={20} color="var(--warning)" />
-            <h3 style={{ margin: 0, fontSize: '16px' }}>Current Streak</h3>
+            <h3 style={{ margin: 0, fontSize: 'var(--fs-lg)' }}>Current Streak</h3>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--warning)' }}>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--warning-text)' }}>
             {streak}
-            <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}> days</span>
+            <span style={{ fontSize: '18px', color: 'var(--text-muted)' }}> days</span>
           </div>
           {/* The bar is the person's own target, or "any outreach" when they have
               none. This copy used to hardcode 10 — so it told every analyst to hit
               a quota that was zeroed in Aug 2026 and that nobody has ever reached,
               which meant it permanently read "Hit 10 today to start a streak!". */}
-          <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--gray-600)' }}>
+          <div style={{ marginTop: '8px', fontSize: 'var(--fs-md)', color: 'var(--gray-600)' }}>
             {streak > 0
               ? `${streak} consecutive days ${hasGoal ? `hitting ${myTarget}` : 'with outreach'}`
               : hasGoal ? `Hit ${myTarget} today to start a streak` : 'Log outreach today to start a streak'}
@@ -676,14 +676,14 @@ function OutreachTracker() {
 
         {/* Weekly Average */}
         <div className="card">
-          <h3 style={{ margin: '0 0 12px 0', fontSize: '16px' }}>Last 7 Days</h3>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: 'var(--fs-lg)' }}>Last 7 Days</h3>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--primary)' }}>
             {weeklyStats.length > 0
               ? Math.round(weeklyStats.reduce((sum, day) => sum + Number(day.total_outreaches), 0) / weeklyStats.length)
               : 0}
-            <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>/day</span>
+            <span style={{ fontSize: '18px', color: 'var(--text-muted)' }}>/day</span>
           </div>
-          <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--gray-600)' }}>
+          <div style={{ marginTop: '8px', fontSize: 'var(--fs-md)', color: 'var(--gray-600)' }}>
             {/* "days hit goal" with no target set read as a quota nobody agreed
                 to (targets zeroed Aug 2026). With no target, goal_met is
                 "any outreach that day" — so say that. */}
@@ -734,9 +734,9 @@ function OutreachTracker() {
             </div>
           </form>
 
-          <details style={{ marginTop: '16px', padding: '12px', background: 'white', borderRadius: '8px' }}>
+          <details style={{ marginTop: '16px', padding: '12px', background: 'white', borderRadius: 'var(--radius-md)' }}>
             <summary style={{ cursor: 'pointer', fontWeight: '600' }}>Example CSV Format</summary>
-            <pre style={{ marginTop: '8px', fontSize: '12px', overflow: 'auto' }}>
+            <pre style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', overflow: 'auto' }}>
 {`lead_name,firm_name,type,status,fit_score,industry,message_content
 John Smith,Acme Capital,cold_email,sent,5,SaaS,Sent intro email about our services
 Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM - she's interested!`}
@@ -911,7 +911,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
       <div className="card" style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '600' }}>View</label>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: 'var(--fs-md)', fontWeight: '600' }}>View</label>
             <select
               value={filter.view}
               onChange={(e) => setFilter({ ...filter, view: e.target.value })}
@@ -924,7 +924,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '600' }}>Type</label>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: 'var(--fs-md)', fontWeight: '600' }}>Type</label>
             <select
               value={filter.type}
               onChange={(e) => setFilter({ ...filter, type: e.target.value })}
@@ -939,7 +939,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '600' }}>Status</label>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: 'var(--fs-md)', fontWeight: '600' }}>Status</label>
             <select
               value={filter.status}
               onChange={(e) => setFilter({ ...filter, status: e.target.value })}
@@ -951,7 +951,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
           </div>
 
           <div style={{ marginLeft: 'auto' }}>
-            <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-600)' }}>
+            <div style={{ fontSize: 'var(--fs-md)', fontWeight: '600', color: 'var(--gray-600)' }}>
               {outreaches.length} outreach{outreaches.length !== 1 ? 'es' : ''}
             </div>
           </div>
@@ -972,32 +972,32 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--gray-200)', textAlign: 'left' }}>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Date</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Lead</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Firm</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Industry</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Fit</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Type</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Status</th>
-                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: '14px' }}>Actions</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: 'var(--fs-md)' }}>Date</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: 'var(--fs-md)' }}>Lead</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: 'var(--fs-md)' }}>Firm</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: 'var(--fs-md)' }}>Industry</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: 'var(--fs-md)' }}>Fit</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: 'var(--fs-md)' }}>Type</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: 'var(--fs-md)' }}>Status</th>
+                  <th style={{ padding: '12px 8px', fontWeight: '600', fontSize: 'var(--fs-md)' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {outreaches.map(outreach => (
                   <tr key={outreach.id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
-                    <td style={{ padding: '12px 8px', fontSize: '14px' }}>
+                    <td style={{ padding: '12px 8px', fontSize: 'var(--fs-md)' }}>
                       {new Date(outreach.outreach_date).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric'
                       })}
                     </td>
-                    <td style={{ padding: '12px 8px', fontSize: '14px', fontWeight: '500' }}>
+                    <td style={{ padding: '12px 8px', fontSize: 'var(--fs-md)', fontWeight: '500' }}>
                       {outreach.lead_name || outreach.lead?.name}
                     </td>
-                    <td style={{ padding: '12px 8px', fontSize: '14px', color: 'var(--gray-600)' }}>
+                    <td style={{ padding: '12px 8px', fontSize: 'var(--fs-md)', color: 'var(--gray-600)' }}>
                       {outreach.firm_name || outreach.lead?.firm_name || '-'}
                     </td>
-                    <td style={{ padding: '12px 8px', fontSize: '13px', color: 'var(--gray-600)' }}>
+                    <td style={{ padding: '12px 8px', fontSize: 'var(--fs-base)', color: 'var(--gray-600)' }}>
                       {outreach.industry || '-'}
                     </td>
                     <td style={{ padding: '12px 8px' }}>
@@ -1005,22 +1005,22 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                         <span style={{
                           padding: '4px 8px',
                           borderRadius: '12px',
-                          fontSize: '13px',
+                          fontSize: 'var(--fs-base)',
                           fontWeight: '600',
                           background:
                             outreach.fit_score >= 4 ? '#d1fae5' :
-                            outreach.fit_score >= 3 ? '#fef3c7' : '#fee2e2',
+                            outreach.fit_score >= 3 ? 'var(--warning-bg-strong)' : 'var(--danger-bg-strong)',
                           color:
                             outreach.fit_score >= 4 ? '#065f46' :
-                            outreach.fit_score >= 3 ? '#92400e' : '#991b1b'
+                            outreach.fit_score >= 3 ? 'var(--warning-text-strong)' : 'var(--danger-text-strong)'
                         }}>
                           {outreach.fit_score}/5
                         </span>
                       ) : (
-                        <span style={{ color: 'var(--gray-400)' }}>-</span>
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 8px', fontSize: '14px' }}>
+                    <td style={{ padding: '12px 8px', fontSize: 'var(--fs-md)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {outreachTypeIcons[outreach.outreach_type]}
                         <span style={{ textTransform: 'capitalize' }}>
@@ -1034,9 +1034,9 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                         onChange={(e) => handleUpdateStatus(outreach.id, e.target.value)}
                         style={{
                           padding: '4px 8px',
-                          fontSize: '13px',
+                          fontSize: 'var(--fs-base)',
                           border: '1px solid var(--gray-300)',
-                          borderRadius: '4px',
+                          borderRadius: 'var(--radius-sm)',
                           background: 'white'
                         }}
                       >
@@ -1149,7 +1149,7 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
               <button
                 className="icon-btn"
                 onClick={() => { setShowDetailsModal(false); setEditedFields({}) }}
-                style={{ fontSize: '24px' }}
+                style={{ fontSize: 'var(--fs-2xl)' }}
               >
                 ×
               </button>
@@ -1378,28 +1378,28 @@ function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, peop
   const fv = k => edits[k] !== undefined ? edits[k] : (lead?.[k] ?? '')
   const set = (k, v) => setEdits(prev => ({ ...prev, [k]: v }))
   const dirty = Object.keys(edits).length > 0 && !!lead?.id
-  const inputStyle = { width: '100%', padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', background: 'white', boxSizing: 'border-box' }
+  const inputStyle = { width: '100%', padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 'var(--fs-base)', background: 'white', boxSizing: 'border-box' }
 
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalBoxStyle} onClick={e => e.stopPropagation()}>
-        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f3f4f6' }}>
+        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--gray-100)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: '16px', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+              <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>
                 Outreach logged ✓
               </div>
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
-                padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 600,
-                background: isNew ? '#f0fdf4' : '#fffbeb',
-                color: isNew ? '#166534' : '#92400e',
-                border: `1px solid ${isNew ? '#bbf7d0' : '#fde68a'}`
+                padding: '4px 10px', borderRadius: 'var(--radius-pill)', fontSize: 'var(--fs-sm)', fontWeight: 600,
+                background: isNew ? 'var(--success-bg)' : 'var(--warning-bg)',
+                color: isNew ? 'var(--success-text-strong)' : 'var(--warning-text-strong)',
+                border: `1px solid ${isNew ? 'var(--success-border)' : 'var(--warning-border)'}`
               }}>
                 {isNew ? <><CheckCircle size={12} /> New lead created</> : <><AlertTriangle size={12} /> Already in database</>}
               </div>
             </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '2px' }}>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }}>
               <X size={18} />
             </button>
           </div>
@@ -1407,55 +1407,55 @@ function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, peop
 
         <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div style={{ gridColumn: '1 / -1' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Outreach</div>
-            <div style={{ fontSize: '13px', color: '#374151', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Outreach</div>
+            <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-2)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <span>{OUTREACH_TYPE_LABELS[outreach?.outreach_type] || '—'}</span>
-              <span style={{ color: '#9ca3af' }}>·</span>
+              <span style={{ color: 'var(--text-muted)' }}>·</span>
               <span>{STATUS_LABELS[outreach?.status] || 'Sent'}</span>
-              {outreach?.platform_details && <><span style={{ color: '#9ca3af' }}>·</span><span style={{ color: '#6b7280' }}>{outreach.platform_details}</span></>}
+              {outreach?.platform_details && <><span style={{ color: 'var(--text-muted)' }}>·</span><span style={{ color: 'var(--text-muted)' }}>{outreach.platform_details}</span></>}
             </div>
           </div>
 
           {lead?.id ? (
             <>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Name</div>
+                <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Name</div>
                 <input style={inputStyle} value={fv('name')} onChange={e => set('name', e.target.value)} />
               </div>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Firm</div>
+                <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Firm</div>
                 <input style={inputStyle} value={fv('firm_name')} onChange={e => set('firm_name', e.target.value)} />
               </div>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Industry</div>
+                <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Industry</div>
                 <select style={inputStyle} value={fv('industry')} onChange={e => set('industry', e.target.value)}>
                   <option value="">—</option>
                   {industryOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Deal Size</div>
+                <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Deal Size</div>
                 <select style={inputStyle} value={fv('deal_size')} onChange={e => set('deal_size', e.target.value)}>
                   <option value="">—</option>
                   {dealSizeOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Location</div>
+                <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Location</div>
                 <select style={inputStyle} value={fv('location')} onChange={e => set('location', e.target.value)}>
                   <option value="">—</option>
                   {locationOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Lead Source</div>
+                <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Lead Source</div>
                 <select style={inputStyle} value={fv('lead_source')} onChange={e => set('lead_source', e.target.value)}>
                   <option value="">—</option>
                   {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Fit Score</div>
+                <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Fit Score</div>
                 <select style={inputStyle} value={fv('fit_score') || ''} onChange={e => set('fit_score', e.target.value ? parseInt(e.target.value) : null)}>
                   <option value="">—</option>
                   {[5,4,3,2,1].map(n => <option key={n} value={n}>{n}</option>)}
@@ -1463,13 +1463,13 @@ function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, peop
               </div>
               {lead.stage && (
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Stage</div>
-                  <div style={{ fontSize: '13px', color: '#374151', padding: '7px 0' }}>{STAGE_LABELS[lead.stage] || lead.stage}</div>
+                  <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Stage</div>
+                  <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-2)', padding: '7px 0' }}>{STAGE_LABELS[lead.stage] || lead.stage}</div>
                 </div>
               )}
               {people.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Assign to</div>
+                  <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Assign to</div>
                   <select style={inputStyle} value={fv('assigned_to') || ''} onChange={e => set('assigned_to', e.target.value ? parseInt(e.target.value) : null)}>
                     <option value="">— Unassigned</option>
                     {people.map(p => (
@@ -1482,13 +1482,13 @@ function EntryResultModal({ lead, isNew, outreach, edits, setEdits, saving, peop
               )}
             </>
           ) : (
-            <div style={{ gridColumn: '1 / -1', fontSize: '14px', color: '#374151' }}>
+            <div style={{ gridColumn: '1 / -1', fontSize: 'var(--fs-md)', color: 'var(--text-2)' }}>
               <strong>{lead?.name}</strong>{lead?.firm_name ? ` · ${lead.firm_name}` : ''}
             </div>
           )}
         </div>
 
-        <div style={{ padding: '12px 20px 20px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid #f3f4f6' }}>
+        <div style={{ padding: '12px 20px 20px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--gray-100)' }}>
           <button className="btn btn-secondary" onClick={onClose} disabled={saving}>Close</button>
           {dirty && (
             <button className="btn btn-primary" onClick={onSave} disabled={saving}>
@@ -1505,51 +1505,51 @@ function CsvPreviewModal({ rows, skipped, importing, people = [], currentPersonI
   const [expandedIdx, setExpandedIdx] = useState(null)
   const dupeCount = rows.filter(r => r._dupe).length
   const newCount = rows.length - dupeCount
-  const inputStyle = { width: '100%', padding: '6px 8px', border: '1px solid #e5e7eb', borderRadius: '5px', fontSize: '12px', background: 'white', boxSizing: 'border-box' }
+  const inputStyle = { width: '100%', padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '5px', fontSize: 'var(--fs-sm)', background: 'white', boxSizing: 'border-box' }
 
   const fv = (row, k) => row._edits?.[k] !== undefined ? row._edits[k] : (row[k] ?? '')
 
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={{ ...modalBoxStyle, maxWidth: '740px' }} onClick={e => e.stopPropagation()}>
-        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #f3f4f6' }}>
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--gray-100)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: '16px', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+              <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>
                 CSV Preview — {rows.length} row{rows.length !== 1 ? 's' : ''}
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, padding: '3px 8px', borderRadius: '999px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
+                <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '3px 8px', borderRadius: 'var(--radius-pill)', background: 'var(--success-bg)', border: '1px solid var(--success-border)', color: 'var(--success-text-strong)' }}>
                   {newCount} new
                 </span>
                 {dupeCount > 0 && (
-                  <span style={{ fontSize: '12px', fontWeight: 600, padding: '3px 8px', borderRadius: '999px', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, padding: '3px 8px', borderRadius: 'var(--radius-pill)', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', color: 'var(--warning-text-strong)' }}>
                     {dupeCount} already in DB
                   </span>
                 )}
                 {skipped > 0 && (
-                  <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
                     {skipped} skipped (no name)
                   </span>
                 )}
               </div>
             </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '2px' }} disabled={importing}>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }} disabled={importing}>
               <X size={18} />
             </button>
           </div>
         </div>
 
         <div style={{ overflowY: 'auto', maxHeight: 'calc(90vh - 140px)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
-              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lead Name</th>
-                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Firm</th>
-                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Type</th>
-                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fit</th>
-                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</th>
-                <th style={{ padding: '10px 12px', fontWeight: 600, color: '#374151', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}></th>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
+            <thead style={{ position: 'sticky', top: 0, background: 'var(--surface-subtle)', zIndex: 1 }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-2)', textAlign: 'left', fontSize: 'var(--fs-xs)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lead Name</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-2)', textAlign: 'left', fontSize: 'var(--fs-xs)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Firm</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-2)', textAlign: 'left', fontSize: 'var(--fs-xs)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Type</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-2)', textAlign: 'left', fontSize: 'var(--fs-xs)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fit</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-2)', textAlign: 'left', fontSize: 'var(--fs-xs)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-2)', textAlign: 'left', fontSize: 'var(--fs-xs)', textTransform: 'uppercase', letterSpacing: '0.04em' }}></th>
                 <th style={{ padding: '10px 12px', width: '32px' }}></th>
               </tr>
             </thead>
@@ -1558,73 +1558,73 @@ function CsvPreviewModal({ rows, skipped, importing, people = [], currentPersonI
                 <>
                   <tr
                     key={idx}
-                    style={{ borderBottom: expandedIdx === idx ? 'none' : '1px solid #f3f4f6', background: expandedIdx === idx ? '#f9fafb' : 'white', cursor: 'pointer' }}
+                    style={{ borderBottom: expandedIdx === idx ? 'none' : '1px solid var(--gray-100)', background: expandedIdx === idx ? 'var(--surface-subtle)' : 'white', cursor: 'pointer' }}
                     onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
                   >
-                    <td style={{ padding: '10px 12px', fontWeight: 500, color: '#111827' }}>{fv(row, 'lead_name') || '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{fv(row, 'firm_name') || '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{OUTREACH_TYPE_LABELS[row.outreach_type] || '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{row.fit_score || '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{STATUS_LABELS[row.status] || '—'}</td>
+                    <td style={{ padding: '10px 12px', fontWeight: 500, color: 'var(--text)' }}>{fv(row, 'lead_name') || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{fv(row, 'firm_name') || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{OUTREACH_TYPE_LABELS[row.outreach_type] || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{row.fit_score || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{STATUS_LABELS[row.status] || '—'}</td>
                     <td style={{ padding: '10px 12px' }}>
                       {row._dupe ? (
-                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 7px', borderRadius: '999px', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--radius-pill)', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', color: 'var(--warning-text-strong)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                           <AlertTriangle size={10} /> In DB
                         </span>
                       ) : (
-                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 7px', borderRadius: '999px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
+                        <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--radius-pill)', background: 'var(--success-bg)', border: '1px solid var(--success-border)', color: 'var(--success-text-strong)' }}>
                           New
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 8px', textAlign: 'center', color: '#9ca3af', fontSize: '10px' }}>
+                    <td style={{ padding: '10px 8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-xs)' }}>
                       {expandedIdx === idx ? '▲' : '▼'}
                     </td>
                   </tr>
                   {expandedIdx === idx && (
-                    <tr key={`${idx}-edit`} style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+                    <tr key={`${idx}-edit`} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
                       <td colSpan={7} style={{ padding: '0 12px 14px' }}>
                         {row._dupe && row._existingLead && (
-                          <div style={{ marginBottom: '10px', fontSize: '12px', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ marginBottom: '10px', fontSize: 'var(--fs-sm)', color: 'var(--warning-text-strong)', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 'var(--radius)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <AlertTriangle size={12} />
                             Matches existing lead: <strong>{row._existingLead.name}</strong>{row._existingLead.firm_name ? ` · ${row._existingLead.firm_name}` : ''}
                             {row._existingLead.stage ? ` · Stage: ${STAGE_LABELS[row._existingLead.stage] || row._existingLead.stage}` : ''}
                           </div>
                         )}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Lead Name</div>
+                          <div><div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Lead Name</div>
                             <input style={inputStyle} value={fv(row, 'lead_name')} onChange={e => onRowEdit(idx, 'lead_name', e.target.value)} /></div>
-                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Firm</div>
+                          <div><div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Firm</div>
                             <input style={inputStyle} value={fv(row, 'firm_name')} onChange={e => onRowEdit(idx, 'firm_name', e.target.value)} /></div>
-                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Industry</div>
+                          <div><div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Industry</div>
                             <select style={inputStyle} value={fv(row, 'industry')} onChange={e => onRowEdit(idx, 'industry', e.target.value)}>
                               <option value="">—</option>
                               {industryOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                             </select></div>
-                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Deal Size</div>
+                          <div><div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Deal Size</div>
                             <select style={inputStyle} value={fv(row, 'deal_size')} onChange={e => onRowEdit(idx, 'deal_size', e.target.value)}>
                               <option value="">—</option>
                               {dealSizeOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                             </select></div>
-                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Location</div>
+                          <div><div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Location</div>
                             <select style={inputStyle} value={fv(row, 'location')} onChange={e => onRowEdit(idx, 'location', e.target.value)}>
                               <option value="">—</option>
                               {locationOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                             </select></div>
-                          <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Fit Score</div>
+                          <div><div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Fit Score</div>
                             <select style={inputStyle} value={fv(row, 'fit_score') || ''} onChange={e => onRowEdit(idx, 'fit_score', e.target.value ? parseInt(e.target.value) : null)}>
                               <option value="">—</option>
                               {[5,4,3,2,1].map(n => <option key={n} value={n}>{n}</option>)}
                             </select></div>
                           {people.length > 0 && (
-                            <div><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Assign to</div>
+                            <div><div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Assign to</div>
                               <select style={inputStyle} value={fv(row, 'assigned_to') || ''} onChange={e => onRowEdit(idx, 'assigned_to', e.target.value ? parseInt(e.target.value) : null)}>
                                 <option value="">— Unassigned</option>
                                 {people.map(p => <option key={p.id} value={p.id}>{p.name}{p.id === currentPersonId ? ' (me)' : ''}</option>)}
                               </select>
                             </div>
                           )}
-                          <div style={{ gridColumn: '1 / -1' }}><div style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Notes</div>
+                          <div style={{ gridColumn: '1 / -1' }}><div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Notes</div>
                             <input style={inputStyle} value={fv(row, 'notes')} onChange={e => onRowEdit(idx, 'notes', e.target.value)} placeholder="Optional notes…" /></div>
                         </div>
                       </td>
@@ -1636,7 +1636,7 @@ function CsvPreviewModal({ rows, skipped, importing, people = [], currentPersonI
           </table>
         </div>
 
-        <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--gray-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button className="btn btn-secondary" onClick={onClose} disabled={importing}>Cancel</button>
           <button className="btn btn-primary" onClick={onImport} disabled={importing}>
             {importing ? 'Importing…' : `Import ${rows.length} row${rows.length !== 1 ? 's' : ''}`}

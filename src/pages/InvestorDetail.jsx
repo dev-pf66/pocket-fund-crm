@@ -319,7 +319,7 @@ function InvestorDetail() {
         <div className="card">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>Interaction Log</h3>
-            <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '13px' }} onClick={() => setShowInteractionForm(!showInteractionForm)}>
+            <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 'var(--fs-base)' }} onClick={() => setShowInteractionForm(!showInteractionForm)}>
               <Plus size={16} /> Log Interaction
             </button>
           </div>
@@ -353,7 +353,7 @@ function InvestorDetail() {
 
           <div style={{ padding: '16px' }}>
             {interactions.length === 0 ? (
-              <p style={{ color: 'var(--gray-400)', textAlign: 'center', padding: '24px 0' }}>No interactions logged yet.</p>
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>No interactions logged yet.</p>
             ) : (
               <div className="activity-timeline">
                 {interactions.map(interaction => {

@@ -6,7 +6,7 @@ import {
   applyFollowUpCadence,
   setFollowUp,
   snoozeFollowUp,
-  clearFollowUp,
+  DEFAULT_FOLLOW_UP_DAYS,
   logFollowUpTouch
 } from '../lib/crm-api'
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
@@ -104,8 +104,13 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
     })
   }
 
+  // There is no "no reminder" for a live lead (Dev, 2026-11-16) — what used to
+  // be Clear now pushes the reminder to the default check-in.
   function handleClear() {
-    run('Reminder cleared', () => clearFollowUp(lead.id, currentPerson?.id))
+    // Same as Notifications' +30d: pushes from the later of today or the date
+    // already set, keeps a running cadence, never pulls a reminder earlier.
+    run(`Pushed ${DEFAULT_FOLLOW_UP_DAYS} days`, () =>
+      snoozeFollowUp(lead, DEFAULT_FOLLOW_UP_DAYS, { note: lead.follow_up_note }, currentPerson?.id))
   }
 
   async function handleCreateCadence() {
@@ -141,30 +146,30 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
 
       {/* Current reminder */}
       <div style={{
-        padding: '10px 12px', borderRadius: '8px', marginBottom: '14px',
-        background: overdue ? '#fef2f2' : due ? '#f0f9ff' : '#f9fafb',
-        border: `1px solid ${overdue ? '#fecaca' : due ? '#bae6fd' : '#e5e7eb'}`
+        padding: '10px 12px', borderRadius: 'var(--radius-md)', marginBottom: '14px',
+        background: overdue ? 'var(--danger-bg)' : due ? '#f0f9ff' : 'var(--surface-subtle)',
+        border: `1px solid ${overdue ? 'var(--danger-border)' : due ? '#bae6fd' : 'var(--border)'}`
       }}>
         {due ? (
           <>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: overdue ? '#991b1b' : '#0c4a6e' }}>
+            <div style={{ fontSize: 'var(--fs-md)', fontWeight: 600, color: overdue ? 'var(--danger-text-strong)' : '#0c4a6e' }}>
               {overdue ? 'Overdue since ' : due === today ? 'Due today' : 'Scheduled for '}
               {due === today ? '' : fmtDate(due)}
             </div>
             {lead.follow_up_note && (
-              <div style={{ fontSize: '13px', color: '#374151', marginTop: '4px' }}>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-2)', marginTop: '4px' }}>
                 “{lead.follow_up_note}”
               </div>
             )}
             {cadence?.offsets?.length > 0 && (
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <Repeat size={12} /> {cadence.name} — touch {Math.min(cadence.step, cadence.offsets.length)} of {cadence.offsets.length}
                 {' '}(days {cadence.offsets.join(' / ')} from {fmtDate(cadence.anchor)})
               </div>
             )}
           </>
         ) : (
-          <div style={{ fontSize: '13px', color: '#6b7280' }}>
+          <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
             No reach-out scheduled — this lead only surfaces when it goes stale.
           </div>
         )}
@@ -174,15 +179,16 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
             <button className="btn btn-sm btn-primary" onClick={handleReachedOut} disabled={busy}>
               <Check size={14} /> Reached out
             </button>
-            <button className="btn btn-sm btn-secondary" onClick={handleClear} disabled={busy}>
-              <X size={14} /> Clear
+            <button className="btn btn-sm btn-secondary" onClick={handleClear} disabled={busy}
+              title={`Push the reminder back ${DEFAULT_FOLLOW_UP_DAYS} days. Only marking the lead dead ends reminders.`}>
+              <AlarmClock size={14} /> +{DEFAULT_FOLLOW_UP_DAYS} days
             </button>
           </div>
         )}
       </div>
 
       {/* Note — carried onto whatever gets scheduled below */}
-      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>
+      <label style={{ display: 'block', fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: '4px' }}>
         What to say when you circle back
       </label>
       <input
@@ -190,7 +196,7 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
         value={note}
         onChange={e => setNote(e.target.value)}
         placeholder="e.g. Ask if the Q3 board approved the mandate"
-        style={{ width: '100%', padding: '7px 9px', fontSize: '13px', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '12px' }}
+        style={{ width: '100%', padding: '7px 9px', fontSize: 'var(--fs-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', marginBottom: '12px' }}
       />
 
       {/* Quick schedule */}
@@ -205,7 +211,7 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
           value={customDate}
           min={today}
           onChange={e => setCustomDate(e.target.value)}
-          style={{ padding: '5px 8px', fontSize: '13px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
+          style={{ padding: '5px 8px', fontSize: 'var(--fs-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
         />
         <button className="btn btn-sm btn-secondary" onClick={handleCustomDate} disabled={busy || !customDate}>
           Set
@@ -213,15 +219,15 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
       </div>
 
       {/* Cadence */}
-      <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '12px' }}>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>
+      <div style={{ borderTop: '1px solid var(--gray-100)', paddingTop: '12px' }}>
+        <label style={{ display: 'block', fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: '4px' }}>
           Or put them on a cadence
         </label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
           <select
             value={cadenceId}
             onChange={e => setCadenceId(e.target.value)}
-            style={{ padding: '6px 8px', fontSize: '13px', border: '1px solid #e5e7eb', borderRadius: '6px', minWidth: '200px' }}
+            style={{ padding: '6px 8px', fontSize: 'var(--fs-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', minWidth: '200px' }}
           >
             <option value="">Select a cadence…</option>
             {cadences.map(c => (
@@ -237,7 +243,7 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
             <Plus size={14} /> New
           </button>
         </div>
-        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '6px' }}>
           Each logged touch rolls the lead to the cadence's next day automatically.
         </div>
 
@@ -248,14 +254,14 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
               value={newCadence.name}
               onChange={e => setNewCadence(c => ({ ...c, name: e.target.value }))}
               placeholder="Cadence name"
-              style={{ flex: '1 1 160px', padding: '6px 8px', fontSize: '13px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
+              style={{ flex: '1 1 160px', padding: '6px 8px', fontSize: 'var(--fs-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
             />
             <input
               type="text"
               value={newCadence.offsets}
               onChange={e => setNewCadence(c => ({ ...c, offsets: e.target.value }))}
               placeholder="Days, e.g. 3, 10, 30"
-              style={{ flex: '1 1 160px', padding: '6px 8px', fontSize: '13px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
+              style={{ flex: '1 1 160px', padding: '6px 8px', fontSize: 'var(--fs-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
             />
             <button className="btn btn-sm btn-primary" onClick={handleCreateCadence} disabled={busy}>
               Save

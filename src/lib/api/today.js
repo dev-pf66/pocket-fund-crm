@@ -4,12 +4,13 @@
  */
 
 import { supabase } from '../supabase.js'
-import { istAddDays, istWeekStart } from '../dateUtils.js'
+import { istAddDays, istWeekStart, istToday } from '../dateUtils.js'
 import { cacheClear, istDateStr, getDaysBetween, fetchAllRows } from './core.js'
 import { logActivity, calculateStaleness, updateLead } from './leads.js'
 import { runBulk } from '../bulkActions.js'
-import { advanceFollowUpCadence, clearFollowUp, snoozeFollowUp } from './followups.js'
+import { advanceFollowUpCadence, resetFollowUpToDefault, snoozeFollowUp } from './followups.js'
 import { getCRMSettings } from './misc.js'
+import { getsDefaultReminder, isDefaultReminder, DEAD_REMINDER_RESET } from '../followUpPolicy.js'
 import { ownerScopeIds, scopeToOwners } from './cover.js'
 
 // ============================================================================
@@ -129,6 +130,40 @@ export async function getTodayQueue(personId, { limit = 25 } = {}) {
 }
 
 /**
+ * Does this touch complete a follow-up that is DUE? That is the scoreboard's
+ * "F/U done" (Dev, 2026-11-15: a follow-up handled with Touched counts, the
+ * same as one handled with Reached out on Notifications). Due means:
+ *   - the caller says so — the row came from Today's "Follow-ups due" section,
+ *     which includes the day-3/7/14 staleness marks that carry no date; or
+ *   - the lead's follow-up date (one-off or the current cadence step) is today
+ *     or earlier.
+ * A touch on a lead whose follow-up is still in the future, or that has none,
+ * is NOT a follow-up done — otherwise an early ping or a bulk touch on the
+ * board would credit follow-ups weeks before they happen.
+ */
+export function isDueFollowUpTouch(lead, { followUp = false } = {}, today = istToday()) {
+  if (followUp) return true
+  const due = lead?.next_follow_up_date
+  return !!due && String(due).slice(0, 10) <= today
+}
+
+/**
+ * The activity note a touch writes. A due follow-up gets the `Followed up`
+ * prefix the scoreboard counts (isFollowUpDoneNote); any other touch stays a
+ * plain `Touched` note. Pure, so test/follow-up-done.test.js can pin both sides.
+ * `source` names the surface in the audit trail: the Pipeline board logs
+ * touches too, and "Touched (Today tab)" on a lead nobody opened in Today
+ * would be a lie in that lead's history.
+ */
+export function touchNote(lead, note = '', source = 'Today tab', opts = {}, today) {
+  const trimmed = (note || '').trim()
+  if (isDueFollowUpTouch(lead, opts, today)) {
+    return trimmed ? `Followed up (touched) — ${trimmed}` : `Followed up (touched, ${source})`
+  }
+  return trimmed ? `Touched — ${trimmed}` : `Touched (${source})`
+}
+
+/**
  * One-tap "✓ Touched": logs a note activity (which also stamps
  * last_activity_date via logActivity) so the lead drops out of the queue
  * and the touch shows up in every activity-driven metric.
@@ -137,24 +172,24 @@ export async function getTodayQueue(personId, { limit = 25 } = {}) {
  * next step — that's what makes a cadence self-sustaining instead of
  * something you re-arm by hand after every reach-out.
  */
-export async function markLeadTouched(lead, currentPersonId, note = '', { source = 'Today tab' } = {}) {
-  const trimmed = (note || '').trim()
+export async function markLeadTouched(lead, currentPersonId, note = '', { source = 'Today tab', followUp = false } = {}) {
   const activity = await logActivity(lead.id, {
     activity_type: 'note',
-    // `source` names the surface in the audit trail. The Pipeline board logs
-    // touches too now, and "Touched (Today tab)" on a lead nobody opened in
-    // Today would be a lie in that lead's history.
-    notes: trimmed ? `Touched — ${trimmed}` : `Touched (${source})`
+    notes: touchNote(lead, note, source, { followUp })
   }, currentPersonId)
 
+  // A lead always keeps a next reminder (Dev, 2026-11-16; resetFollowUpToDefault):
+  //  - cadence running → roll it (a finished cadence falls back to the default);
+  //  - one-off reminder due/overdue, or none at all → the default check-in;
+  //  - one-off reminder still in the FUTURE → leave it. This touch was early, and
+  //    it used to wipe a promise made weeks ahead ("after their board meeting").
   if (lead.follow_up_cadence?.offsets?.length) {
     await advanceFollowUpCadence(lead, currentPersonId).catch(err =>
       console.error('Cadence advance failed (touch was logged):', err)
     )
-  } else if (lead.next_follow_up_date) {
-    // One-off reminder, now spent.
-    await clearFollowUp(lead.id, currentPersonId).catch(err =>
-      console.error('Follow-up clear failed (touch was logged):', err)
+  } else if (getsDefaultReminder(lead) && (!lead.next_follow_up_date || String(lead.next_follow_up_date).slice(0, 10) <= istToday())) {
+    await resetFollowUpToDefault(lead.id, currentPersonId).catch(err =>
+      console.error('Scheduling the next reminder failed (touch was logged):', err)
     )
   }
   return activity
@@ -193,7 +228,10 @@ export async function getFollowUpsDue(personId) {
   const marks = new Set([t.cold, t.warm, t.active])
   return (data || [])
     .filter(lead => {
-      if (lead.next_follow_up_date) return lead.next_follow_up_date <= horizon && lead.next_follow_up_date >= floor
+      if (lead.next_follow_up_date && lead.next_follow_up_date <= horizon && lead.next_follow_up_date >= floor) return true
+      // The automatic 30-day check-in is a safety net, not a promise: the
+      // day-3/7/14 marks still fire under it (isDefaultReminder).
+      if (lead.next_follow_up_date && !isDefaultReminder(lead)) return false
       if (!TODAY_ENGAGED_STAGES.includes(lead.stage)) return false
       return marks.has(daysStaleFor(lead))
     })
@@ -293,7 +331,10 @@ export async function bulkClaimLeads(leadIds, personId) {
 
 /** Bulk "✓ Touched" — logs a touch (and rolls any cadence) on every lead. */
 export async function bulkMarkTouched(leads, currentPersonId, note = '', opts = {}) {
-  return runBulk(leads, lead => markLeadTouched(lead, currentPersonId, note, opts))
+  // `followUpIds`: the leads the caller showed as follow-ups due (Today's
+  // "Follow-ups due" section). Decided per lead, so one bulk action can mix them.
+  const { followUpIds, ...rest } = opts
+  return runBulk(leads, lead => markLeadTouched(lead, currentPersonId, note, { ...rest, followUp: !!followUpIds?.has(lead.id) }))
 }
 
 /**
@@ -309,8 +350,11 @@ export async function bulkSnoozeLeads(leads, days, currentPersonId) {
 }
 
 /** Bulk dismiss — marks every lead dead (stage → passed). */
+/** Marking a lead dead is the ONE thing that ends its reminders (updateLead/moveLead enforce it too). */
+export const DEAD_LEAD_UPDATES = { stage: 'passed', ...DEAD_REMINDER_RESET }
+
 export async function bulkDismissLeads(leads, currentPersonId) {
-  return runBulk(leads, lead => updateLead(lead.id, { stage: 'passed' }, currentPersonId))
+  return runBulk(leads, lead => updateLead(lead.id, { ...DEAD_LEAD_UPDATES }, currentPersonId))
 }
 
 /**

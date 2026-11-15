@@ -214,6 +214,29 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - Sources run under `Promise.allSettled`: one failing source degrades that source and is
     reported in `errors`, rather than silently shortening the list.
   - The badge counts overdue + due-today only. Never count upcoming work into it.
+- **Every live lead always has a next reminder (Dev, 2026-11-16).** "There should always be an
+  automatic follow-up reminder, unless we are marking the lead as dead — whether that's 30 days,
+  90 days." Policy in `src/lib/followUpPolicy.js` — change the interval (`DEFAULT_FOLLOW_UP_DAYS`,
+  30) there only. Guardrail: `test/always-a-reminder.test.js`.
+  - Completing a follow-up (Touched, Reached out) schedules the next one 30 days out; a touch on a
+    lead with no reminder gives it one; an **early** Touched leaves a future reminder where it is
+    (it used to wipe it). Reached out consumes a future one on purpose — it is explicitly about
+    that follow-up. A finished cadence falls back to the default. The old Clear / ✕ buttons are
+    now "+30 days" (`snoozeFollowUp`, keeps a cadence, never pulls a date earlier). "Still working"
+    on the 30-day clock with no date gives a reminder-less lead the default.
+  - **Scope: leads that have replied** (`REMINDER_STAGES` = responded, meeting_booked,
+    warm_active, reach_out_later — the Today set). Not `outreach`: a board bulk touch on 150
+    never-replied leads would otherwise land 150 reminders in the bell on one morning.
+  - **The automatic check-in is a safety net, not a promise** (`isDefaultReminder`: note is
+    "30-day check-in"). "Gone quiet" and Today's day-3/7/14 marks only fire on leads with no
+    promise, so they treat it as none — otherwise the 30-day floor would mute them for a month.
+    One lead, one reason: once the check-in is inside the 14-day follow-up window, "gone quiet"
+    skips it.
+  - **Dead ends reminders on every path**: `updateLead`/`moveLead` to `passed` null the date and
+    cadence (`DEAD_REMINDER_RESET`), as does `disposeLead`'s dead.
+  - **Not done, by choice:** no backfill (a one-shot run would land hundreds of reminders on the
+    same day 30 days later — they get one the next time they're touched), and none at lead
+    creation. Explicitly blanking the date in a form or via the API is still allowed.
 - **Archiving leads (migration 049).** `crm_leads.is_archived` / `archived_at` /
   `archived_reason`, mirroring `people.is_archived` (029). Archived leads are out of every board,
   count, queue and notification, but **nothing is deleted** and un-archiving is one flag flip.
@@ -341,8 +364,11 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - Meetings booked comes from `crm_lead_stage_events`, which is append-only and still holds
     retired stage names (`cold_outreach` 27, `warm_lead` 2). **Map old→new when grouping by stage**
     or history silently under-counts.
-  - "Follow-up done" is matched on the `Followed up…` note prefix that `logFollowUpTouch` writes —
-    ugly, but it is the only marker. Do NOT count all notes: 214 of the last 416 activities were
+  - "Follow-up done" is matched on the `Followed up…` note prefix (`isFollowUpDoneNote`) —
+    ugly, but it is the only marker. Two writers produce it: `followUpNote` (Reached out — a typed
+    note keeps the prefix since 2026-11-15; before, it was written bare and never counted) and
+    `touchNote` (Touched, only when it completes a DUE follow-up). Guardrail:
+    `test/follow-up-done.test.js`. Do NOT count all notes: 214 of the last 416 activities were
     auto-generated "Lead created in CRM" rows, which would turn one import into a week of work.
   - Team totals sum **only the listed rows**; unattributed outreach is reported separately, never
     folded in. `dev+localtest` is filtered out of every per-person grid.
@@ -389,10 +415,13 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - **"Touched" and "Reached out" are deliberately different words** (Dev, 2026-11-13): touched =
     a lead you are already in conversation with; reached out = first outreach. Don't unify the
     button labels across Today and Notifications. Note they also write different activity notes
-    (`markLeadTouched` → `Touched…`, `logFollowUpTouch` → `Followed up…`), and the scoreboard's
-    "F/U done" column counts only the `Followed up` prefix — a follow-up cleared from Today's
-    "Follow-ups due" section with Touched does not count there. Raised with Dev 2026-11-13;
-    unresolved, and it is scoreboard maths, so don't change it from a UI pass.
+    (`markLeadTouched` → `Touched…`, `logFollowUpTouch` → `Followed up…`). **Resolved
+    2026-11-15 (Dev: yes):** a Touched on a lead that HAS a follow-up (date or cadence) is a
+    follow-up done **when it is due** (`isDueFollowUpTouch`: follow-up date today or earlier, or the
+    row came from Today's "Follow-ups due" section — which includes the dateless day-3/7/14 marks).
+    Then `touchNote` writes `Followed up (touched)…` and the scoreboard counts it. An early touch, a
+    bulk touch on the board ahead of the date, or a lead with no follow-up stays `Touched…`. Applies from that date —
+    older Touched rows can't be told apart after the fact, so there is no backfill.
 - **Card click on the Pipeline board opens the lead in a popup** (Dev, 2026-11-13 — same as the
   other boards), with an "Open full page" link to `/leads/:id` for everything else. The popup is
   `LeadForm` in edit mode and saves only the fields that changed, through the same `updateLead`

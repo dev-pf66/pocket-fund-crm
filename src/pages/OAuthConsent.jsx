@@ -56,7 +56,7 @@ function OAuthConsent() {
               <strong>{details.client?.name || 'An application'}</strong> wants to access the CRM as{' '}
               <strong>{details.user?.email}</strong>.
             </p>
-            <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
               It will be able to read and update leads, activities, investors, partners and tags — the same
               things you can do in the app. You can revoke it from the connector's settings.
             </p>

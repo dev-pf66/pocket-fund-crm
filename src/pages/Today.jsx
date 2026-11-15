@@ -17,6 +17,7 @@ import {
   markLeadTouched,
   pingDevOnLead,
   updateLead,
+  DEAD_LEAD_UPDATES,
   daysStaleFor,
   leadOwnerId
 } from '../lib/crm-api'
@@ -217,7 +218,7 @@ function Today() {
     if (!selectedLeads.length) return
     setBulkBusy(true)
     try {
-      const { succeeded, failed } = await bulkMarkTouched(selectedLeads, currentPerson.id)
+      const { succeeded, failed } = await bulkMarkTouched(selectedLeads, currentPerson.id, '', { followUpIds })
       removeFromQueues(succeeded)
       notifyFollowUpsChanged()
       clearSelection()
@@ -275,7 +276,7 @@ function Today() {
   async function handleTouched(lead, note) {
     setPendingId(lead.id)
     try {
-      await markLeadTouched(lead, currentPerson.id, note)
+      await markLeadTouched(lead, currentPerson.id, note, { followUp: followUpIds.has(lead.id) })
       notifyFollowUpsChanged()
       setQueue(prev => ({
         leads: prev.leads.filter(l => l.id !== lead.id),
@@ -314,7 +315,7 @@ function Today() {
   async function handleDismiss(lead) {
     setPendingId(lead.id)
     try {
-      await updateLead(lead.id, { stage: 'passed' }, currentPerson.id)
+      await updateLead(lead.id, { ...DEAD_LEAD_UPDATES }, currentPerson.id)
       setQueue(prev => ({
         leads: prev.leads.filter(l => l.id !== lead.id),
         total: Math.max(0, prev.total - 1)
@@ -383,7 +384,7 @@ function Today() {
   if (loading) {
     return (
       <div className="page-container">
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
           Loading your day…
         </div>
@@ -397,7 +398,7 @@ function Today() {
         <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
           <Sun size={24} /> Today
         </h1>
-        <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+        <p style={{ color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
           Your queue for {fmtDate(istToday())} — work top to bottom, every button logs itself.
         </p>
       </div>
@@ -409,10 +410,10 @@ function Today() {
         <div className="stat-card">
           <div className="stat-value">{movementFailed ? '—' : movement?.advanced ?? '…'}</div>
           <div className="stat-label">Moved forward this wk</div>
-          <div style={{ fontSize: '12px', color: movementFailed ? '#b91c1c' : '#6b7280', marginTop: '6px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: movementFailed ? 'var(--danger-text)' : 'var(--text-muted)', marginTop: '6px' }}>
             {movementFailed ? "couldn't load — retry"
               : movementDelta === null ? 'first week of tracking'
-              : <>vs last wk <span style={{ color: movementDelta >= 0 ? '#16a34a' : '#dc2626' }}>
+              : <>vs last wk <span style={{ color: movementDelta >= 0 ? 'var(--success-text)' : 'var(--danger)' }}>
                   {movementDelta >= 0 ? '+' : ''}{movementDelta}
                 </span></>}
           </div>
@@ -420,21 +421,21 @@ function Today() {
         <div className="stat-card">
           <div className="stat-value">{movementFailed ? '—' : movement?.replies ?? '…'}</div>
           <div className="stat-label">Replies this wk</div>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '6px' }}>
             {movementFailed ? '' : `${movement?.meetings ?? 0} meeting${movement?.meetings === 1 ? '' : 's'} booked`}
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{movementFailed ? '—' : movement?.live ?? '…'}</div>
           <div className="stat-label">Live conversations</div>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '6px' }}>
             {followUps.length} follow-up{followUps.length === 1 ? '' : 's'} due
           </div>
         </div>
         <div className={`stat-card ${escalations.length > 0 ? 'warning' : ''}`}>
           <div className="stat-value">{escalations.length}</div>
           <div className="stat-label">Escalations</div>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '6px' }}>
             {queue.total} to touch · {counters.overdueSLA} overdue
           </div>
         </div>
@@ -443,7 +444,7 @@ function Today() {
       {/* Admin: per-person touches this week */}
       {isAdmin && rollup.length > 0 && (
         <div className="card" style={{ padding: '12px 16px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
             What moved this week — team
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -451,8 +452,8 @@ function Today() {
               <span
                 key={r.personId}
                 style={{
-                  padding: '4px 10px', borderRadius: '999px', background: '#f3f4f6',
-                  fontSize: '13px', color: '#374151'
+                  padding: '4px 10px', borderRadius: 'var(--radius-pill)', background: 'var(--gray-100)',
+                  fontSize: 'var(--fs-base)', color: 'var(--text-2)'
                 }}
               >
                 {r.name} · <strong>{r.advanced}</strong> moved
@@ -471,10 +472,10 @@ function Today() {
           style={{
             padding: '12px 16px', marginBottom: '16px', display: 'flex',
             alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            background: '#fffbeb', border: '1px solid #fde68a'
+            background: 'var(--warning-bg)', border: '1px solid var(--warning-border)'
           }}
         >
-          <span style={{ fontSize: '14px', color: '#92400e' }}>
+          <span style={{ fontSize: 'var(--fs-md)', color: 'var(--warning-text-strong)' }}>
             <strong>{unassigned.length}</strong> lead{unassigned.length === 1 ? '' : 's'} unassigned — nobody is working them.
           </span>
           <button className="btn btn-sm btn-primary" onClick={handleClaimAll} disabled={claiming}>
@@ -490,11 +491,11 @@ function Today() {
           style={{
             padding: '10px 16px', marginBottom: '16px', display: 'flex',
             alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            flexWrap: 'wrap', background: 'var(--primary-light)', border: '1px solid var(--primary-border-soft)',
             position: 'sticky', top: '8px', zIndex: 5
           }}
         >
-          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--fs-md)', color: 'var(--primary-text)', fontWeight: 500 }}>
             {selectedIds.size} lead{selectedIds.size === 1 ? '' : 's'} selected
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -513,7 +514,7 @@ function Today() {
                 <div
                   style={{
                     position: 'absolute', right: 0, top: '100%', marginTop: '4px', zIndex: 10,
-                    background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px',
+                    background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: '120px', overflow: 'hidden'
                   }}
                 >
@@ -523,8 +524,8 @@ function Today() {
                       onClick={() => handleBulkSnooze(days)}
                       style={{
                         display: 'block', width: '100%', padding: '8px 12px', border: 'none',
-                        background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px',
-                        color: '#374151'
+                        background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--fs-base)',
+                        color: 'var(--text-2)'
                       }}
                     >
                       {label}
@@ -537,7 +538,7 @@ function Today() {
               className="btn btn-sm btn-secondary"
               onClick={handleBulkDismiss}
               disabled={bulkBusy}
-              style={{ color: '#b91c1c' }}
+              style={{ color: 'var(--danger-text)' }}
             >
               <XCircle size={14} /> Mark dead
             </button>
@@ -652,12 +653,12 @@ function Today() {
 function SectionCard({ icon, title, subtitle, headerExtra, children }) {
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '16px' }}>
-      <div style={{ padding: '14px 18px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+      <div style={{ padding: '14px 18px', background: 'var(--surface-subtle)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: '#111827', fontSize: '15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: 'var(--text)', fontSize: '15px' }}>
             {icon} {title}
           </div>
-          {subtitle && <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{subtitle}</div>}
+          {subtitle && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '2px' }}>{subtitle}</div>}
         </div>
         {headerExtra}
       </div>
@@ -684,9 +685,9 @@ function SelectAllCheckbox({ ids, selectedIds, onToggle }) {
 
 function EmptyState({ icon, title, children }) {
   return (
-    <div style={{ padding: '28px 16px', textAlign: 'center', color: '#6b7280' }}>
-      {icon && <div style={{ color: '#9ca3af', marginBottom: '8px' }}>{icon}</div>}
-      <div style={{ fontSize: '14px', marginBottom: children ? '12px' : 0 }}>{title}</div>
+    <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+      {icon && <div style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>{icon}</div>}
+      <div style={{ fontSize: 'var(--fs-md)', marginBottom: children ? '12px' : 0 }}>{title}</div>
       {children}
     </div>
   )
@@ -742,7 +743,7 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
   }
 
   return (
-    <div style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 10px', opacity: busy ? 0.5 : 1 }}>
+    <div style={{ borderBottom: '1px solid var(--gray-100)', padding: '12px 10px', opacity: busy ? 0.5 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
         {onToggleSelect && (
           <input
@@ -756,15 +757,15 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
         )}
         <div style={{ flex: 1, minWidth: '220px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 500, color: '#111827', fontSize: '14px' }}>
+            <span style={{ fontWeight: 500, color: 'var(--text)', fontSize: 'var(--fs-md)' }}>
               {lead.name || 'Unknown'}
             </span>
-            {lead.firm_name && <span style={{ color: '#6b7280', fontSize: '13px' }}>— {lead.firm_name}</span>}
+            {lead.firm_name && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>— {lead.firm_name}</span>}
             <StageChip stage={lead.stage} />
             {settings && <StalenessBadge lead={lead} settings={settings} />}
             {coveredOwner && <CoveredOwnerChip name={coveredOwner} />}
           </div>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '2px' }}>
             {contextOverride || touchContext(lead)}
           </div>
         </div>
@@ -819,7 +820,7 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
               <div
                 style={{
                   position: 'absolute', right: 0, top: '100%', marginTop: '4px', zIndex: 10,
-                  background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px',
+                  background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: '120px', overflow: 'hidden'
                 }}
               >
@@ -829,8 +830,8 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
                     onClick={() => { setShowSnooze(false); onSnooze(lead, days) }}
                     style={{
                       display: 'block', width: '100%', padding: '8px 12px', border: 'none',
-                      background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px',
-                      color: '#374151'
+                      background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--fs-base)',
+                      color: 'var(--text-2)'
                     }}
                   >
                     {label}
@@ -860,8 +861,8 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
             placeholder="One-line note — logged with the touch (Enter to log)"
             autoFocus
             style={{
-              flex: 1, padding: '6px 8px', fontSize: '13px',
-              border: '1px solid #e5e7eb', borderRadius: '4px'
+              flex: 1, padding: '6px 8px', fontSize: 'var(--fs-base)',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)'
             }}
           />
         </div>
@@ -875,7 +876,7 @@ function CoveredOwnerChip({ name }) {
   return (
     <span
       title={`You cover ${name}'s leads. Still ${name}'s lead — your work on it is credited to you.`}
-      style={{ fontSize: '11px', fontWeight: 500, color: '#5b21b6', background: '#ede9fe', borderRadius: '9999px', padding: '1px 8px' }}
+      style={{ fontSize: 'var(--fs-xs)', fontWeight: 500, color: '#5b21b6', background: '#ede9fe', borderRadius: 'var(--radius-pill)', padding: '1px 8px' }}
     >
       {name}&apos;s lead
     </span>
@@ -891,21 +892,21 @@ function EscalationRow({ lead, settings, busy, pinged, ownerName, onPing }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
-      padding: '12px 10px', borderBottom: '1px solid #f3f4f6', opacity: busy ? 0.5 : 1
+      padding: '12px 10px', borderBottom: '1px solid var(--gray-100)', opacity: busy ? 0.5 : 1
     }}>
       <div style={{ flex: 1, minWidth: '220px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 500, color: '#111827', fontSize: '14px' }}>
+          <span style={{ fontWeight: 500, color: 'var(--text)', fontSize: 'var(--fs-md)' }}>
             {lead.name || 'Unknown'}
           </span>
-          {lead.firm_name && <span style={{ color: '#6b7280', fontSize: '13px' }}>— {lead.firm_name}</span>}
+          {lead.firm_name && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>— {lead.firm_name}</span>}
           <StageChip stage={lead.stage} />
           {settings && <StalenessBadge lead={lead} settings={settings} />}
           {ownerName && (
-            <span style={{ fontSize: '12px', color: '#6b7280' }}>owner: {ownerName}</span>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>owner: {ownerName}</span>
           )}
         </div>
-        <div style={{ fontSize: '12px', color: '#b45309', marginTop: '2px' }}>{reason}</div>
+        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--warning-text)', marginTop: '2px' }}>{reason}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <button

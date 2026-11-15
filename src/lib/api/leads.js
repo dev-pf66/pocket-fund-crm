@@ -10,6 +10,8 @@ import { cacheGet, cacheSet, cacheClear, fireTTEvent, istDateStr, getDaysBetween
 import { getCRMSettings } from './misc.js'
 import { getCoveredOwnerIds } from './cover.js'
 import { AWAITING_STATUSES } from '../outreachStatus.js'
+import { DEFAULT_FOLLOW_UP_DAYS, DEFAULT_FOLLOW_UP_NOTE, getsDefaultReminder, DEAD_REMINDER_RESET } from '../followUpPolicy.js'
+import { istToday, istAddDays } from '../dateUtils.js'
 
 // ============================================================================
 // LEADS API
@@ -429,6 +431,12 @@ export async function updateLead(id, updates, currentPersonId = null) {
   // fire lead_stage_changed with oldStage when it actually moves. Only
   // pay for the extra read when stage is in scope — most updates aren't
   // stage moves and shouldn't bear the cost.
+  // Dead ends reminders, however the lead got to passed (board bulk action,
+  // stage dropdown, popup, API). An explicit date in the same update wins.
+  if (cleanUpdates.stage === 'passed') {
+    for (const [k, v] of Object.entries(DEAD_REMINDER_RESET)) if (!(k in cleanUpdates)) cleanUpdates[k] = v
+  }
+
   let priorStage = null
   if (cleanUpdates.stage !== undefined) {
     const { data: prior } = await supabase
@@ -478,9 +486,10 @@ export async function moveLead(id, newStage, currentPersonId) {
     .single()
   const oldStage = prior?.stage ?? null
 
+  // Dragging a lead to passed ends its reminders, same as every other dead path.
   const { data, error } = await supabase
     .from('crm_leads')
-    .update({ stage: newStage })
+    .update(newStage === 'passed' ? { stage: newStage, ...DEAD_REMINDER_RESET } : { stage: newStage })
     .eq('id', id)
     .select()
     .single()
@@ -971,8 +980,7 @@ export async function disposeLead(leadId, { disposition, reason = null, note = n
       : reason
     updates.dead_reason_note = note || null
     // A dead lead never nags again.
-    updates.next_follow_up_date = null
-    updates.follow_up_cadence = null
+    Object.assign(updates, DEAD_REMINDER_RESET)
   } else if (disposition === 'later') {
     updates.stage = 'reach_out_later'
     updates.reach_out_later_date = followUpDate
@@ -982,6 +990,19 @@ export async function disposeLead(leadId, { disposition, reason = null, note = n
     // working — no stage change, but the clock is answered.
     if (followUpDate) updates.next_follow_up_date = followUpDate
     if (note) updates.follow_up_note = note
+    // A live lead always has a next reminder (Dev, 2026-11-16). "Still working"
+    // with no date on a lead that has none gets the default check-in.
+    // If the read fails, leave the reminder alone rather than risk
+    // overwriting a real one with the default.
+    if (!followUpDate) {
+      const { data: current, error: readError } = await supabase
+        .from('crm_leads').select('next_follow_up_date, stage').eq('id', leadId).single()
+      if (readError) console.error('disposeLead: could not read the current reminder; leaving it as is', readError)
+      else if (!current?.next_follow_up_date && getsDefaultReminder(current)) {
+        updates.next_follow_up_date = istAddDays(istToday(), DEFAULT_FOLLOW_UP_DAYS)
+        if (!note) updates.follow_up_note = DEFAULT_FOLLOW_UP_NOTE
+      }
+    }
   }
 
   const updated = await updateLead(leadId, updates, currentPersonId)

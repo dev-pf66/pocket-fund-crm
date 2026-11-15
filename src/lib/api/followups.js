@@ -13,6 +13,7 @@ import { supabase } from '../supabase.js'
 import { istToday, istAddDays } from '../dateUtils.js'
 import { cacheClear } from './core.js'
 import { updateLead, logActivity } from './leads.js'
+import { DEFAULT_FOLLOW_UP_DAYS, DEFAULT_FOLLOW_UP_NOTE, getsDefaultReminder } from '../followUpPolicy.js'
 import { ownerScopeIds, scopeToOwners } from './cover.js'
 
 // A lead that's won or dead never nags.
@@ -129,7 +130,32 @@ export async function snoozeFollowUp(lead, days, { note = null } = {}, currentPe
   return setFollowUp(lead.id, { date, note, keepCadence }, currentPersonId)
 }
 
-/** Drop the reminder entirely — no date, no note, no cadence. */
+/**
+ * EVERY LIVE LEAD ALWAYS HAS A NEXT REMINDER (Dev, 2026-11-16: "there should
+ * always be an automatic follow-up reminder, unless we are marking the lead as
+ * dead — whether that's 30 days, 90 days"). Wherever a follow-up is completed
+ * or removed — Touched, Reached out, a cadence running out, the clear buttons —
+ * the next reminder lands DEFAULT_FOLLOW_UP_DAYS out instead of the lead going
+ * silent. Only marking a lead dead (stage → passed) ends its reminders.
+ * Guardrail: test/always-a-reminder.test.js. Change the interval here only.
+ */
+export { DEFAULT_FOLLOW_UP_DAYS, DEFAULT_FOLLOW_UP_NOTE }
+
+export function defaultFollowUpDate(today = istToday()) {
+  return istAddDays(today, DEFAULT_FOLLOW_UP_DAYS)
+}
+
+/** Replace whatever reminder a lead has with the default check-in (ends any cadence). */
+export async function resetFollowUpToDefault(leadId, currentPersonId = null) {
+  return setFollowUp(leadId, { date: defaultFollowUpDate(), note: DEFAULT_FOLLOW_UP_NOTE }, currentPersonId)
+}
+
+/**
+ * Drop the reminder entirely — no date, no note, no cadence. Since 2026-11-16
+ * a replied lead never takes this path (resetFollowUpToDefault instead); it is
+ * only used to retire a spent reminder on a lead outside REMINDER_STAGES.
+ * Dead leads clear theirs in the same update that sets stage passed.
+ */
 export async function clearFollowUp(leadId, currentPersonId = null) {
   const updated = await updateLead(leadId, {
     next_follow_up_date: null,
@@ -167,7 +193,7 @@ export async function applyFollowUpCadence(leadId, cadence, { note = null } = {}
  *
  * Steps that have already gone by are skipped — a lead touched on day 12 of a
  * 3/10/30 cadence jumps straight to day 30. When the cadence runs out, the
- * reminder clears and the lead falls back to normal staleness ranking.
+ * lead gets the default check-in DEFAULT_FOLLOW_UP_DAYS out (never no reminder).
  *
  * Returns the cadence state that was written, or null if the lead had no
  * cadence running / the cadence finished.
@@ -195,10 +221,12 @@ export async function advanceFollowUpCadence(lead, currentPersonId = null) {
   }
 
   if (!nextDate) {
+    // Cadence finished: a replied lead still gets a next reminder, never silence.
+    const keep = getsDefaultReminder(lead)
     await updateLead(lead.id, {
-      next_follow_up_date: null,
+      next_follow_up_date: keep ? defaultFollowUpDate(today) : null,
       follow_up_cadence: null,
-      follow_up_note: null
+      follow_up_note: keep ? DEFAULT_FOLLOW_UP_NOTE : null
     }, currentPersonId)
     cacheClear('leads')
     return null
@@ -211,19 +239,40 @@ export async function advanceFollowUpCadence(lead, currentPersonId = null) {
 }
 
 /**
+ * The note a "Reached out" follow-up touch writes. It must ALWAYS start with
+ * `Followed up` — that prefix is what the scoreboard's "F/U done" column counts.
+ * A typed note used to be written bare, so a follow-up logged with a note
+ * counted nowhere (fixed 2026-11-15; test/follow-up-done.test.js).
+ */
+export function followUpNote(lead, note = '') {
+  const trimmed = (note || '').trim()
+  if (trimmed) return `Followed up — ${trimmed}`
+  return `Followed up${lead?.follow_up_note ? ` — ${lead.follow_up_note}` : ''}`
+}
+
+/**
  * Log the reach-out and roll the cadence forward in one call — what the
  * "Reached out" button on the follow-up card does.
  */
 export async function logFollowUpTouch(lead, currentPersonId, { note = '', activityType = 'note' } = {}) {
-  const trimmed = (note || '').trim()
   const activity = await logActivity(lead.id, {
     activity_type: activityType,
-    notes: trimmed || `Followed up${lead.follow_up_note ? ` — ${lead.follow_up_note}` : ''}`
+    notes: followUpNote(lead, note)
   }, currentPersonId)
 
-  // No cadence running: the one-off reminder is spent, so retire it.
+  // No cadence running: the one-off reminder is spent. A replied lead gets the
+  // default check-in next (it never goes without one unless dead); anything else
+  // just retires the spent reminder, as before. Unlike an early Touched, Reached
+  // out is explicitly about THIS follow-up, so it consumes a future one too.
+  // The activity is already logged, so a failed reminder write is reported, not
+  // thrown — a thrown error invites a retry that logs the follow-up twice.
   if (!lead.follow_up_cadence?.offsets?.length) {
-    if (lead.next_follow_up_date) await clearFollowUp(lead.id, currentPersonId)
+    try {
+      if (getsDefaultReminder(lead)) await resetFollowUpToDefault(lead.id, currentPersonId)
+      else if (lead.next_follow_up_date) await clearFollowUp(lead.id, currentPersonId)
+    } catch (err) {
+      console.error('Scheduling the next reminder failed (reach-out was logged):', err)
+    }
     return { activity, cadence: null }
   }
   const cadence = await advanceFollowUpCadence(lead, currentPersonId)

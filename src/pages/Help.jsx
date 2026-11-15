@@ -106,7 +106,7 @@ function Help() {
             Help & Documentation
           </h1>
           {lastUpdated && (
-            <p style={{ color: 'var(--gray-600)', margin: '8px 0 0 0', fontSize: '14px' }}>
+            <p style={{ color: 'var(--gray-600)', margin: '8px 0 0 0', fontSize: 'var(--fs-md)' }}>
               Last updated: {new Date(lastUpdated).toLocaleDateString('en-US', {
                 month: 'long',
                 day: 'numeric',
@@ -167,7 +167,7 @@ function Help() {
           <Search size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
           <div>No help articles found</div>
           {searchQuery && (
-            <div style={{ marginTop: '8px', fontSize: '14px' }}>
+            <div style={{ marginTop: '8px', fontSize: 'var(--fs-md)' }}>
               Try a different search term or <button onClick={() => setSearchQuery('')} style={{ color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>clear search</button>
             </div>
           )}
@@ -176,10 +176,10 @@ function Help() {
         Object.entries(groupedArticles).map(([category, categoryArticles]) => (
           <div key={category} className="card" style={{ marginBottom: '24px' }}>
             <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <span style={{ fontSize: '24px' }}>{CATEGORIES[category]?.icon}</span>
+              <span style={{ fontSize: 'var(--fs-2xl)' }}>{CATEGORIES[category]?.icon}</span>
               {CATEGORIES[category]?.label || category}
               <span style={{
-                fontSize: '14px',
+                fontSize: 'var(--fs-md)',
                 fontWeight: 'normal',
                 color: 'var(--gray-500)',
                 marginLeft: 'auto'
@@ -194,7 +194,7 @@ function Help() {
                   key={article.id}
                   style={{
                     border: '1px solid var(--gray-200)',
-                    borderRadius: '8px',
+                    borderRadius: 'var(--radius-md)',
                     overflow: 'hidden'
                   }}
                 >
@@ -218,7 +218,7 @@ function Help() {
                     )}
                     <h3 style={{
                       margin: 0,
-                      fontSize: '16px',
+                      fontSize: 'var(--fs-lg)',
                       fontWeight: '600',
                       flex: 1
                     }}>
@@ -249,7 +249,7 @@ function Help() {
                           marginTop: '20px',
                           paddingTop: '12px',
                           borderTop: '1px solid var(--gray-100)',
-                          fontSize: '13px',
+                          fontSize: 'var(--fs-base)',
                           color: 'var(--gray-500)'
                         }}>
                           Last updated: {new Date(article.updated_at).toLocaleDateString()}

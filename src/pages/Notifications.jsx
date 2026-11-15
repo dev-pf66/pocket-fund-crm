@@ -5,7 +5,7 @@ import {
   getNotificationFeed,
   logFollowUpTouch,
   snoozeFollowUp,
-  clearFollowUp,
+  DEFAULT_FOLLOW_UP_DAYS,
   assignLead
 } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
@@ -105,8 +105,6 @@ function Notifications() {
     logFollowUpTouch(item.lead, currentPerson.id))
   const handleSnooze = (item, days) => act(item, `${item.title} pushed ${days} day${days === 1 ? '' : 's'}`, () =>
     snoozeFollowUp(item.lead, days, { note: item.lead?.follow_up_note }, currentPerson.id))
-  const handleClear = item => act(item, `Reminder cleared on ${item.title}`, () =>
-    clearFollowUp(item.leadId, currentPerson.id))
   const handleClaim = item => act(item, `${item.title} assigned to you`, () =>
     assignLead(item.leadId, currentPerson.id, currentPerson.id))
 
@@ -116,7 +114,7 @@ function Notifications() {
   if (loading) {
     return (
       <div className="page-container">
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
           Working out what needs you…
         </div>
@@ -131,13 +129,13 @@ function Notifications() {
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
             <Bell size={24} /> Notifications
           </h1>
-          <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+          <p style={{ color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
             Promised callbacks, scheduled reach-outs, demos on the calendar, and conversations that have gone quiet.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {isAdmin && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#374151' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-base)', color: 'var(--text-2)' }}>
               <input
                 type="checkbox"
                 checked={showAllOwners}
@@ -155,11 +153,11 @@ function Notifications() {
       {/* A source that failed must say so. A notification page that silently
           under-reports is worse than one that is plainly down. */}
       {feed.errors?.length > 0 && (
-        <div className="card" style={{ padding: '12px 14px', marginBottom: '16px', background: '#fffbeb', border: '1px solid #fde68a' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400e', fontSize: '13px', fontWeight: 600 }}>
+        <div className="card" style={{ padding: '12px 14px', marginBottom: '16px', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--warning-text-strong)', fontSize: 'var(--fs-base)', fontWeight: 600 }}>
             <AlertTriangle size={15} /> Showing an incomplete list
           </div>
-          <div style={{ fontSize: '12px', color: '#92400e', marginTop: '4px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--warning-text-strong)', marginTop: '4px' }}>
             {feed.errors.map(e => `${e.source}: ${e.message}`).join(' · ')}
           </div>
         </div>
@@ -212,10 +210,10 @@ function Notifications() {
       )}
 
       {visible.length === 0 && (
-        <div className="card" style={{ padding: '36px', textAlign: 'center', color: '#6b7280' }}>
-          <Bell size={32} style={{ color: '#9ca3af', marginBottom: '8px' }} />
-          <div style={{ fontSize: '14px', marginBottom: '4px' }}>Nothing is waiting on you.</div>
-          <div style={{ fontSize: '13px' }}>
+        <div className="card" style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <Bell size={32} style={{ color: 'var(--text-muted)', marginBottom: '8px' }} />
+          <div style={{ fontSize: 'var(--fs-md)', marginBottom: '4px' }}>Nothing is waiting on you.</div>
+          <div style={{ fontSize: 'var(--fs-base)' }}>
             Every promised callback is made, nothing has gone quiet past its threshold, and nothing is due.
           </div>
         </div>
@@ -230,12 +228,12 @@ function Notifications() {
           showOwner={isAdmin && showAllOwners}
           viewerId={currentPerson?.id}
           pendingId={pendingId}
-          handlers={{ handleTouch, handleSnooze, handleClear, handleClaim }}
+          handlers={{ handleTouch, handleSnooze, handleClaim }}
         />
       ))}
 
       {feed.truncated && (
-        <div style={{ textAlign: 'center', fontSize: '12px', color: '#6b7280', padding: '8px' }}>
+        <div style={{ textAlign: 'center', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', padding: '8px' }}>
           Showing the top {feed.items.length}. Work these down, or archive what is never coming back
           (Admin → Archive old leads).
         </div>
@@ -249,17 +247,17 @@ function Section({ title, subtitle, tone, items, personById, showOwner, viewerId
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '16px' }}>
       <div style={{
-        padding: '14px 18px', borderBottom: '1px solid #e5e7eb',
-        background: tone === 'danger' ? '#fef2f2' : '#f9fafb'
+        padding: '14px 18px', borderBottom: '1px solid var(--border)',
+        background: tone === 'danger' ? 'var(--danger-bg)' : 'var(--surface-subtle)'
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '15px',
-          color: tone === 'danger' ? '#991b1b' : '#111827'
+          color: tone === 'danger' ? 'var(--danger-text-strong)' : 'var(--text)'
         }}>
           {tone === 'danger' ? <AlarmClock size={16} /> : <CalendarClock size={16} />}
-          {title} <span style={{ fontWeight: 500, color: '#6b7280' }}>({items.length})</span>
+          {title} <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>({items.length})</span>
         </div>
-        {subtitle && <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{subtitle}</div>}
+        {subtitle && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '2px' }}>{subtitle}</div>}
       </div>
       <div style={{ padding: '10px' }}>
         {items.map(item => (
@@ -286,29 +284,29 @@ function Row({ item, ownerName, busy, handlers }) {
   const cadence = item.lead?.follow_up_cadence
 
   return (
-    <div style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 10px', opacity: busy ? 0.5 : 1 }}>
+    <div style={{ borderBottom: '1px solid var(--gray-100)', padding: '12px 10px', opacity: busy ? 0.5 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: '240px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px',
+              display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--fs-xs)',
               fontWeight: 600, color: meta.tone, border: `1px solid ${meta.tone}33`,
-              background: `${meta.tone}11`, borderRadius: '4px', padding: '1px 6px'
+              background: `${meta.tone}11`, borderRadius: 'var(--radius-sm)', padding: '1px 6px'
             }}>
               <Icon size={11} /> {meta.label}
             </span>
-            <span style={{ fontWeight: 500, color: '#111827', fontSize: '14px' }}>{item.title}</span>
-            {item.subtitle && <span style={{ color: '#6b7280', fontSize: '13px' }}>— {item.subtitle}</span>}
+            <span style={{ fontWeight: 500, color: 'var(--text)', fontSize: 'var(--fs-md)' }}>{item.title}</span>
+            {item.subtitle && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>— {item.subtitle}</span>}
             {item.stage && <StageChip stage={item.stage} />}
             <span style={{
-              fontSize: '12px', fontWeight: 600,
-              color: item.urgency === 'overdue' ? '#b91c1c' : item.urgency === 'today' ? '#0c4a6e' : '#6b7280'
+              fontSize: 'var(--fs-sm)', fontWeight: 600,
+              color: item.urgency === 'overdue' ? 'var(--danger-text)' : item.urgency === 'today' ? '#0c4a6e' : 'var(--text-muted)'
             }}>
               {item.timing}
             </span>
-            {ownerName && <span style={{ fontSize: '12px', color: '#6b7280' }}>owner: {ownerName}</span>}
+            {ownerName && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>owner: {ownerName}</span>}
           </div>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '2px' }}>
             {item.detail || 'No note on this one'}
             {item.meta && <span style={{ marginLeft: '8px' }}>{item.meta}</span>}
             {cadence?.offsets?.length > 0 && (
@@ -329,7 +327,9 @@ function Row({ item, ownerName, busy, handlers }) {
                 title="Log the reach-out — a cadence rolls to its next day automatically">
                 <Check size={14} /> Reached out
               </button>
-              {[[1, '+1d'], [7, '+1w']].map(([days, label]) => (
+              {/* The ✕ "drop the reminder" button became +30d (Dev, 2026-11-16): a
+                  live lead always has a next reminder; only marking it dead ends them. */}
+              {[[1, '+1d'], [7, '+1w'], [DEFAULT_FOLLOW_UP_DAYS, `+${DEFAULT_FOLLOW_UP_DAYS}d`]].map(([days, label]) => (
                 <button key={days} className="btn btn-sm btn-secondary" onClick={() => handlers.handleSnooze(item, days)} disabled={busy}>
                   {label}
                 </button>
@@ -352,12 +352,6 @@ function Row({ item, ownerName, busy, handlers }) {
             <span className="btn btn-sm btn-secondary btn-slot-empty" title="No LinkedIn on file" aria-hidden="true">
               <ExternalLink size={14} />
             </span>
-          )}
-          {item.kind === 'followup' && (
-            <button className="btn btn-sm btn-secondary btn-danger-quiet" onClick={() => handlers.handleClear(item)} disabled={busy}
-              title="Drop the reminder entirely" aria-label="Drop the reminder">
-              <X size={14} />
-            </button>
           )}
         </div>
       </div>

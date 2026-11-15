@@ -29,19 +29,19 @@ function ActivityFeed({ limit = 15 }) {
   function getActivityIcon(actionType) {
     switch (actionType) {
       case 'lead_created':
-        return <UserPlus size={16} color="#3b82f6" />
+        return <UserPlus size={16} color="var(--primary)" />
       case 'lead_assigned':
         return <User size={16} color="#8b5cf6" />
       case 'outreach_logged':
         return <Send size={16} color="#10b981" />
       case 'status_changed':
-        return <TrendingUp size={16} color="#f59e0b" />
+        return <TrendingUp size={16} color="var(--warning-text)" />
       case 'lead_qualified':
         return <CheckCircle size={16} color="#06b6d4" />
       case 'lead_replied':
-        return <CheckCircle size={16} color="#22c55e" />
+        return <CheckCircle size={16} color="var(--success-text)" />
       default:
-        return <Activity size={16} color="#6b7280" />
+        return <Activity size={16} color="var(--text-muted)" />
     }
   }
 
@@ -71,7 +71,7 @@ function ActivityFeed({ limit = 15 }) {
       <div style={{ padding: '32px', textAlign: 'center', color: 'var(--gray-500)' }}>
         <Activity size={48} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
         <div>No recent activity yet</div>
-        <div style={{ fontSize: '14px', marginTop: '8px' }}>Team actions will appear here</div>
+        <div style={{ fontSize: 'var(--fs-md)', marginTop: '8px' }}>Team actions will appear here</div>
       </div>
     )
   }
@@ -96,7 +96,7 @@ function ActivityFeed({ limit = 15 }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '14px',
+            fontSize: 'var(--fs-md)',
             fontWeight: '600',
             flexShrink: 0
           }}>
@@ -106,7 +106,7 @@ function ActivityFeed({ limit = 15 }) {
           {/* Activity Content */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize: '14px',
+              fontSize: 'var(--fs-md)',
               lineHeight: '1.5',
               color: 'var(--gray-700)',
               marginBottom: '4px'
@@ -114,7 +114,7 @@ function ActivityFeed({ limit = 15 }) {
               {activity.description}
             </div>
             <div style={{
-              fontSize: '12px',
+              fontSize: 'var(--fs-sm)',
               color: 'var(--gray-500)',
               display: 'flex',
               alignItems: 'center',
@@ -130,7 +130,7 @@ function ActivityFeed({ limit = 15 }) {
                     style={{
                       color: 'var(--primary)',
                       textDecoration: 'none',
-                      fontSize: '12px'
+                      fontSize: 'var(--fs-sm)'
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >

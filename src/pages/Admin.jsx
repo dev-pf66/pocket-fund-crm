@@ -64,31 +64,31 @@ function FieldOptionsSection({ title, fieldName, hint }) {
   return (
     <div className="card" style={{ padding: '20px', marginBottom: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: '600' }}>
+        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-lg)', fontWeight: '600' }}>
           <List size={18} /> {title}
         </h3>
-        <span style={{ fontSize: '13px', color: '#6b7280' }}>{loading ? '' : `${options.length} options`}</span>
+        <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>{loading ? '' : `${options.length} options`}</span>
       </div>
-      {hint && <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#9ca3af' }}>{hint}</p>}
+      {hint && <p style={{ margin: '0 0 12px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{hint}</p>}
 
       {loading ? (
-        <div style={{ padding: '12px 0', color: '#6b7280', fontSize: '13px' }}>Loading…</div>
+        <div style={{ padding: '12px 0', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>Loading…</div>
       ) : (
         <>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
             {options.map(opt => (
-              <div key={opt.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 10px', background: '#f3f4f6', borderRadius: '20px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+              <div key={opt.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 10px', background: 'var(--gray-100)', borderRadius: '20px', fontSize: 'var(--fs-base)', fontWeight: '500', color: 'var(--text-2)' }}>
                 {opt.value}
-                <button onClick={() => handleDelete(opt)} disabled={deletingId === opt.id} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center', color: '#9ca3af' }}>
+                <button onClick={() => handleDelete(opt)} disabled={deletingId === opt.id} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
                   <Trash2 size={13} />
                 </button>
               </div>
             ))}
-            {options.length === 0 && <span style={{ fontSize: '13px', color: '#9ca3af' }}>No options yet.</span>}
+            {options.length === 0 && <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>No options yet.</span>}
           </div>
           <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', maxWidth: '400px' }}>
             <input type="text" value={newValue} onChange={e => setNewValue(e.target.value)} placeholder="Add new option…" maxLength={80}
-              style={{ flex: 1, padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }} />
+              style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', fontSize: 'var(--fs-md)' }} />
             <button type="submit" className="btn btn-primary btn-sm" disabled={adding || !newValue.trim()} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Plus size={14} /> {adding ? 'Adding…' : 'Add'}
             </button>
@@ -173,7 +173,7 @@ function ArchiveSweepSection() {
         <Archive size={18} />
         <h2 style={{ margin: 0, fontSize: '18px' }}>Archive old leads</h2>
       </div>
-      <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+      <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', marginBottom: '16px' }}>
         Takes leads nobody has touched in a long time out of the boards, the counts and the
         notification feed. Nothing is deleted — every row, activity and call is kept, and
         archived leads still block duplicate imports. Clients are never swept.
@@ -181,24 +181,24 @@ function ArchiveSweepSection() {
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end', marginBottom: '14px' }}>
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+          <label style={{ display: 'block', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-2)', marginBottom: '6px' }}>
             No activity in (days)
           </label>
           <input
             type="number" min="1" max="3650" value={days}
             onChange={e => { setDays(Number(e.target.value)); setPreview(null) }}
             disabled={busy}
-            style={{ width: '110px', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+            style={{ width: '110px', padding: '8px 10px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', fontSize: 'var(--fs-md)' }}
           />
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#374151' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-base)', color: 'var(--text-2)' }}>
           <input
             type="checkbox" checked={includeEngaged} disabled={busy}
             onChange={e => { setIncludeEngaged(e.target.checked); setPreview(null) }}
           />
           Include leads that replied (responded / meeting / warm)
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#374151' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-base)', color: 'var(--text-2)' }}>
           <input
             type="checkbox" checked={keepScheduled} disabled={busy}
             onChange={e => { setKeepScheduled(e.target.checked); setPreview(null) }}
@@ -211,10 +211,10 @@ function ArchiveSweepSection() {
       </div>
 
       {preview && (
-        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '14px', background: '#f9fafb' }}>
-          <div style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '8px' }}>
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '14px', background: 'var(--surface-subtle)' }}>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>
             {preview.total} of {preview.scanned} live leads would be archived
-            <span style={{ fontWeight: 400, color: '#6b7280', fontSize: '13px' }}>
+            <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
               {' '}— nothing touched since {preview.criteria.cutoff}
             </span>
           </div>
@@ -224,27 +224,27 @@ function ArchiveSweepSection() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
                 {Object.entries(preview.byStage).sort((a, b) => b[1] - a[1]).map(([stage, n]) => (
                   <span key={stage} style={{
-                    fontSize: '12px', padding: '3px 8px', borderRadius: '4px',
-                    background: 'white', border: '1px solid #e5e7eb', color: '#374151'
+                    fontSize: 'var(--fs-sm)', padding: '3px 8px', borderRadius: 'var(--radius-sm)',
+                    background: 'white', border: '1px solid var(--border)', color: 'var(--text-2)'
                   }}>
                     {stage.replace(/_/g, ' ')}: <strong>{n}</strong>
                   </span>
                 ))}
               </div>
 
-              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 Oldest {Math.min(preview.sample.length, 20)}:
               </div>
-              <div style={{ maxHeight: '190px', overflowY: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+              <div style={{ maxHeight: '190px', overflowY: 'auto', background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                 {preview.sample.map(s => (
                   <div key={s.id} style={{
                     display: 'flex', justifyContent: 'space-between', gap: '10px',
-                    padding: '6px 10px', fontSize: '12px', borderBottom: '1px solid #f3f4f6'
+                    padding: '6px 10px', fontSize: 'var(--fs-sm)', borderBottom: '1px solid var(--gray-100)'
                   }}>
-                    <span style={{ color: '#111827' }}>
+                    <span style={{ color: 'var(--text)' }}>
                       {s.name || 'Unknown'}{s.firm_name ? ` — ${s.firm_name}` : ''}
                     </span>
-                    <span style={{ color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {s.stage.replace(/_/g, ' ')} · {s.lastTouched}
                     </span>
                   </div>
@@ -266,11 +266,11 @@ function ArchiveSweepSection() {
 
       {lastSweep && (
         <div style={{
-          border: '1px solid #bbf7d0', background: '#f0fdf4', borderRadius: '8px',
+          border: '1px solid var(--success-border)', background: 'var(--success-bg)', borderRadius: 'var(--radius-md)',
           padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           gap: '12px', flexWrap: 'wrap'
         }}>
-          <div style={{ fontSize: '13px', color: '#166534' }}>
+          <div style={{ fontSize: 'var(--fs-base)', color: 'var(--success-text-strong)' }}>
             Archived <strong>{lastSweep.archived}</strong> leads with no activity in {lastSweep.criteria.days} days.
             They are out of the boards and the feed, and fully recoverable.
           </div>
@@ -602,7 +602,7 @@ function Admin() {
         <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
           <Shield size={24} /> Admin
         </h1>
-        <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+        <p style={{ color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
           Manage users, admin access, and lead configuration.
         </p>
       </div>
@@ -610,16 +610,16 @@ function Admin() {
       {/* Lead Types */}
       <div className="card" style={{ padding: '20px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: '600' }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-lg)', fontWeight: '600' }}>
             <Tag size={18} /> Lead Types
           </h3>
-          <span style={{ fontSize: '13px', color: '#6b7280' }}>
+          <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
             {leadTypesLoading ? '' : `${leadTypes.length} types`}
           </span>
         </div>
 
         {leadTypesLoading ? (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
             <div className="loading-spinner" style={{ margin: '0 auto 8px' }}></div>
             Loading…
           </div>
@@ -631,8 +631,8 @@ function Admin() {
                   key={type.id}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    padding: '5px 10px', background: '#f3f4f6', borderRadius: '20px',
-                    fontSize: '13px', fontWeight: '500', color: '#374151'
+                    padding: '5px 10px', background: 'var(--gray-100)', borderRadius: '20px',
+                    fontSize: 'var(--fs-base)', fontWeight: '500', color: 'var(--text-2)'
                   }}
                 >
                   {type.name}
@@ -643,7 +643,7 @@ function Admin() {
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
                       padding: '0 2px', display: 'flex', alignItems: 'center',
-                      color: '#9ca3af', lineHeight: 1
+                      color: 'var(--text-muted)', lineHeight: 1
                     }}
                   >
                     <Trash2 size={13} />
@@ -651,7 +651,7 @@ function Admin() {
                 </div>
               ))}
               {leadTypes.length === 0 && (
-                <span style={{ fontSize: '13px', color: '#9ca3af' }}>No lead types configured.</span>
+                <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>No lead types configured.</span>
               )}
             </div>
 
@@ -661,7 +661,7 @@ function Admin() {
                 value={newTypeName}
                 onChange={e => setNewTypeName(e.target.value)}
                 placeholder="e.g., Search Fund"
-                style={{ flex: 1, padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', fontSize: 'var(--fs-md)' }}
                 maxLength={60}
               />
               <button
@@ -696,44 +696,44 @@ function Admin() {
       {/* Users */}
       <div className="card" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: '600' }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-lg)', fontWeight: '600' }}>
             <UsersIcon size={18} /> All Users
           </h3>
-          <span style={{ fontSize: '13px', color: '#6b7280' }}>
+          <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
             {loading ? '' : `${users.length} ${users.length === 1 ? 'user' : 'users'}`}
           </span>
         </div>
 
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
             <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
             Loading users…
           </div>
         ) : error ? (
-          <div style={{ padding: '20px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#991b1b' }}>
+          <div style={{ padding: '20px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 'var(--radius)', color: 'var(--danger-text-strong)' }}>
             {error}
           </div>
         ) : users.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
             No users found.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-md)' }}>
               <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Name</th>
-                  <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Email</th>
-                  <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Role</th>
-                  <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Targets</th>
+                <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border)' }}>
+                  <th style={{ padding: '10px 8px', fontWeight: '600', color: 'var(--text-2)' }}>Name</th>
+                  <th style={{ padding: '10px 8px', fontWeight: '600', color: 'var(--text-2)' }}>Email</th>
+                  <th style={{ padding: '10px 8px', fontWeight: '600', color: 'var(--text-2)' }}>Role</th>
+                  <th style={{ padding: '10px 8px', fontWeight: '600', color: 'var(--text-2)' }}>Targets</th>
                   <th
-                    style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}
+                    style={{ padding: '10px 8px', fontWeight: '600', color: 'var(--text-2)' }}
                     title="Covers: this person also gets these people's leads on their Today, notifications and Pipeline 'My Leads'. Ownership does not move."
                   >
                     Covers
                   </th>
-                  <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151' }}>Joined</th>
-                  <th style={{ padding: '10px 8px', fontWeight: '600', color: '#374151', textAlign: 'right' }}>Actions</th>
+                  <th style={{ padding: '10px 8px', fontWeight: '600', color: 'var(--text-2)' }}>Joined</th>
+                  <th style={{ padding: '10px 8px', fontWeight: '600', color: 'var(--text-2)', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -741,28 +741,28 @@ function Admin() {
                   const isSelf = u.id === currentPerson?.id
                   const busy = actingId === u.id
                   return (
-                    <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '10px 8px', color: u.is_archived ? '#9ca3af' : '#111827', fontWeight: '500' }}>
-                        {u.name || <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>No name</span>}
+                    <tr key={u.id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                      <td style={{ padding: '10px 8px', color: u.is_archived ? 'var(--text-muted)' : 'var(--text)', fontWeight: '500' }}>
+                        {u.name || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No name</span>}
                         {isSelf && (
-                          <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: '600', color: '#1d4ed8', padding: '2px 6px', background: '#eff6ff', borderRadius: '10px' }}>
+                          <span style={{ marginLeft: '8px', fontSize: 'var(--fs-xs)', fontWeight: '600', color: 'var(--primary-strong)', padding: '2px 6px', background: 'var(--primary-light)', borderRadius: '10px' }}>
                             you
                           </span>
                         )}
                         {u.is_archived && (
-                          <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: '600', color: '#92400e', padding: '2px 6px', background: '#fef3c7', borderRadius: '10px' }}>
+                          <span style={{ marginLeft: '8px', fontSize: 'var(--fs-xs)', fontWeight: '600', color: 'var(--warning-text-strong)', padding: '2px 6px', background: 'var(--warning-bg-strong)', borderRadius: '10px' }}>
                             archived
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '10px 8px', color: '#374151' }}>{u.email || '—'}</td>
+                      <td style={{ padding: '10px 8px', color: 'var(--text-2)' }}>{u.email || '—'}</td>
                       <td style={{ padding: '10px 8px' }}>
                         {u.is_admin ? (
-                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#7c3aed', padding: '3px 8px', background: '#f3e8ff', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: 'var(--fs-sm)', fontWeight: '600', color: '#7c3aed', padding: '3px 8px', background: '#f3e8ff', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                             <ShieldCheck size={12} /> Admin
                           </span>
                         ) : (
-                          <span style={{ fontSize: '12px', color: '#6b7280' }}>User</span>
+                          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>User</span>
                         )}
                       </td>
                       <td style={{ padding: '10px 8px' }}>
@@ -780,7 +780,7 @@ function Admin() {
                       </td>
                       <td style={{ padding: '10px 8px' }}>
                         {coverLoadFailed ? (
-                          <span style={{ fontSize: '12px', color: '#b91c1c' }}>couldn&apos;t load</span>
+                          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger-text)' }}>couldn&apos;t load</span>
                         ) : (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
                             {coverLinks.filter(l => l.coverer_id === u.id).map(l => {
@@ -803,7 +803,7 @@ function Admin() {
                                 onChange={(e) => e.target.value && handleStartCover(u, Number(e.target.value))}
                                 disabled={busy}
                                 aria-label={`Choose whose leads ${u.name || u.email} covers`}
-                                style={{ fontSize: '12px', padding: '2px 4px' }}
+                                style={{ fontSize: 'var(--fs-sm)', padding: '2px 4px' }}
                               >
                                 <option value="">+ cover…</option>
                                 {users
@@ -814,7 +814,7 @@ function Admin() {
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '10px 8px', color: '#6b7280' }}>
+                      <td style={{ padding: '10px 8px', color: 'var(--text-muted)' }}>
                         {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                       </td>
                       <td style={{ padding: '10px 8px', textAlign: 'right' }}>
@@ -859,7 +859,7 @@ function Admin() {
                             onClick={() => handleRemove(u)}
                             disabled={busy || isSelf}
                             title={isSelf ? "Can't remove yourself" : 'Remove user'}
-                            style={{ color: isSelf ? '#9ca3af' : '#dc2626' }}
+                            style={{ color: isSelf ? 'var(--text-muted)' : 'var(--danger)' }}
                           >
                             <Trash2 size={14} /> Remove
                           </button>
@@ -892,14 +892,14 @@ function Admin() {
             }}
           >
             <h2 style={{ margin: '0 0 6px', fontSize: '18px' }}>Outreach targets</h2>
-            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+            <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', marginBottom: '16px' }}>
               {targetsUser.name || targetsUser.email}
-              {targetsUser.email && <span style={{ color: '#9ca3af' }}> · {targetsUser.email}</span>}
+              {targetsUser.email && <span style={{ color: 'var(--text-muted)' }}> · {targetsUser.email}</span>}
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-2)', marginBottom: '6px' }}>
                   Daily target
                 </label>
                 <input
@@ -907,11 +907,11 @@ function Admin() {
                   value={targetsDaily}
                   onChange={(e) => setTargetsDaily(e.target.value)}
                   disabled={savingTargets}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', fontSize: 'var(--fs-md)' }}
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-2)', marginBottom: '6px' }}>
                   Weekly target
                 </label>
                 <input
@@ -919,11 +919,11 @@ function Admin() {
                   value={targetsWeekly}
                   onChange={(e) => setTargetsWeekly(e.target.value)}
                   disabled={savingTargets}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', fontSize: 'var(--fs-md)' }}
                 />
               </div>
             </div>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '20px' }}>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '20px' }}>
               Drives their Dashboard daily ring, streak, and weekly bar. Takes effect immediately.
             </div>
 
@@ -959,12 +959,12 @@ function Admin() {
             <h2 style={{ margin: '0 0 6px', fontSize: '18px' }}>
               {resetApplied ? 'Password set' : 'Reset password'}
             </h2>
-            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+            <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', marginBottom: '16px' }}>
               {resetTarget.name || resetTarget.email}
-              <span style={{ color: '#9ca3af' }}> · {resetTarget.email}</span>
+              <span style={{ color: 'var(--text-muted)' }}> · {resetTarget.email}</span>
             </div>
 
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-2)', marginBottom: '6px' }}>
               New password
             </label>
             <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
@@ -975,9 +975,9 @@ function Admin() {
                 disabled={resetting}
                 style={{
                   flex: 1, padding: '10px 12px',
-                  border: '1px solid #d1d5db', borderRadius: '6px',
+                  border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)',
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                  fontSize: '14px'
+                  fontSize: 'var(--fs-md)'
                 }}
               />
               <button
@@ -996,7 +996,7 @@ function Admin() {
                 Copy
               </button>
             </div>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '20px' }}>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '20px' }}>
               {resetApplied ? (
                 <>Password applied. Copy and share it with {resetTarget.name || resetTarget.email} — they can change it after signing in.</>
               ) : (

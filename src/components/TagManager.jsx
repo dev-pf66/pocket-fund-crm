@@ -83,10 +83,10 @@ function TagManager() {
 
   return (
     <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
-      <h3 style={{ margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: 600 }}>
+      <h3 style={{ margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-lg)', fontWeight: 600 }}>
         <TagIcon size={18} /> Tags
       </h3>
-      <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+      <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', marginBottom: '16px' }}>
         Free-form labels for making lists — the conference you met someone at, who
         introduced them, what they are hunting for. Filter by one on the Pipeline
         board to get the list. For the countable inbound-vs-outbound split use
@@ -108,9 +108,9 @@ function TagManager() {
         </button>
       </form>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
         <thead>
-          <tr style={{ background: '#f9fafb' }}>
+          <tr style={{ background: 'var(--surface-subtle)' }}>
             <th style={{ textAlign: 'left', padding: '8px' }}>Tag</th>
             <th style={{ textAlign: 'right', padding: '8px' }}>Leads</th>
             <th style={{ textAlign: 'right', padding: '8px' }}></th>
@@ -118,7 +118,7 @@ function TagManager() {
         </thead>
         <tbody>
           {tags.map(t => (
-            <tr key={t.id} style={{ borderTop: '1px solid #f3f4f6' }}>
+            <tr key={t.id} style={{ borderTop: '1px solid var(--gray-100)' }}>
               <td style={{ padding: '8px' }}>
                 {editingId === t.id ? (
                   <input
@@ -129,12 +129,12 @@ function TagManager() {
                   />
                 ) : (
                   <span style={{
-                    display: 'inline-block', padding: '2px 10px', borderRadius: '999px',
-                    fontSize: '12px', fontWeight: 600, color: 'white', background: t.color || '#3b82f6'
+                    display: 'inline-block', padding: '2px 10px', borderRadius: 'var(--radius-pill)',
+                    fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'white', background: t.color || '#3b82f6'
                   }}>{t.name}</span>
                 )}
               </td>
-              <td style={{ padding: '8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: (usage.get(t.id) || 0) === 0 ? '#9ca3af' : '#111827' }}>
+              <td style={{ padding: '8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: (usage.get(t.id) || 0) === 0 ? 'var(--text-muted)' : 'var(--text)' }}>
                 {usage.get(t.id) || 0}
               </td>
               <td style={{ padding: '8px', textAlign: 'right' }}>
@@ -152,7 +152,7 @@ function TagManager() {
         </tbody>
       </table>
 
-      <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>
+      <div style={{ marginTop: '10px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
         Renaming carries every lead that has the tag. There is no delete — removing a
         tag would strip it from every lead silently; rename it instead.
       </div>

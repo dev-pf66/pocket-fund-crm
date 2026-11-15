@@ -38,7 +38,7 @@ function Signup() {
         <div className="login-card">
           <h1>Account Created! ✓</h1>
           <p>Check your email to confirm your account.</p>
-          <p style={{ marginTop: '1rem', color: '#9ca3af' }}>
+          <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>
             Redirecting to login...
           </p>
         </div>
@@ -86,7 +86,7 @@ function Signup() {
               required
               minLength={6}
             />
-            <small style={{ color: '#9ca3af', marginTop: '0.25rem' }}>
+            <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>
               Minimum 6 characters
             </small>
           </div>
@@ -101,8 +101,8 @@ function Signup() {
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <span style={{ color: '#9ca3af' }}>Already have an account? </span>
-          <Link to="/login" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+          <span style={{ color: 'var(--text-muted)' }}>Already have an account? </span>
+          <Link to="/login" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
             Sign in
           </Link>
         </div>

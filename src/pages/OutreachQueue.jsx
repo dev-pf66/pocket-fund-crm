@@ -170,7 +170,7 @@ function OutreachQueue() {
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
             <Inbox size={24} /> Queue
           </h1>
-          <p style={{ color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+          <p style={{ color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
             Work through leads you haven't contacted yet.
           </p>
         </div>
@@ -180,15 +180,15 @@ function OutreachQueue() {
       </div>
 
       {loading ? (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
           Loading queue…
         </div>
       ) : grouped.length === 0 ? (
         <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
-          <Inbox size={40} style={{ color: '#9ca3af', marginBottom: '12px' }} />
-          <h3 style={{ margin: '0 0 6px', color: '#111827' }}>No leads in your queue</h3>
-          <p style={{ color: '#6b7280', margin: '0 0 16px' }}>
+          <Inbox size={40} style={{ color: 'var(--text-muted)', marginBottom: '12px' }} />
+          <h3 style={{ margin: '0 0 6px', color: 'var(--text)' }}>No leads in your queue</h3>
+          <p style={{ color: 'var(--text-muted)', margin: '0 0 16px' }}>
             Paste a list of LinkedIn URLs to get started.
           </p>
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
@@ -242,32 +242,32 @@ function BatchGroup({ group, stats, collapsed, onToggle, pendingId, onMark, onDe
         onClick={onToggle}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '14px 18px', background: '#f9fafb', border: 'none',
-          borderBottom: collapsed ? 'none' : '1px solid #e5e7eb', cursor: 'pointer',
+          padding: '14px 18px', background: 'var(--surface-subtle)', border: 'none',
+          borderBottom: collapsed ? 'none' : '1px solid var(--border)', cursor: 'pointer',
           textAlign: 'left'
         }}
       >
         {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: '#111827', fontSize: '15px' }}>{title}</div>
+          <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '15px' }}>{title}</div>
           {!isUnbatched && stats && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
               <div style={{
-                flex: 1, maxWidth: '260px', height: '6px', background: '#e5e7eb',
-                borderRadius: '999px', overflow: 'hidden'
+                flex: 1, maxWidth: '260px', height: '6px', background: 'var(--border)',
+                borderRadius: 'var(--radius-pill)', overflow: 'hidden'
               }}>
                 <div style={{
-                  width: `${pct}%`, height: '100%', background: '#16a34a',
+                  width: `${pct}%`, height: '100%', background: 'var(--success)',
                   transition: 'width 0.3s'
                 }} />
               </div>
-              <span style={{ fontSize: '12px', color: '#6b7280' }}>
+              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
                 {contacted} of {total} contacted
               </span>
             </div>
           )}
         </div>
-        <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
           {remaining} remaining
         </span>
       </button>
@@ -296,11 +296,11 @@ function QueueRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '12px',
-      padding: '12px 10px', borderBottom: '1px solid #f3f4f6',
+      padding: '12px 10px', borderBottom: '1px solid var(--gray-100)',
       opacity: busy ? 0.5 : 1
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 500, color: '#111827', fontSize: '14px' }}>
+        <div style={{ fontWeight: 500, color: 'var(--text)', fontSize: 'var(--fs-md)' }}>
           {lead.name || 'Unknown'}
         </div>
         {lead.linkedin_url && (
@@ -309,7 +309,7 @@ function QueueRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              fontSize: '12px', color: '#2563eb', textDecoration: 'none',
+              fontSize: 'var(--fs-sm)', color: 'var(--primary)', textDecoration: 'none',
               display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px'
             }}
           >
@@ -324,8 +324,8 @@ function QueueRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
         onBlur={() => onFirmUpdate(lead, firm.trim())}
         placeholder="Firm…"
         style={{
-          width: '180px', padding: '6px 8px', fontSize: '13px',
-          border: '1px solid #e5e7eb', borderRadius: '4px', background: '#fff'
+          width: '180px', padding: '6px 8px', fontSize: 'var(--fs-base)',
+          border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: '#fff'
         }}
       />
       <button
@@ -341,7 +341,7 @@ function QueueRow({ lead, busy, onMark, onDelete, onFirmUpdate }) {
         onClick={onDelete}
         disabled={busy}
         title="Remove from queue"
-        style={{ color: '#dc2626' }}
+        style={{ color: 'var(--danger)' }}
       >
         <Trash2 size={14} />
       </button>
@@ -410,7 +410,7 @@ function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
       <div className="modal modal-large" onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h2 style={{ margin: 0 }}>Add leads in bulk</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
             <X size={20} />
           </button>
         </div>
@@ -438,11 +438,11 @@ function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
                     onClick={() => toggleAssignee(p.id)}
                     style={{
                       padding: '5px 12px',
-                      borderRadius: '999px',
-                      border: selected ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
-                      background: selected ? '#eff6ff' : 'white',
-                      color: selected ? '#1d4ed8' : '#374151',
-                      fontSize: '12px',
+                      borderRadius: 'var(--radius-pill)',
+                      border: selected ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+                      background: selected ? 'var(--primary-light)' : 'white',
+                      color: selected ? 'var(--primary-strong)' : 'var(--text-2)',
+                      fontSize: 'var(--fs-sm)',
                       fontWeight: selected ? 600 : 500,
                       cursor: 'pointer'
                     }}
@@ -452,7 +452,7 @@ function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
                 )
               })}
             </div>
-            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '6px' }}>
               {assigneeIds.length === 0
                 ? 'Pick at least one analyst.'
                 : assigneeIds.length === 1
@@ -469,7 +469,7 @@ function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
             onChange={e => setText(e.target.value)}
             placeholder={'Paste one URL per line, or upload a CSV/TXT file.\n\nhttps://linkedin.com/in/john-smith\nhttps://linkedin.com/in/jane-doe-ab12\n…'}
             rows={10}
-            style={{ fontFamily: 'monospace', fontSize: '13px' }}
+            style={{ fontFamily: 'monospace', fontSize: 'var(--fs-base)' }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
             <button
@@ -486,7 +486,7 @@ function BulkAddModal({ personId, isAdmin, people, onClose, onDone }) {
               onChange={handleFile}
               style={{ display: 'none' }}
             />
-            <span style={{ fontSize: '12px', color: urls.length > 0 ? '#16a34a' : '#6b7280' }}>
+            <span style={{ fontSize: 'var(--fs-sm)', color: urls.length > 0 ? 'var(--success-text)' : 'var(--text-muted)' }}>
               {urls.length > 0 ? `${urls.length} LinkedIn URL${urls.length === 1 ? '' : 's'} detected` : 'No LinkedIn URLs detected yet'}
             </span>
           </div>

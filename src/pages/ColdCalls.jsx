@@ -83,7 +83,7 @@ function ColdCalls() {
           <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
             <PhoneCall size={24} /> Cold Calls
           </h1>
-          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>
+          <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
             Every dial counts as outreach. Pickups and conversations are what we manage on.
           </p>
         </div>
@@ -106,20 +106,20 @@ function ColdCalls() {
         <div
           className="alert-banner"
           style={{
-            marginBottom: '16px', padding: '12px 14px', borderRadius: '8px',
-            background: syncStatus.critical ? '#fef2f2' : '#fffbeb',
-            border: `1px solid ${syncStatus.critical ? '#dc2626' : '#f59e0b'}`
+            marginBottom: '16px', padding: '12px 14px', borderRadius: 'var(--radius-md)',
+            background: syncStatus.critical ? 'var(--danger-bg)' : 'var(--warning-bg)',
+            border: `1px solid ${syncStatus.critical ? 'var(--danger)' : 'var(--warning)'}`
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-            <AlertTriangle size={18} style={{ color: syncStatus.critical ? '#dc2626' : '#b45309', flexShrink: 0, marginTop: '1px' }} />
+            <AlertTriangle size={18} style={{ color: syncStatus.critical ? 'var(--danger)' : 'var(--warning-text)', flexShrink: 0, marginTop: '1px' }} />
             <div>
               <strong>
                 {syncStatus.neverRun
                   ? 'Calls have never synced from CallHippo.'
                   : `Calls haven't synced from CallHippo in ${syncStatus.ageDays} day${syncStatus.ageDays === 1 ? '' : 's'}.`}
               </strong>
-              <div style={{ fontSize: '14px', marginTop: '4px', color: '#374151' }}>
+              <div style={{ fontSize: 'var(--fs-md)', marginTop: '4px', color: 'var(--text-2)' }}>
                 {syncStatus.critical
                   ? 'CallHippo deletes call logs after about a month, so dials may already be permanently lost. This needs fixing today.'
                   : 'New dials won\u2019t appear here until it runs. CallHippo only keeps a month of history, so this can\u2019t be left.'}
@@ -137,8 +137,8 @@ function ColdCalls() {
           <Inbox size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />Claim
           {unclaimedCount > 0 && (
             <span style={{
-              marginLeft: 6, padding: '1px 7px', borderRadius: '999px', fontSize: '11px',
-              fontWeight: 700, color: 'white', background: '#dc2626'
+              marginLeft: 6, padding: '1px 7px', borderRadius: 'var(--radius-pill)', fontSize: 'var(--fs-xs)',
+              fontWeight: 700, color: 'white', background: 'var(--danger)'
             }}>{unclaimedCount}</span>
           )}
         </button>
@@ -429,7 +429,7 @@ function CallMode({ person, notify }) {
           <h3 style={{ margin: '12px 0 4px' }}>
             {workList.length === 0 ? 'Nothing to call' : 'Queue cleared'}
           </h3>
-          <p style={{ color: '#6b7280', maxWidth: '460px', margin: '0 auto 16px' }}>
+          <p style={{ color: 'var(--text-muted)', maxWidth: '460px', margin: '0 auto 16px' }}>
             {workList.length === 0
               ? 'No leads assigned to you have a phone number on them. Add numbers on the Pipeline, or ask an admin to assign you leads.'
               : `You worked through all ${workList.length}. ${exhausted.length > 0 ? `${exhausted.length} more are past ${MAX_CALL_ATTEMPTS} attempts.` : ''}`}
@@ -441,20 +441,20 @@ function CallMode({ person, notify }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' }}>
             <div>
               {current.isCallback && (
-                <span className="badge" style={{ background: '#0ea5e9', color: 'white', marginBottom: '8px', display: 'inline-block' }}>
+                <span className="badge" style={{ background: '#0369a1', color: 'white', marginBottom: '8px', display: 'inline-block' }}>
                   Callback due {timeAgo(current.callbackAt)}
                 </span>
               )}
               <h2 style={{ margin: '0 0 2px' }}>{current.name}</h2>
-              <div style={{ color: '#6b7280' }}>
+              <div style={{ color: 'var(--text-muted)' }}>
                 {current.firm_name || 'No firm'}{current.lead_type ? ` · ${current.lead_type}` : ''}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '13px', color: '#6b7280' }}>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
                 {cursor + 1} of {workList.length} in queue
               </div>
-              <div style={{ fontSize: '13px', color: '#6b7280' }}>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
                 Attempt {(current.attempts || 0) + 1}
                 {current.lastOutcome && <> · last: {outcomeLabel(current.lastOutcome)} {timeAgo(current.lastCalledAt)}</>}
               </div>
@@ -468,7 +468,7 @@ function CallMode({ person, notify }) {
             <a
               href={`tel:${String(current.phone || '').replace(/\s/g, '')}`}
               className="btn btn-primary"
-              style={{ fontSize: '20px', padding: '12px 22px', textDecoration: 'none' }}
+              style={{ fontSize: 'var(--fs-xl)', padding: '12px 22px', textDecoration: 'none' }}
             >
               <Phone size={20} /> {current.phone}
             </a>
@@ -503,13 +503,13 @@ function CallMode({ person, notify }) {
           </div>
 
           {(current.follow_up_note || current.notes) && (
-            <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '10px 12px', marginBottom: '16px', fontSize: '14px' }}>
+            <div style={{ background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', marginBottom: '16px', fontSize: 'var(--fs-md)' }}>
               <strong>Context:</strong> {current.follow_up_note || current.notes}
             </div>
           )}
 
           {/* One tap per outcome. Numbered so the keyboard path is discoverable. */}
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '8px' }}>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
             How did it go? <span style={{ fontWeight: 400 }}>(press the number, or S to skip)</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>
@@ -545,7 +545,7 @@ function CallMode({ person, notify }) {
                   onChange={e => setCallbackAt(e.target.value)}
                   autoFocus
                 />
-                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Also sets the lead&apos;s next follow-up date, so it surfaces on Today.
                 </div>
               </div>
@@ -566,15 +566,15 @@ function CallMode({ person, notify }) {
               cost nothing and never block the one-tap path. */}
           <div className="form-row" style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: '110px 1fr 1fr', gap: '10px' }}>
             <div className="form-group">
-              <label className="form-label" style={{ fontSize: '12px' }}>Minutes</label>
+              <label className="form-label" style={{ fontSize: 'var(--fs-sm)' }}>Minutes</label>
               <input className="form-input" type="number" min="0" step="0.5" value={duration} onChange={e => setDuration(e.target.value)} placeholder="0" />
             </div>
             <div className="form-group">
-              <label className="form-label" style={{ fontSize: '12px' }}>Notes</label>
+              <label className="form-label" style={{ fontSize: 'var(--fs-sm)' }}>Notes</label>
               <input className="form-input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="What they said" />
             </div>
             <div className="form-group">
-              <label className="form-label" style={{ fontSize: '12px' }}>
+              <label className="form-label" style={{ fontSize: 'var(--fs-sm)' }}>
                 <Mic size={11} style={{ verticalAlign: '-1px' }} /> Recording URL
               </label>
               <input className="form-input" value={recordingUrl} onChange={e => setRecordingUrl(e.target.value)} placeholder="Paste the CallHippo link" />
@@ -594,7 +594,7 @@ function CallMode({ person, notify }) {
             </button>
           ) : (
             <div className="form-group" style={{ marginTop: '12px' }}>
-              <label className="form-label" style={{ fontSize: '12px' }}>
+              <label className="form-label" style={{ fontSize: 'var(--fs-sm)' }}>
                 <FileText size={11} style={{ verticalAlign: '-1px' }} /> Transcript
               </label>
               <textarea
@@ -605,7 +605,7 @@ function CallMode({ person, notify }) {
                 placeholder="Paste the call transcript — it saves with the outcome you tap next"
                 style={{ fontFamily: 'inherit', resize: 'vertical' }}
               />
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Saved against this specific dial, not just the lead. You can also add one
                 afterwards from the list below.
               </div>
@@ -616,7 +616,7 @@ function CallMode({ person, notify }) {
             <button className="btn btn-secondary" onClick={advance} disabled={saving}>
               <SkipForward size={14} /> Skip for now
             </button>
-            {saving && <span style={{ color: '#6b7280', fontSize: '13px' }}>Saving…</span>}
+            {saving && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>Saving…</span>}
           </div>
         </div>
       )}
@@ -626,19 +626,19 @@ function CallMode({ person, notify }) {
           <div className="card-header"><h3 style={{ margin: 0 }}>Logged today</h3></div>
           <div style={{ maxHeight: '260px', overflowY: 'auto' }}>
             {todayRows.map(r => (
-              <div key={r.id} style={{ borderBottom: '1px solid #f3f4f6', padding: '7px 0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+              <div key={r.id} style={{ borderBottom: '1px solid var(--gray-100)', padding: '7px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: 'var(--fs-md)' }}>
                   <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: outcomeColor(r.call_outcome), flexShrink: 0 }} />
                   <span style={{ fontWeight: 500 }}>{r.lead_name || r.phone_number || 'Unknown'}</span>
-                  <span style={{ color: '#6b7280' }}>{r.firm_name}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{r.firm_name}</span>
                   <span style={{ marginLeft: 'auto', color: outcomeColor(r.call_outcome), fontWeight: 500 }}>
                     {outcomeLabel(r.call_outcome)}
                   </span>
                   {r.call_duration_seconds > 0 && (
-                    <span style={{ color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{fmtDuration(r.call_duration_seconds)}</span>
+                    <span style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{fmtDuration(r.call_duration_seconds)}</span>
                   )}
                   {transcriptIds.has(r.id) ? (
-                    <span style={{ color: '#16a34a', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    <span style={{ color: 'var(--success-text)', fontSize: 'var(--fs-sm)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                       <Check size={13} /> transcript
                     </span>
                   ) : r.lead_id ? (
@@ -749,7 +749,7 @@ function ClaimView({ person, notify, onCountChange }) {
       <div className="empty-state" style={{ textAlign: 'center', padding: '48px 24px' }}>
         <Check size={40} style={{ opacity: 0.3 }} />
         <h3 style={{ margin: '12px 0 4px' }}>Nothing to claim</h3>
-        <p style={{ color: '#6b7280', maxWidth: '460px', margin: '0 auto 16px' }}>
+        <p style={{ color: 'var(--text-muted)', maxWidth: '460px', margin: '0 auto 16px' }}>
           Every imported call has an owner. New ones appear here after the daily
           CallHippo sync.
         </p>
@@ -760,9 +760,9 @@ function ClaimView({ person, notify, onCountChange }) {
 
   return (
     <div>
-      <div className="card" style={{ marginBottom: '16px', borderLeft: '4px solid #dc2626' }}>
+      <div className="card" style={{ marginBottom: '16px', borderLeft: '4px solid var(--danger)' }}>
         <strong>{rows.length} call{rows.length === 1 ? '' : 's'} imported from CallHippo with no owner.</strong>
-        <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: '14px' }}>
+        <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
           Everyone dials from one shared CallHippo seat, so the import can&apos;t tell who made
           which call. Claim yours and they count toward your target and your numbers —
           until then they count for nobody. Adding the outcome at the same time is what
@@ -780,24 +780,24 @@ function ClaimView({ person, notify, onCountChange }) {
                 title={row.connected ? 'The line connected' : 'Never picked up'}
                 style={{
                   width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
-                  background: row.connected ? '#16a34a' : '#9ca3af'
+                  background: row.connected ? 'var(--success)' : 'var(--gray-400)'
                 }}
               />
               <div style={{ minWidth: '180px' }}>
                 <div style={{ fontWeight: 600 }}>
                   {row.lead?.name || row.lead_name || 'Unknown number'}
                 </div>
-                <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
                   {row.lead?.firm_name || row.firm_name || (row.lead_id ? '' : 'Not in the CRM')}
                 </div>
               </div>
-              <div style={{ fontSize: '13px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
                 {row.phone_number}
               </div>
-              <div style={{ fontSize: '13px', color: '#6b7280', marginLeft: 'auto', textAlign: 'right' }}>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', marginLeft: 'auto', textAlign: 'right' }}>
                 {timeAgo(row.called_at)}
                 {row.call_duration_seconds > 0 && <> · {fmtDuration(row.call_duration_seconds)}</>}
-                <div style={{ fontSize: '11px' }}>
+                <div style={{ fontSize: 'var(--fs-xs)' }}>
                   {row.connected ? 'connected' : 'no pickup'}
                 </div>
               </div>
@@ -816,8 +816,8 @@ function ClaimView({ person, notify, onCountChange }) {
             </div>
 
             {isOpen && (
-              <div style={{ marginTop: '12px', borderTop: '1px solid #f3f4f6', paddingTop: '12px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '8px' }}>
+              <div style={{ marginTop: '12px', borderTop: '1px solid var(--gray-100)', paddingTop: '12px' }}>
+                <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
                   How did it go? CallHippo knows the line {row.connected ? 'connected' : 'never connected'} —
                   it can&apos;t know whether you reached the person.
                 </div>
@@ -889,7 +889,7 @@ function FunnelView({ daysBack, personId, teamScope }) {
       <div className="empty-state" style={{ textAlign: 'center', padding: '48px 24px' }}>
         <PhoneOff size={40} style={{ opacity: 0.3 }} />
         <h3 style={{ margin: '12px 0 4px' }}>No calls logged in this window</h3>
-        <p style={{ color: '#6b7280' }}>
+        <p style={{ color: 'var(--text-muted)' }}>
           Log some dials in Call Mode and the funnel fills in from there.
         </p>
       </div>
@@ -925,18 +925,18 @@ function FunnelView({ daysBack, personId, teamScope }) {
       <div className="card" style={{ marginBottom: '20px' }}>
         <div className="card-header">
           <h3 style={{ margin: 0 }}>The funnel {teamScope ? '— whole team' : ''}</h3>
-          <span style={{ color: '#6b7280', fontSize: '13px' }}>last {daysBack} days</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>last {daysBack} days</span>
         </div>
         {levels.map(l => (
           <div key={l.key} style={{ marginBottom: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '4px' }}>
-              <span><strong>{l.label}</strong> <span style={{ color: '#9ca3af' }}>· {l.note}</span></span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-md)', marginBottom: '4px' }}>
+              <span><strong>{l.label}</strong> <span style={{ color: 'var(--text-muted)' }}>· {l.note}</span></span>
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                 <strong>{l.value}</strong>
-                {l.rateLabel && <span style={{ color: '#6b7280' }}> · {l.rateLabel} of {l.of}</span>}
+                {l.rateLabel && <span style={{ color: 'var(--text-muted)' }}> · {l.rateLabel} of {l.of}</span>}
               </span>
             </div>
-            <div style={{ background: '#f3f4f6', borderRadius: '6px', height: '22px', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--gray-100)', borderRadius: 'var(--radius)', height: '22px', overflow: 'hidden' }}>
               <div style={{
                 width: `${data.dials ? (l.value / data.dials) * 100 : 0}%`,
                 background: l.color, height: '100%', minWidth: l.value > 0 ? '3px' : 0,
@@ -953,11 +953,11 @@ function FunnelView({ daysBack, personId, teamScope }) {
           {data.outcomeRows.map(r => (
             <div key={r.outcome || 'none'} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 0' }}>
               <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: outcomeColor(r.outcome), flexShrink: 0 }} />
-              <span style={{ fontSize: '14px', minWidth: '120px' }}>{r.outcome ? outcomeLabel(r.outcome) : 'Not recorded'}</span>
-              <div style={{ flex: 1, background: '#f3f4f6', borderRadius: '4px', height: '10px' }}>
-                <div style={{ width: `${r.share || 0}%`, background: outcomeColor(r.outcome), height: '100%', borderRadius: '4px' }} />
+              <span style={{ fontSize: 'var(--fs-md)', minWidth: '120px' }}>{r.outcome ? outcomeLabel(r.outcome) : 'Not recorded'}</span>
+              <div style={{ flex: 1, background: 'var(--gray-100)', borderRadius: 'var(--radius-sm)', height: '10px' }}>
+                <div style={{ width: `${r.share || 0}%`, background: outcomeColor(r.outcome), height: '100%', borderRadius: 'var(--radius-sm)' }} />
               </div>
-              <span style={{ fontSize: '13px', color: '#6b7280', minWidth: '64px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', minWidth: '64px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                 {r.count} · {fmtRate(r.share)}
               </span>
             </div>
@@ -967,30 +967,35 @@ function FunnelView({ daysBack, personId, teamScope }) {
         <div className="card">
           <div className="card-header">
             <h3 style={{ margin: 0 }}>When they pick up</h3>
-            <span style={{ color: '#6b7280', fontSize: '12px' }}>IST hour</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>IST hour</span>
           </div>
           {data.byHour.length === 0 ? (
-            <p style={{ color: '#6b7280', fontSize: '14px' }}>No call times recorded yet.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>No call times recorded yet.</p>
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '110px', marginBottom: '8px' }}>
                 {data.byHour.map(h => {
                   const maxDials = Math.max(...data.byHour.map(x => x.dials), 1)
                   return (
-                    <div key={h.hour} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}
+                    // The column needs a real height for the bar's % height to
+                    // resolve against — without it every bar collapsed to 0 and
+                    // the chart showed only its hour labels (Nov 2026).
+                    <div key={h.hour} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
                       title={`${h.hour}:00 IST — ${h.dials} dials, ${h.pickups} pickups (${fmtRate(h.pickupRate)})`}>
-                      <div style={{ width: '100%', background: '#e5e7eb', height: `${(h.dials / maxDials) * 100}%`, borderRadius: '2px 2px 0 0', position: 'relative' }}>
-                        <div style={{ position: 'absolute', bottom: 0, width: '100%', background: '#f59e0b', height: `${h.dials ? (h.pickups / h.dials) * 100 : 0}%`, borderRadius: '2px 2px 0 0' }} />
+                      <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                        <div style={{ width: '100%', background: 'var(--border)', height: `${(h.dials / maxDials) * 100}%`, minHeight: h.dials ? '2px' : 0, borderRadius: '2px 2px 0 0', position: 'relative' }}>
+                          <div style={{ position: 'absolute', bottom: 0, width: '100%', background: 'var(--warning)', height: `${h.dials ? (h.pickups / h.dials) * 100 : 0}%`, borderRadius: '2px 2px 0 0' }} />
+                        </div>
                       </div>
-                      <span style={{ fontSize: '9px', color: '#9ca3af', marginTop: '2px' }}>{h.hour}</span>
+                      <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>{h.hour}</span>
                     </div>
                   )
                 })}
               </div>
               {peakHours.length > 0 && (
-                <p style={{ fontSize: '13px', color: '#374151', margin: 0 }}>
+                <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-2)', margin: 0 }}>
                   Best window: {peakHours.map(h => `${h.hour}:00 (${fmtRate(h.pickupRate)})`).join(', ')}
-                  <span style={{ color: '#9ca3af' }}> — hours with at least 5 dials</span>
+                  <span style={{ color: 'var(--text-muted)' }}> — hours with at least 5 dials</span>
                 </p>
               )}
             </>
@@ -1001,9 +1006,9 @@ function FunnelView({ daysBack, personId, teamScope }) {
           <div className="card-header">
             <h3 style={{ margin: 0 }}>Is the 5th dial worth it?</h3>
           </div>
-          <table style={{ width: '100%', fontSize: '14px' }}>
+          <table style={{ width: '100%', fontSize: 'var(--fs-md)' }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: '#6b7280', fontSize: '12px' }}>
+              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
                 <th style={{ padding: '4px 0' }}>Attempt</th>
                 <th style={{ textAlign: 'right' }}>Dials</th>
                 <th style={{ textAlign: 'right' }}>Pickups</th>
@@ -1012,7 +1017,7 @@ function FunnelView({ daysBack, personId, teamScope }) {
             </thead>
             <tbody>
               {data.attempts.map(a => (
-                <tr key={a.attempt} style={{ borderTop: '1px solid #f3f4f6' }}>
+                <tr key={a.attempt} style={{ borderTop: '1px solid var(--gray-100)' }}>
                   <td style={{ padding: '5px 0' }}>{a.label}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{a.dials}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{a.pickups}</td>
@@ -1021,7 +1026,7 @@ function FunnelView({ daysBack, personId, teamScope }) {
               ))}
             </tbody>
           </table>
-          <p style={{ fontSize: '12px', color: '#9ca3af', margin: '8px 0 0' }}>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', margin: '8px 0 0' }}>
             The queue stops offering a lead after {MAX_CALL_ATTEMPTS} attempts. If the rate holds up here, raise it.
           </p>
         </div>
@@ -1032,16 +1037,16 @@ function FunnelView({ daysBack, personId, teamScope }) {
             {data.daily.map(d => {
               const maxDials = Math.max(...data.daily.map(x => x.dials), 1)
               return (
-                <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+                <div key={d.date} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
                   title={`${d.date}: ${d.dials} dials, ${d.pickups} pickups, ${d.conversations} conversations`}>
-                  <div style={{ background: '#e5e7eb', height: `${(d.dials / maxDials) * 100}%`, borderRadius: '2px 2px 0 0', position: 'relative', minHeight: '2px' }}>
+                  <div style={{ background: 'var(--border)', height: `${(d.dials / maxDials) * 100}%`, borderRadius: '2px 2px 0 0', position: 'relative', minHeight: '2px' }}>
                     <div style={{ position: 'absolute', bottom: 0, width: '100%', background: '#0ea5e9', height: `${d.dials ? (d.conversations / d.dials) * 100 : 0}%`, borderRadius: '2px 2px 0 0' }} />
                   </div>
                 </div>
               )
             })}
           </div>
-          <p style={{ fontSize: '12px', color: '#9ca3af', margin: '8px 0 0' }}>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', margin: '8px 0 0' }}>
             Grey = dials, blue = conversations. {data.daily.length} day{data.daily.length === 1 ? '' : 's'} with activity.
           </p>
         </div>
@@ -1086,23 +1091,23 @@ function DailyOutputGrid({ daysBack }) {
     <div className="card" style={{ marginBottom: '16px' }}>
       <div className="card-header">
         <h3 style={{ margin: 0 }}>Daily output</h3>
-        <span style={{ color: '#6b7280', fontSize: '13px' }}>dials per person per day · IST</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>dials per person per day · IST</span>
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', fontSize: '13px', width: '100%' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: 'var(--fs-base)', width: '100%' }}>
           <thead>
             <tr>
               <th style={{ textAlign: 'left', padding: '4px 8px 6px 0', minWidth: '130px' }}></th>
               {data.days.map(d => (
                 <th key={d} style={{
-                  padding: '4px 2px', fontWeight: 500, fontSize: '10px',
-                  color: isWeekend(d) ? '#d1d5db' : '#9ca3af', textAlign: 'center', minWidth: '26px'
+                  padding: '4px 2px', fontWeight: 500, fontSize: 'var(--fs-xs)',
+                  color: isWeekend(d) ? 'var(--gray-300)' : 'var(--text-muted)', textAlign: 'center', minWidth: '26px'
                 }}>
                   {new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { day: 'numeric' })}
                 </th>
               ))}
-              <th style={{ padding: '4px 0 6px 10px', textAlign: 'right', color: '#6b7280', fontSize: '11px' }}>Total</th>
-              <th style={{ padding: '4px 0 6px 8px', textAlign: 'right', color: '#6b7280', fontSize: '11px' }}>Days on</th>
+              <th style={{ padding: '4px 0 6px 10px', textAlign: 'right', color: 'var(--text-muted)', fontSize: 'var(--fs-xs)' }}>Total</th>
+              <th style={{ padding: '4px 0 6px 8px', textAlign: 'right', color: 'var(--text-muted)', fontSize: 'var(--fs-xs)' }}>Days on</th>
             </tr>
           </thead>
           <tbody>
@@ -1110,7 +1115,7 @@ function DailyOutputGrid({ daysBack }) {
               <tr key={r.key}>
                 <td style={{
                   padding: '3px 8px 3px 0', fontWeight: r.key === 'unclaimed' ? 400 : 600,
-                  color: r.key === 'unclaimed' ? '#b45309' : 'inherit', whiteSpace: 'nowrap'
+                  color: r.key === 'unclaimed' ? 'var(--warning-text)' : 'inherit', whiteSpace: 'nowrap'
                 }}>
                   {r.name}
                 </td>
@@ -1121,13 +1126,13 @@ function DailyOutputGrid({ daysBack }) {
                       style={{
                         height: '22px', borderRadius: '3px', display: 'flex',
                         alignItems: 'center', justifyContent: 'center',
-                        fontSize: '11px', fontVariantNumeric: 'tabular-nums',
+                        fontSize: 'var(--fs-xs)', fontVariantNumeric: 'tabular-nums',
                         // Intensity by volume; a zero on a weekday is left
                         // visibly blank because that is the thing to notice.
                         background: n === 0
-                          ? (isWeekend(data.days[i]) ? '#fafafa' : '#f3f4f6')
+                          ? (isWeekend(data.days[i]) ? '#fafafa' : 'var(--gray-100)')
                           : `rgba(14, 165, 233, ${0.15 + 0.85 * (n / peak)})`,
-                        color: n === 0 ? '#d1d5db' : (n / peak > 0.55 ? 'white' : '#0c4a6e'),
+                        color: n === 0 ? 'var(--gray-300)' : (n / peak > 0.55 ? 'white' : '#0c4a6e'),
                         fontWeight: n > 0 ? 600 : 400,
                       }}
                     >
@@ -1136,20 +1141,20 @@ function DailyOutputGrid({ daysBack }) {
                   </td>
                 ))}
                 <td style={{ padding: '2px 0 2px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                  {r.total || <span style={{ color: '#d1d5db' }}>0</span>}
+                  {r.total || <span style={{ color: 'var(--gray-300)' }}>0</span>}
                 </td>
-                <td style={{ padding: '2px 0 2px 8px', textAlign: 'right', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                <td style={{ padding: '2px 0 2px 8px', textAlign: 'right', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
                   {r.activeDays}
                 </td>
               </tr>
             ))}
-            <tr style={{ borderTop: '2px solid #e5e7eb' }}>
+            <tr style={{ borderTop: '2px solid var(--border)' }}>
               <td style={{ padding: '6px 8px 0 0', fontWeight: 700 }}>Team</td>
               {data.totals.map((n, i) => (
                 <td key={data.days[i]} style={{
-                  padding: '6px 2px 0', textAlign: 'center', fontSize: '11px',
+                  padding: '6px 2px 0', textAlign: 'center', fontSize: 'var(--fs-xs)',
                   fontWeight: 600, fontVariantNumeric: 'tabular-nums',
-                  color: n === 0 ? '#d1d5db' : '#374151'
+                  color: n === 0 ? 'var(--gray-300)' : 'var(--text-2)'
                 }}>{n || '·'}</td>
               ))}
               <td style={{ padding: '6px 0 0 10px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
@@ -1161,7 +1166,7 @@ function DailyOutputGrid({ daysBack }) {
         </table>
       </div>
       {data.rows.some(r => r.key === 'unclaimed' && r.total > 0) && (
-        <p style={{ fontSize: '12px', color: '#b45309', margin: '10px 0 0' }}>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--warning-text)', margin: '10px 0 0' }}>
           Calls on the <strong>Unclaimed</strong> row were made — they just have no owner yet.
           Everyone dials from one shared CallHippo seat, so until people claim their calls on the
           Claim tab, that row holds work the per-person rows are missing.
@@ -1214,14 +1219,14 @@ function CallersView({ daysBack }) {
       <div className="card">
       <div className="card-header">
         <h3 style={{ margin: 0 }}>Consistency and effectiveness</h3>
-        <span style={{ color: '#6b7280', fontSize: '13px' }}>
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
           last {daysBack} days · sorted by conversations, not dials
         </span>
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', fontSize: 'var(--fs-md)', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ textAlign: 'right', color: '#6b7280', fontSize: '12px', borderBottom: '2px solid #e5e7eb' }}>
+            <tr style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', borderBottom: '2px solid var(--border)' }}>
               <th style={{ textAlign: 'left', padding: '8px 6px' }}>Caller</th>
               <th style={{ padding: '8px 6px' }} title="Days they logged at least one dial, over weekdays in the window">Days on</th>
               <th style={{ padding: '8px 6px' }}>Consistency</th>
@@ -1236,23 +1241,23 @@ function CallersView({ daysBack }) {
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.personId} style={{ borderBottom: '1px solid #f3f4f6', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+              <tr key={r.personId} style={{ borderBottom: '1px solid var(--gray-100)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                 <td style={{ textAlign: 'left', padding: '9px 6px', fontWeight: 600 }}>{r.name}</td>
-                <td style={{ padding: '9px 6px' }}>{r.activeDays}<span style={{ color: '#9ca3af' }}>/{r.expectedDays}</span></td>
+                <td style={{ padding: '9px 6px' }}>{r.activeDays}<span style={{ color: 'var(--text-muted)' }}>/{r.expectedDays}</span></td>
                 <td style={{ padding: '9px 6px', fontWeight: 600, color: consistencyColor(r.consistency) }}>{fmtRate(r.consistency)}</td>
                 <td style={{ padding: '9px 6px' }}>{r.dials}</td>
                 <td style={{ padding: '9px 6px' }}>{r.dialsPerActiveDay ? r.dialsPerActiveDay.toFixed(1) : '—'}</td>
-                <td style={{ padding: '9px 6px' }}>{r.pickups} <span style={{ color: '#9ca3af' }}>{fmtRate(r.pickupRate)}</span></td>
-                <td style={{ padding: '9px 6px', fontWeight: 600, color: '#0369a1' }}>{r.conversations} <span style={{ color: '#9ca3af', fontWeight: 400 }}>{fmtRate(r.conversationRate)}</span></td>
-                <td style={{ padding: '9px 6px', fontWeight: 600, color: r.meetings > 0 ? '#15803d' : '#9ca3af' }}>{r.meetings}</td>
+                <td style={{ padding: '9px 6px' }}>{r.pickups} <span style={{ color: 'var(--text-muted)' }}>{fmtRate(r.pickupRate)}</span></td>
+                <td style={{ padding: '9px 6px', fontWeight: 600, color: '#0369a1' }}>{r.conversations} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{fmtRate(r.conversationRate)}</span></td>
+                <td style={{ padding: '9px 6px', fontWeight: 600, color: r.meetings > 0 ? 'var(--success-text)' : 'var(--text-muted)' }}>{r.meetings}</td>
                 <td style={{ padding: '9px 6px' }}>{r.dialsPerMeeting ? Math.round(r.dialsPerMeeting) : '—'}</td>
-                <td style={{ padding: '9px 6px', color: '#6b7280' }}>{fmtDuration(r.avgTalkSeconds)}</td>
+                <td style={{ padding: '9px 6px', color: 'var(--text-muted)' }}>{fmtDuration(r.avgTalkSeconds)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p style={{ fontSize: '12px', color: '#9ca3af', margin: '12px 0 0' }}>
+      <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', margin: '12px 0 0' }}>
         Consistency is days with at least one dial, over weekdays in the window — nobody is expected to
         cold call on a Sunday. &ldquo;Cost&rdquo; is dials per meeting booked: high dials with a high cost is a
         script problem, low dials with a low cost is a volume problem.
@@ -1338,7 +1343,7 @@ function CallQueueView({ person, isAdmin, people, notify }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ color: '#6b7280', fontSize: '14px' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
           {loading ? 'Loading…' : `${queue.length} to call${exhausted.length ? ` · ${exhausted.length} maxed out on attempts` : ''}`}
         </div>
         <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
@@ -1347,14 +1352,14 @@ function CallQueueView({ person, isAdmin, people, notify }) {
       </div>
 
       {loading ? (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
           Loading queue…
         </div>
       ) : groups.length === 0 ? (
         <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
-          <Inbox size={40} style={{ color: '#9ca3af', marginBottom: '12px' }} />
-          <h3 style={{ margin: '0 0 6px', color: '#111827' }}>Nobody to call</h3>
-          <p style={{ color: '#6b7280', margin: '0 0 16px' }}>
+          <Inbox size={40} style={{ color: 'var(--text-muted)', marginBottom: '12px' }} />
+          <h3 style={{ margin: '0 0 6px', color: 'var(--text)' }}>Nobody to call</h3>
+          <p style={{ color: 'var(--text-muted)', margin: '0 0 16px' }}>
             Paste a list of numbers to fill the queue. A lead needs a phone number
             to be callable — that is what puts it here.
           </p>
@@ -1375,27 +1380,27 @@ function CallQueueView({ person, isAdmin, people, notify }) {
                   onClick={() => setCollapsed(c => ({ ...c, [g.key]: !c[g.key] }))}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '13px 16px', background: '#f9fafb', border: 'none',
-                    borderBottom: isCollapsed ? 'none' : '1px solid #e5e7eb',
+                    padding: '13px 16px', background: 'var(--surface-subtle)', border: 'none',
+                    borderBottom: isCollapsed ? 'none' : '1px solid var(--border)',
                     cursor: 'pointer', textAlign: 'left'
                   }}
                 >
                   {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                   <span style={{ fontWeight: 600, flex: 1 }}>{title}</span>
-                  <span style={{ fontSize: '12px', color: '#6b7280' }}>{g.leads.length} to call</span>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{g.leads.length} to call</span>
                 </button>
                 {!isCollapsed && (
                   <div style={{ padding: '6px 10px' }}>
                     {g.leads.map(l => (
-                      <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '9px 6px', borderBottom: '1px solid #f3f4f6', fontSize: '14px' }}>
+                      <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '9px 6px', borderBottom: '1px solid var(--gray-100)', fontSize: 'var(--fs-md)' }}>
                         <span style={{ fontWeight: 500, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {l.name}
                         </span>
-                        <span style={{ color: '#6b7280', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ color: 'var(--text-muted)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {l.firm_name || ''}
                         </span>
-                        <span style={{ color: '#374151', fontVariantNumeric: 'tabular-nums' }}>{l.phone}</span>
-                        <span style={{ color: '#6b7280', fontSize: '12px', minWidth: '92px', textAlign: 'right' }}>
+                        <span style={{ color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{l.phone}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', minWidth: '92px', textAlign: 'right' }}>
                           {l.attempts > 0
                             ? `${l.attempts} attempt${l.attempts === 1 ? '' : 's'}`
                             : 'not called'}
@@ -1476,7 +1481,7 @@ function AddCallListModal({ personId, isAdmin, people, onClose, onDone }) {
       <div className="modal modal-large" onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0 }}>Add call list</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
             <X size={20} />
           </button>
         </div>
@@ -1499,7 +1504,7 @@ function AddCallListModal({ personId, isAdmin, people, onClose, onDone }) {
             value={text}
             onChange={e => setText(e.target.value)}
             placeholder={'One per line. The number is found wherever it sits:\n\n+1 415 555 0142\nJohn Smith, +1 415 555 0143\nJane Doe, Acme Capital, +1 415 555 0144'}
-            style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '13px', resize: 'vertical' }}
+            style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 'var(--fs-base)', resize: 'vertical' }}
           />
           <label className="btn btn-secondary btn-sm" style={{ marginTop: '8px', display: 'inline-flex', cursor: 'pointer' }}>
             <Upload size={14} /> Upload CSV or TXT
@@ -1516,7 +1521,7 @@ function AddCallListModal({ personId, isAdmin, people, onClose, onDone }) {
               onChange={e => setDefaultCode(e.target.value.replace(/[^0-9]/g, ''))}
               placeholder="e.g. 1"
             />
-            <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>
               Applied only to local numbers. Leave blank to never guess a country.
             </div>
           </div>
@@ -1535,7 +1540,7 @@ function AddCallListModal({ personId, isAdmin, people, onClose, onDone }) {
                   </button>
                 ))}
               </div>
-              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>
                 None selected = all assigned to you.
               </div>
             </div>
@@ -1543,12 +1548,12 @@ function AddCallListModal({ personId, isAdmin, people, onClose, onDone }) {
         </div>
 
         {text.trim() && (
-          <div className="card" style={{ background: '#f9fafb', padding: '12px', marginTop: '4px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+          <div className="card" style={{ background: 'var(--surface-subtle)', padding: '12px', marginTop: '4px' }}>
+            <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: '6px' }}>
               {parsed.rows.length} number{parsed.rows.length === 1 ? '' : 's'} ready
             </div>
             {parsed.unresolved > 0 && (
-              <div style={{ fontSize: '12px', color: '#b45309', display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--warning-text)', display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
                 <AlertTriangle size={13} style={{ marginTop: '1px', flexShrink: 0 }} />
                 <span>
                   {parsed.unresolved} could not be resolved to a full international number.
@@ -1558,27 +1563,27 @@ function AddCallListModal({ personId, isAdmin, people, onClose, onDone }) {
               </div>
             )}
             {parsed.invalid.length > 0 && (
-              <div style={{ fontSize: '12px', color: '#b91c1c', marginTop: '6px' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--danger-text)', marginTop: '6px' }}>
                 {parsed.invalid.length} line{parsed.invalid.length === 1 ? '' : 's'} had no phone
                 number and will be skipped: {parsed.invalid.slice(0, 3).map(i => `"${i.line}"`).join(', ')}
                 {parsed.invalid.length > 3 ? '…' : ''}
               </div>
             )}
-            <div style={{ marginTop: '8px', maxHeight: '120px', overflowY: 'auto', fontSize: '12px', color: '#374151' }}>
+            <div style={{ marginTop: '8px', maxHeight: '120px', overflowY: 'auto', fontSize: 'var(--fs-sm)', color: 'var(--text-2)' }}>
               {parsed.rows.slice(0, 8).map((r, i) => (
                 <div key={i} style={{ display: 'flex', gap: '10px', padding: '2px 0' }}>
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-                  <span style={{ color: '#6b7280', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.firm_name}</span>
-                  <span style={{ fontVariantNumeric: 'tabular-nums', color: r.resolved ? '#374151' : '#b45309' }}>{r.phone}</span>
+                  <span style={{ color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.firm_name}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', color: r.resolved ? 'var(--text-2)' : 'var(--warning-text)' }}>{r.phone}</span>
                 </div>
               ))}
-              {parsed.rows.length > 8 && <div style={{ color: '#6b7280' }}>…and {parsed.rows.length - 8} more</div>}
+              {parsed.rows.length > 8 && <div style={{ color: 'var(--text-muted)' }}>…and {parsed.rows.length - 8} more</div>}
             </div>
           </div>
         )}
 
         {error && (
-          <div style={{ color: '#b91c1c', fontSize: '13px', marginTop: '10px' }}>{error}</div>
+          <div style={{ color: 'var(--danger-text)', fontSize: 'var(--fs-base)', marginTop: '10px' }}>{error}</div>
         )}
 
         <div className="form-actions" style={{ marginTop: '16px' }}>
@@ -1673,7 +1678,7 @@ function HistoryView({ daysBack, people, isAdmin }) {
           <option value="none">No outcome yet</option>
           {CALL_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: 'auto' }}>
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginLeft: 'auto' }}>
           {filtered.length} call{filtered.length === 1 ? '' : 's'} · last {daysBack} days
           {!isAdmin && ' · you only see calls you can access'}
         </span>
@@ -1683,23 +1688,23 @@ function HistoryView({ daysBack, people, isAdmin }) {
         <div className="empty-state" style={{ textAlign: 'center', padding: '40px' }}>
           <PhoneOff size={36} style={{ opacity: 0.3 }} />
           <h3 style={{ margin: '12px 0 4px' }}>No calls match</h3>
-          <p style={{ color: '#6b7280' }}>Try a wider window or a different filter.</p>
+          <p style={{ color: 'var(--text-muted)' }}>Try a wider window or a different filter.</p>
         </div>
       ) : byDay.map(([day, calls]) => (
         <div key={day} className="card" style={{ marginBottom: '12px' }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
             <h3 style={{ margin: 0, fontSize: '15px' }}>{day === 'undated' ? 'Undated' : fmtDate(day)}</h3>
-            <span style={{ color: '#6b7280', fontSize: '13px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
               {calls.length} dial{calls.length === 1 ? '' : 's'} ·{' '}
               {calls.filter(c => c.connected).length} connected
             </span>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', fontSize: 'var(--fs-md)', borderCollapse: 'collapse' }}>
               <tbody>
                 {calls.map(c => (
-                  <tr key={c.id} style={{ borderTop: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '7px 6px', width: '70px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                  <tr key={c.id} style={{ borderTop: '1px solid var(--gray-100)' }}>
+                    <td style={{ padding: '7px 6px', width: '70px', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
                       {c.called_at
                         ? new Date(c.called_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' })
                         : '—'}
@@ -1707,27 +1712,27 @@ function HistoryView({ daysBack, people, isAdmin }) {
                     <td style={{ padding: '7px 6px', width: '14px' }}>
                       <span
                         title={c.connected ? 'The line connected' : 'Never picked up'}
-                        style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: c.connected ? '#16a34a' : '#d1d5db' }}
+                        style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: c.connected ? 'var(--success)' : 'var(--border-strong)' }}
                       />
                     </td>
                     <td style={{ padding: '7px 6px' }}>
                       {c.lead?.id ? (
                         <a href={`/leads/${c.lead.id}`} style={{ fontWeight: 500 }}>{c.lead.name}</a>
                       ) : (
-                        <span style={{ color: '#6b7280' }}>{c.lead_name || c.phone_number || 'Unknown'}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{c.lead_name || c.phone_number || 'Unknown'}</span>
                       )}
-                      {c.lead?.firm_name && <span style={{ color: '#9ca3af' }}> · {c.lead.firm_name}</span>}
-                      {!c.lead?.id && <span style={{ color: '#9ca3af', fontSize: '12px' }}> · not in the CRM</span>}
+                      {c.lead?.firm_name && <span style={{ color: 'var(--text-muted)' }}> · {c.lead.firm_name}</span>}
+                      {!c.lead?.id && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}> · not in the CRM</span>}
                     </td>
                     <td style={{ padding: '7px 6px', width: '130px' }}>
                       {c.logged_by_person?.name
                         ? <span style={{ fontWeight: 500 }}>{c.logged_by_person.name}</span>
-                        : <span style={{ color: '#b45309', fontSize: '13px' }}>unclaimed</span>}
+                        : <span style={{ color: 'var(--warning-text)', fontSize: 'var(--fs-base)' }}>unclaimed</span>}
                     </td>
                     <td style={{ padding: '7px 6px', width: '140px', color: outcomeColor(c.call_outcome), fontWeight: 500 }}>
-                      {c.call_outcome ? outcomeLabel(c.call_outcome) : <span style={{ color: '#9ca3af', fontWeight: 400 }}>no outcome</span>}
+                      {c.call_outcome ? outcomeLabel(c.call_outcome) : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>no outcome</span>}
                     </td>
-                    <td style={{ padding: '7px 6px', width: '70px', textAlign: 'right', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                    <td style={{ padding: '7px 6px', width: '70px', textAlign: 'right', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
                       {c.call_duration_seconds > 0 ? fmtDuration(c.call_duration_seconds) : '—'}
                     </td>
                   </tr>
@@ -1753,7 +1758,7 @@ function StatCard({ label, value, sub, accent }) {
     <div className="stat-card">
       <div className="stat-label">{label}</div>
       <div className="stat-value" style={accent ? { color: accent } : undefined}>{value}</div>
-      {sub && <div className="stat-target" style={{ color: '#6b7280', fontSize: '12px' }}>{sub}</div>}
+      {sub && <div className="stat-target" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>{sub}</div>}
     </div>
   )
 }

@@ -254,7 +254,7 @@ function SellersBoard() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
           <h1 style={{ margin: 0 }}>Indian Sellers</h1>
-          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>Buyside pipeline for Indian businesses we're meeting with</p>
+          <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>Buyside pipeline for Indian businesses we're meeting with</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
           <Plus size={16} /> Add Seller
@@ -263,21 +263,21 @@ function SellersBoard() {
 
       <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+          <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
             placeholder="Search by name, business, industry, or notes..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="form-control"
-            style={{ paddingLeft: '34px', fontSize: '13px' }}
+            style={{ paddingLeft: '34px', fontSize: 'var(--fs-base)' }}
           />
         </div>
         <button className="btn btn-sm btn-secondary" onClick={toggleSelectAll} disabled={filteredSellers.length === 0}>
           {filteredSellers.length > 0 && filteredSellers.every(s => selectedIds.has(s.id)) ? 'Deselect all' : 'Select all shown'}
         </button>
-        <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6b7280' }}>
-          <strong style={{ color: '#111827' }}>{filteredSellers.length}</strong> shown
+        <div style={{ marginLeft: 'auto', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
+          <strong style={{ color: 'var(--text)' }}>{filteredSellers.length}</strong> shown
         </div>
       </div>
 
@@ -287,11 +287,11 @@ function SellersBoard() {
           style={{
             padding: '10px 16px', marginBottom: '16px', display: 'flex',
             alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            flexWrap: 'wrap', background: '#eff6ff', border: '1px solid #bfdbfe',
+            flexWrap: 'wrap', background: 'var(--primary-light)', border: '1px solid var(--primary-border-soft)',
             position: 'sticky', top: '8px', zIndex: 5
           }}
         >
-          <span style={{ fontSize: '14px', color: '#1e3a8a', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--fs-md)', color: 'var(--primary-text)', fontWeight: 500 }}>
             {selectedIds.size} seller{selectedIds.size === 1 ? '' : 's'} selected
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -320,25 +320,25 @@ function SellersBoard() {
       )}
 
       {dueFollowUps.length > 0 && (
-        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px' }}>
+        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 'var(--radius-md)', padding: '12px 14px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <AlertCircle size={16} style={{ color: '#c2410c' }} />
-            <strong style={{ color: '#9a3412', fontSize: '13px' }}>
+            <strong style={{ color: '#9a3412', fontSize: 'var(--fs-base)' }}>
               {dueFollowUps.length} follow-up{dueFollowUps.length === 1 ? '' : 's'} due
             </strong>
             <button
               onClick={() => setShowOnlyDue(v => !v)}
               style={{
                 background: showOnlyDue ? '#c2410c' : 'white', color: showOnlyDue ? 'white' : '#c2410c',
-                border: '1px solid #c2410c', borderRadius: '999px', padding: '3px 10px',
-                fontSize: '11px', fontWeight: 600, cursor: 'pointer'
+                border: '1px solid #c2410c', borderRadius: 'var(--radius-pill)', padding: '3px 10px',
+                fontSize: 'var(--fs-xs)', fontWeight: 600, cursor: 'pointer'
               }}
             >
               {showOnlyDue ? 'Show all' : 'Show only due'}
             </button>
             <button
               onClick={() => setDueExpanded(v => !v)}
-              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#9a3412', fontSize: '12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#9a3412', fontSize: 'var(--fs-sm)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
             >
               {dueExpanded ? 'Collapse' : 'Expand'}
               {dueExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -352,12 +352,12 @@ function SellersBoard() {
                   <button
                     key={s.id}
                     onClick={() => setEditingSeller(s)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', textAlign: 'left', background: 'white', border: '1px solid #fed7aa', borderRadius: '6px', cursor: 'pointer' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', textAlign: 'left', background: 'white', border: '1px solid #fed7aa', borderRadius: 'var(--radius)', cursor: 'pointer' }}
                   >
-                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#111827' }}>{s.name}</span>
-                    {s.business_name && <span style={{ fontSize: '12px', color: '#6b7280' }}>{s.business_name}</span>}
+                    <span style={{ fontWeight: 600, fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{s.name}</span>
+                    {s.business_name && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{s.business_name}</span>}
                     {status && (
-                      <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 6px', borderRadius: '999px', background: status.color + '22', color: status.color }}>
+                      <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 6px', borderRadius: 'var(--radius-pill)', background: status.color + '22', color: status.color }}>
                         {status.label}
                       </span>
                     )}
@@ -370,7 +370,7 @@ function SellersBoard() {
       )}
 
       {loading ? (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
           Loading sellers…
         </div>
@@ -392,12 +392,12 @@ function SellersBoard() {
                 key={stage.key}
                 onDragOver={handleDragOver}
                 onDrop={e => handleDrop(e, stage.key)}
-                style={{ flex: '0 0 280px', background: '#f9fafb', borderRadius: '8px', padding: '12px', minHeight: '300px' }}
+                style={{ flex: '0 0 280px', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)', padding: '12px', minHeight: '300px' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                   <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }}></span>
-                  <strong style={{ fontSize: '13px', color: '#111827' }}>{stage.label}</strong>
-                  <span style={{ fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+                  <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {items.map(s => (
@@ -414,7 +414,7 @@ function SellersBoard() {
                     />
                   ))}
                   {items.length === 0 && (
-                    <div style={{ padding: '16px', textAlign: 'center', color: '#9ca3af', fontSize: '12px' }}>
+                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
                       Drag a seller here
                     </div>
                   )}
@@ -458,8 +458,8 @@ function SellerMeta({ seller }) {
   const money = [seller.asking_price && `Ask: ${seller.asking_price}`, seller.revenue && `Rev: ${seller.revenue}`].filter(Boolean).join(' · ')
   return (
     <>
-      {line && <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>{line}</div>}
-      {money && <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>{money}</div>}
+      {line && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '4px' }}>{line}</div>}
+      {money && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '4px' }}>{money}</div>}
     </>
   )
 }
@@ -471,7 +471,7 @@ function SellerCard({ seller, owner, creator, onEdit, onDelete, onDragStart, sel
       draggable
       onDragStart={(e) => onDragStart(e, seller)}
       onClick={onEdit}
-      style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '10px 12px', cursor: 'grab', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
+      style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 12px', cursor: 'grab', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
@@ -486,12 +486,12 @@ function SellerCard({ seller, owner, creator, onEdit, onDelete, onDragStart, sel
               style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'pointer' }}
             />
           )}
-          <div style={{ fontWeight: 600, fontSize: '13px', color: '#111827', lineHeight: 1.3 }}>{seller.name}</div>
+          <div style={{ fontWeight: 600, fontSize: 'var(--fs-base)', color: 'var(--text)', lineHeight: 1.3 }}>{seller.name}</div>
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
           title="Delete"
-          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '2px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
         >
           <Trash2 size={12} />
         </button>
@@ -500,32 +500,32 @@ function SellerCard({ seller, owner, creator, onEdit, onDelete, onDragStart, sel
       <SellerMeta seller={seller} />
 
       {creator?.name && (
-        <div style={{ fontSize: '10px', color: '#9ca3af', fontStyle: 'italic', marginBottom: '4px' }}>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '4px' }}>
           Added by {creator.name}
         </div>
       )}
 
       {seller.meeting_date && (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px', marginRight: '6px', fontSize: '10px', fontWeight: 600, padding: '2px 6px', borderRadius: '999px', background: '#eff6ff', color: '#1d4ed8' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px', marginRight: '6px', fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 6px', borderRadius: 'var(--radius-pill)', background: 'var(--primary-light)', color: 'var(--primary-strong)' }}>
           <Calendar size={10} /> Met {seller.meeting_date}
         </div>
       )}
 
       {followUp && (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontSize: '10px', fontWeight: 600, padding: '2px 6px', borderRadius: '999px', background: followUp.color + '22', color: followUp.color }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 6px', borderRadius: 'var(--radius-pill)', background: followUp.color + '22', color: followUp.color }}>
           <Calendar size={10} /> {followUp.label}
         </div>
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         {owner && (
-          <span title={owner.name} style={{ fontSize: '9px', fontWeight: 700, color: 'white', background: '#6366f1', borderRadius: '999px', padding: '2px 6px' }}>
+          <span title={owner.name} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'white', background: '#6366f1', borderRadius: 'var(--radius-pill)', padding: '2px 6px' }}>
             {initials(owner.name)}
           </span>
         )}
         <span style={{ marginLeft: 'auto' }}>
           {seller.url && (
-            <a href={seller.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#6b7280' }} title={seller.url}>
+            <a href={seller.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: 'var(--text-muted)' }} title={seller.url}>
               <ExternalLink size={11} />
             </a>
           )}
@@ -547,22 +547,22 @@ function MobileSellerList({ stages, sellersInStage, peopleById, onEdit, onDelete
           <div key={stage.key}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '0 4px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }} />
-              <strong style={{ fontSize: '13px', color: '#111827' }}>{stage.label}</strong>
-              <span style={{ fontSize: '11px', color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+              <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
+              <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {items.map(s => (
                 <div
                   key={s.id}
                   onClick={() => onEdit(s)}
-                  style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 14px', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
+                  style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '12px 14px', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '6px' }}>
-                    <div style={{ fontWeight: 600, fontSize: '15px', color: '#111827', lineHeight: 1.3 }}>{s.name}</div>
+                    <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text)', lineHeight: 1.3 }}>{s.name}</div>
                     <button
                       onClick={(e) => { e.stopPropagation(); onDelete(s.id) }}
                       title="Delete"
-                      style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -573,14 +573,14 @@ function MobileSellerList({ stages, sellersInStage, peopleById, onEdit, onDelete
                       value={s.stage}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => { e.stopPropagation(); onMove(s, e.target.value) }}
-                      style={{ flex: 1, fontSize: '12px', padding: '6px 8px' }}
+                      style={{ flex: 1, fontSize: 'var(--fs-sm)', padding: '6px 8px' }}
                     >
                       {stages.map(st => (
                         <option key={st.key} value={st.key}>Move to: {st.label}</option>
                       ))}
                     </select>
                     {peopleById[s.assigned_to] && (
-                      <span title={peopleById[s.assigned_to].name} style={{ fontSize: '10px', fontWeight: 700, color: 'white', background: '#6366f1', borderRadius: '999px', padding: '3px 7px' }}>
+                      <span title={peopleById[s.assigned_to].name} style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'white', background: '#6366f1', borderRadius: 'var(--radius-pill)', padding: '3px 7px' }}>
                         {initials(peopleById[s.assigned_to].name)}
                       </span>
                     )}

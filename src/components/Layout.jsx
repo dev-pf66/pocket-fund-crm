@@ -56,12 +56,12 @@ function Layout() {
             display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
             margin: '0 0 12px', padding: '7px 10px',
             background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: '8px', color: 'inherit', opacity: 0.75, cursor: 'pointer',
-            fontSize: '13px', textAlign: 'left'
+            borderRadius: 'var(--radius-md)', color: 'inherit', opacity: 0.75, cursor: 'pointer',
+            fontSize: 'var(--fs-base)', textAlign: 'left'
           }}
         >
           <Search size={14} /> Search
-          <span style={{ marginLeft: 'auto', fontSize: '11px', opacity: 0.7 }}>⌘K</span>
+          <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', opacity: 0.7 }}>⌘K</span>
         </button>
         <nav>{navGroups.map(group => (
           <div key={group.label} className="nav-group">
@@ -76,9 +76,9 @@ function Layout() {
                     title={item.badgeUrgent ? 'Overdue follow-ups' : 'Follow-ups due today'}
                     style={{
                       marginLeft: 'auto', minWidth: '20px', padding: '1px 6px',
-                      borderRadius: '999px', fontSize: '11px', fontWeight: 700,
+                      borderRadius: 'var(--radius-pill)', fontSize: 'var(--fs-xs)', fontWeight: 700,
                       textAlign: 'center', color: 'white',
-                      background: item.badgeUrgent ? '#dc2626' : '#2563eb'
+                      background: item.badgeUrgent ? 'var(--danger)' : 'var(--primary)'
                     }}
                   >
                     {item.badge}
