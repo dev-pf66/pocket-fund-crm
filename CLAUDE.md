@@ -341,8 +341,11 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - Meetings booked comes from `crm_lead_stage_events`, which is append-only and still holds
     retired stage names (`cold_outreach` 27, `warm_lead` 2). **Map old→new when grouping by stage**
     or history silently under-counts.
-  - "Follow-up done" is matched on the `Followed up…` note prefix that `logFollowUpTouch` writes —
-    ugly, but it is the only marker. Do NOT count all notes: 214 of the last 416 activities were
+  - "Follow-up done" is matched on the `Followed up…` note prefix (`isFollowUpDoneNote`) —
+    ugly, but it is the only marker. Two writers produce it: `followUpNote` (Reached out — a typed
+    note keeps the prefix since 2026-11-15; before, it was written bare and never counted) and
+    `touchNote` (Touched, only when it completes a DUE follow-up). Guardrail:
+    `test/follow-up-done.test.js`. Do NOT count all notes: 214 of the last 416 activities were
     auto-generated "Lead created in CRM" rows, which would turn one import into a week of work.
   - Team totals sum **only the listed rows**; unattributed outreach is reported separately, never
     folded in. `dev+localtest` is filtered out of every per-person grid.
@@ -389,10 +392,13 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - **"Touched" and "Reached out" are deliberately different words** (Dev, 2026-11-13): touched =
     a lead you are already in conversation with; reached out = first outreach. Don't unify the
     button labels across Today and Notifications. Note they also write different activity notes
-    (`markLeadTouched` → `Touched…`, `logFollowUpTouch` → `Followed up…`), and the scoreboard's
-    "F/U done" column counts only the `Followed up` prefix — a follow-up cleared from Today's
-    "Follow-ups due" section with Touched does not count there. Raised with Dev 2026-11-13;
-    unresolved, and it is scoreboard maths, so don't change it from a UI pass.
+    (`markLeadTouched` → `Touched…`, `logFollowUpTouch` → `Followed up…`). **Resolved
+    2026-11-15 (Dev: yes):** a Touched on a lead that HAS a follow-up (date or cadence) is a
+    follow-up done **when it is due** (`isDueFollowUpTouch`: follow-up date today or earlier, or the
+    row came from Today's "Follow-ups due" section — which includes the dateless day-3/7/14 marks).
+    Then `touchNote` writes `Followed up (touched)…` and the scoreboard counts it. An early touch, a
+    bulk touch on the board ahead of the date, or a lead with no follow-up stays `Touched…`. Applies from that date —
+    older Touched rows can't be told apart after the fact, so there is no backfill.
 - **Card click on the Pipeline board opens the lead in a popup** (Dev, 2026-11-13 — same as the
   other boards), with an "Open full page" link to `/leads/:id` for everything else. The popup is
   `LeadForm` in edit mode and saves only the fields that changed, through the same `updateLead`

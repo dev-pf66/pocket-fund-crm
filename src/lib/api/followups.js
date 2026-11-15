@@ -211,14 +211,25 @@ export async function advanceFollowUpCadence(lead, currentPersonId = null) {
 }
 
 /**
+ * The note a "Reached out" follow-up touch writes. It must ALWAYS start with
+ * `Followed up` — that prefix is what the scoreboard's "F/U done" column counts.
+ * A typed note used to be written bare, so a follow-up logged with a note
+ * counted nowhere (fixed 2026-11-15; test/follow-up-done.test.js).
+ */
+export function followUpNote(lead, note = '') {
+  const trimmed = (note || '').trim()
+  if (trimmed) return `Followed up — ${trimmed}`
+  return `Followed up${lead?.follow_up_note ? ` — ${lead.follow_up_note}` : ''}`
+}
+
+/**
  * Log the reach-out and roll the cadence forward in one call — what the
  * "Reached out" button on the follow-up card does.
  */
 export async function logFollowUpTouch(lead, currentPersonId, { note = '', activityType = 'note' } = {}) {
-  const trimmed = (note || '').trim()
   const activity = await logActivity(lead.id, {
     activity_type: activityType,
-    notes: trimmed || `Followed up${lead.follow_up_note ? ` — ${lead.follow_up_note}` : ''}`
+    notes: followUpNote(lead, note)
   }, currentPersonId)
 
   // No cadence running: the one-off reminder is spent, so retire it.
