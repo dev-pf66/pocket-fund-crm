@@ -5,7 +5,7 @@ import {
   getNotificationFeed,
   logFollowUpTouch,
   snoozeFollowUp,
-  clearFollowUp,
+  DEFAULT_FOLLOW_UP_DAYS,
   assignLead
 } from '../lib/crm-api'
 import { useToast } from '../components/Toast'
@@ -105,8 +105,6 @@ function Notifications() {
     logFollowUpTouch(item.lead, currentPerson.id))
   const handleSnooze = (item, days) => act(item, `${item.title} pushed ${days} day${days === 1 ? '' : 's'}`, () =>
     snoozeFollowUp(item.lead, days, { note: item.lead?.follow_up_note }, currentPerson.id))
-  const handleClear = item => act(item, `Reminder cleared on ${item.title}`, () =>
-    clearFollowUp(item.leadId, currentPerson.id))
   const handleClaim = item => act(item, `${item.title} assigned to you`, () =>
     assignLead(item.leadId, currentPerson.id, currentPerson.id))
 
@@ -230,7 +228,7 @@ function Notifications() {
           showOwner={isAdmin && showAllOwners}
           viewerId={currentPerson?.id}
           pendingId={pendingId}
-          handlers={{ handleTouch, handleSnooze, handleClear, handleClaim }}
+          handlers={{ handleTouch, handleSnooze, handleClaim }}
         />
       ))}
 
@@ -329,7 +327,9 @@ function Row({ item, ownerName, busy, handlers }) {
                 title="Log the reach-out — a cadence rolls to its next day automatically">
                 <Check size={14} /> Reached out
               </button>
-              {[[1, '+1d'], [7, '+1w']].map(([days, label]) => (
+              {/* The ✕ "drop the reminder" button became +30d (Dev, 2026-11-16): a
+                  live lead always has a next reminder; only marking it dead ends them. */}
+              {[[1, '+1d'], [7, '+1w'], [DEFAULT_FOLLOW_UP_DAYS, `+${DEFAULT_FOLLOW_UP_DAYS}d`]].map(([days, label]) => (
                 <button key={days} className="btn btn-sm btn-secondary" onClick={() => handlers.handleSnooze(item, days)} disabled={busy}>
                   {label}
                 </button>
@@ -352,12 +352,6 @@ function Row({ item, ownerName, busy, handlers }) {
             <span className="btn btn-sm btn-secondary btn-slot-empty" title="No LinkedIn on file" aria-hidden="true">
               <ExternalLink size={14} />
             </span>
-          )}
-          {item.kind === 'followup' && (
-            <button className="btn btn-sm btn-secondary btn-danger-quiet" onClick={() => handlers.handleClear(item)} disabled={busy}
-              title="Drop the reminder entirely" aria-label="Drop the reminder">
-              <X size={14} />
-            </button>
           )}
         </div>
       </div>

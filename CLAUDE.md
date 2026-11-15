@@ -214,6 +214,29 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - Sources run under `Promise.allSettled`: one failing source degrades that source and is
     reported in `errors`, rather than silently shortening the list.
   - The badge counts overdue + due-today only. Never count upcoming work into it.
+- **Every live lead always has a next reminder (Dev, 2026-11-16).** "There should always be an
+  automatic follow-up reminder, unless we are marking the lead as dead — whether that's 30 days,
+  90 days." Policy in `src/lib/followUpPolicy.js` — change the interval (`DEFAULT_FOLLOW_UP_DAYS`,
+  30) there only. Guardrail: `test/always-a-reminder.test.js`.
+  - Completing a follow-up (Touched, Reached out) schedules the next one 30 days out; a touch on a
+    lead with no reminder gives it one; an **early** Touched leaves a future reminder where it is
+    (it used to wipe it). Reached out consumes a future one on purpose — it is explicitly about
+    that follow-up. A finished cadence falls back to the default. The old Clear / ✕ buttons are
+    now "+30 days" (`snoozeFollowUp`, keeps a cadence, never pulls a date earlier). "Still working"
+    on the 30-day clock with no date gives a reminder-less lead the default.
+  - **Scope: leads that have replied** (`REMINDER_STAGES` = responded, meeting_booked,
+    warm_active, reach_out_later — the Today set). Not `outreach`: a board bulk touch on 150
+    never-replied leads would otherwise land 150 reminders in the bell on one morning.
+  - **The automatic check-in is a safety net, not a promise** (`isDefaultReminder`: note is
+    "30-day check-in"). "Gone quiet" and Today's day-3/7/14 marks only fire on leads with no
+    promise, so they treat it as none — otherwise the 30-day floor would mute them for a month.
+    One lead, one reason: once the check-in is inside the 14-day follow-up window, "gone quiet"
+    skips it.
+  - **Dead ends reminders on every path**: `updateLead`/`moveLead` to `passed` null the date and
+    cadence (`DEAD_REMINDER_RESET`), as does `disposeLead`'s dead.
+  - **Not done, by choice:** no backfill (a one-shot run would land hundreds of reminders on the
+    same day 30 days later — they get one the next time they're touched), and none at lead
+    creation. Explicitly blanking the date in a form or via the API is still allowed.
 - **Archiving leads (migration 049).** `crm_leads.is_archived` / `archived_at` /
   `archived_reason`, mirroring `people.is_archived` (029). Archived leads are out of every board,
   count, queue and notification, but **nothing is deleted** and un-archiving is one flag flip.

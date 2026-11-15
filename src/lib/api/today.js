@@ -8,8 +8,9 @@ import { istAddDays, istWeekStart, istToday } from '../dateUtils.js'
 import { cacheClear, istDateStr, getDaysBetween, fetchAllRows } from './core.js'
 import { logActivity, calculateStaleness, updateLead } from './leads.js'
 import { runBulk } from '../bulkActions.js'
-import { advanceFollowUpCadence, clearFollowUp, snoozeFollowUp } from './followups.js'
+import { advanceFollowUpCadence, resetFollowUpToDefault, snoozeFollowUp } from './followups.js'
 import { getCRMSettings } from './misc.js'
+import { getsDefaultReminder, isDefaultReminder, DEAD_REMINDER_RESET } from '../followUpPolicy.js'
 import { ownerScopeIds, scopeToOwners } from './cover.js'
 
 // ============================================================================
@@ -177,14 +178,18 @@ export async function markLeadTouched(lead, currentPersonId, note = '', { source
     notes: touchNote(lead, note, source, { followUp })
   }, currentPersonId)
 
+  // A lead always keeps a next reminder (Dev, 2026-11-16; resetFollowUpToDefault):
+  //  - cadence running → roll it (a finished cadence falls back to the default);
+  //  - one-off reminder due/overdue, or none at all → the default check-in;
+  //  - one-off reminder still in the FUTURE → leave it. This touch was early, and
+  //    it used to wipe a promise made weeks ahead ("after their board meeting").
   if (lead.follow_up_cadence?.offsets?.length) {
     await advanceFollowUpCadence(lead, currentPersonId).catch(err =>
       console.error('Cadence advance failed (touch was logged):', err)
     )
-  } else if (lead.next_follow_up_date) {
-    // One-off reminder, now spent.
-    await clearFollowUp(lead.id, currentPersonId).catch(err =>
-      console.error('Follow-up clear failed (touch was logged):', err)
+  } else if (getsDefaultReminder(lead) && (!lead.next_follow_up_date || String(lead.next_follow_up_date).slice(0, 10) <= istToday())) {
+    await resetFollowUpToDefault(lead.id, currentPersonId).catch(err =>
+      console.error('Scheduling the next reminder failed (touch was logged):', err)
     )
   }
   return activity
@@ -223,7 +228,10 @@ export async function getFollowUpsDue(personId) {
   const marks = new Set([t.cold, t.warm, t.active])
   return (data || [])
     .filter(lead => {
-      if (lead.next_follow_up_date) return lead.next_follow_up_date <= horizon && lead.next_follow_up_date >= floor
+      if (lead.next_follow_up_date && lead.next_follow_up_date <= horizon && lead.next_follow_up_date >= floor) return true
+      // The automatic 30-day check-in is a safety net, not a promise: the
+      // day-3/7/14 marks still fire under it (isDefaultReminder).
+      if (lead.next_follow_up_date && !isDefaultReminder(lead)) return false
       if (!TODAY_ENGAGED_STAGES.includes(lead.stage)) return false
       return marks.has(daysStaleFor(lead))
     })
@@ -342,8 +350,11 @@ export async function bulkSnoozeLeads(leads, days, currentPersonId) {
 }
 
 /** Bulk dismiss — marks every lead dead (stage → passed). */
+/** Marking a lead dead is the ONE thing that ends its reminders (updateLead/moveLead enforce it too). */
+export const DEAD_LEAD_UPDATES = { stage: 'passed', ...DEAD_REMINDER_RESET }
+
 export async function bulkDismissLeads(leads, currentPersonId) {
-  return runBulk(leads, lead => updateLead(lead.id, { stage: 'passed' }, currentPersonId))
+  return runBulk(leads, lead => updateLead(lead.id, { ...DEAD_LEAD_UPDATES }, currentPersonId))
 }
 
 /**

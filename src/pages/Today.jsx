@@ -17,6 +17,7 @@ import {
   markLeadTouched,
   pingDevOnLead,
   updateLead,
+  DEAD_LEAD_UPDATES,
   daysStaleFor,
   leadOwnerId
 } from '../lib/crm-api'
@@ -314,7 +315,7 @@ function Today() {
   async function handleDismiss(lead) {
     setPendingId(lead.id)
     try {
-      await updateLead(lead.id, { stage: 'passed' }, currentPerson.id)
+      await updateLead(lead.id, { ...DEAD_LEAD_UPDATES }, currentPerson.id)
       setQueue(prev => ({
         leads: prev.leads.filter(l => l.id !== lead.id),
         total: Math.max(0, prev.total - 1)

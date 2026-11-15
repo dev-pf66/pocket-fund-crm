@@ -148,7 +148,12 @@ describe('one lead, one reason', () => {
     h.db = dbWith({})
     await getNotificationFeed(6)
     const reads = h.db.ops.filter(o => o.table === 'crm_leads' && o.type === 'select')
-    const quietRead = reads.find(r => r.filters.some(f => f[0] === 'is' && f[1] === 'next_follow_up_date'))
+    // Since 2026-11-16 the automatic 30-day check-in doesn't count as a promise
+    // (followUpPolicy.isDefaultReminder), so the filter is "no date, or only the
+    // automatic check-in" — a real promise still excludes the lead.
+    const quietRead = reads.find(r => r.filters.some(f =>
+      (f[0] === 'is' && f[1] === 'next_follow_up_date') ||
+      (f[0] === 'or' && String(f[1]).startsWith('next_follow_up_date.is.null'))))
     expect(quietRead, 'the went-quiet source should filter out scheduled leads').toBeTruthy()
   })
 
