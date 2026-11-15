@@ -1,15 +1,21 @@
-// Weekly sales digest → Sage task tracker.
-// Vercel cron hits this Monday 9:00 IST (03:30 UTC). Computes last IST week
-// (Mon–Sun) per analyst — meetings, replies, reply rate, demos, and outreach
-// volume — with deltas vs the week before, and files it as a due-dated task
-// assigned to Dev in the task tracker. Idempotent per week via crm_tt_mappings.
+// Weekly sales digest. Computes an IST week (Mon–Sun) per analyst — meetings,
+// replies, reply rate, demos, and outreach volume — with deltas vs the week
+// before.
+//
+// Nov 2026 (Dev: "fix/improve this to a part of the plan page"): the digest is
+// READ on the task tracker's /plan page, from GET ?view=data (x-api-key), and is
+// no longer filed as a Monday Sage task — each one sat overdue on his list.
+// The Monday cron (03:30 UTC = 9:00 IST) still runs: it writes the heartbeat
+// /api/health reports, and files a task only when the CallHippo watchdog fires
+// or the run itself fails.
 //
 // Reports OUTCOMES first, volume second (Dev, Aug 2026): sales moved to a
 // smaller, more targeted motion, so a digest ranked by send count read the
 // strategy as failure. Don't re-sort this by outreach.
 //
 // Manual runs: GET/POST with Authorization: Bearer $CRON_SECRET.
-//   ?dry_run=1  → returns the digest text without creating the task.
+//   ?dry_run=1  → returns the digest text and data without filing anything.
+// Data: GET ?view=data[&week=YYYY-MM-DD] with x-api-key: $CRM_API_KEY.
 
 import { createClient } from '@supabase/supabase-js'
 import { tt } from '../src/lib/integrations/task-tracker.js'
@@ -52,17 +58,23 @@ const delta = (curr, prev) => {
  * Pure aggregation — no DB. Split out from the fetching so the accountability
  * rules (everyone listed zeros included, TEAM line sums only the listed rows)
  * are unit-testable. See test/weekly-digest.test.js.
+ *
+ * Returns STRUCTURED numbers. Two readers render them: composeDigest() below
+ * (the plain-text version, kept for ?dry_run=1 and the tests), and the task
+ * tracker's /plan page, which reads GET ?view=data. Since Nov 2026 the digest
+ * is no longer filed as a Monday Sage task — Dev: "fix/improve this to a part
+ * of the plan page". A task that is a report never gets "done"; it just sat
+ * overdue on his list every week.
+ *
+ * `week` is any date in the week to report (normalised to its Monday). Omitted,
+ * it is the last full Mon–Sun week before `today`. A week that has not ended
+ * yet is reported as `partial`.
  */
-export function composeDigest({ people: allPeople, outreach, meetings, demos, today }) {
-  const lastStart = addDays(weekStart(today), -7)
+export function computeDigest({ people: allPeople, outreach, meetings, demos, today, week }) {
+  const lastStart = week ? weekStart(week) : addDays(weekStart(today), -7)
   const lastEnd = addDays(lastStart, 6)
   const prevStart = addDays(lastStart, -7)
   const prevEnd = addDays(lastStart, -1)
-
-  const outreachRes = { data: outreach }
-  const meetingsRes = { data: meetings }
-  const demosRes = { data: demos }
-  const peopleRes = { data: allPeople }
 
   const inLast = (d) => d >= lastStart && d <= lastEnd
   const inPrev = (d) => d >= prevStart && d <= prevEnd
@@ -77,7 +89,7 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
     return perPerson.get(pid)
   }
 
-  for (const r of outreachRes.data || []) {
+  for (const r of outreach || []) {
     const s = statsFor(r.logged_by)
     if (inLast(r.outreach_date)) {
       s.outreach += 1
@@ -87,13 +99,13 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
       if (isReply(r.status)) s.prevReplies += 1
     }
   }
-  for (const r of meetingsRes.data || []) {
+  for (const r of meetings || []) {
     const d = String(r.activity_date).slice(0, 10)
     const s = statsFor(r.logged_by)
     if (inLast(d)) s.meetings += 1
     else if (inPrev(d)) s.prevMeetings += 1
   }
-  for (const r of demosRes.data || []) {
+  for (const r of demos || []) {
     const s = statsFor(r.created_by)
     if (inLast(r.demo_date)) {
       s.demos += 1
@@ -101,7 +113,9 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
     }
   }
 
-  const people = (peopleRes.data || []).filter(p => !p.is_archived)
+  // dev+localtest is a test account — the scoreboard and the MCP roster
+  // exclude it, and it was showing up in the digest's "No activity" line.
+  const people = (allPeople || []).filter(p => !p.is_archived && !/\+localtest/.test(p.email || ''))
 
   // Sum only the people the digest actually lists. Summing every entry in
   // perPerson included departed/archived analysts, so the TEAM line came out
@@ -113,71 +127,77 @@ export function composeDigest({ people: allPeople, outreach, meetings, demos, to
     for (const k of Object.keys(team)) team[k] += s[k]
   }
 
+  // Ranked by what moved (meetings, then replies, then reply rate) rather than
+  // who sent most — outcomes lead, volume is context (Dev, Aug 2026).
+  const rows = people
+    .map(p => ({ id: p.id, name: p.name, ...(perPerson.get(p.id) || blank()) }))
+    .sort((a, b) =>
+      b.meetings - a.meetings ||
+      b.replies - a.replies ||
+      pct(b.replies, b.outreach) - pct(a.replies, a.outreach) ||
+      String(a.name).localeCompare(String(b.name))
+    )
+  // Every active person is still named (Dev, July 2026): anyone with nothing
+  // at all collapses into one "No activity" list rather than a dozen rows of
+  // zeros. Touches logged with no outcome yet is work, NOT silence, so it
+  // keeps its own row (Dev, Aug 2026).
+  const didSomething = (s) => s.outreach > 0 || s.replies > 0 || s.meetings > 0 || s.demos > 0
+  const withRate = (s) => ({ ...s, replyRate: pct(s.replies, s.outreach) })
+
+  // Rows with no person behind them — CallHippo imports arrive unclaimed. They
+  // are reported, never folded into the team line (same rule as the scoreboard).
+  const unattributed = perPerson.get(null)?.outreach || 0
+
+  return {
+    week: { start: lastStart, end: lastEnd },
+    prev: { start: prevStart, end: prevEnd },
+    partial: Boolean(today) && today <= lastEnd,
+    team: withRate(team),
+    active: rows.filter(didSomething).map(withRate),
+    quiet: rows.filter(s => !didSomething(s)).map(s => s.name).sort(),
+    unattributed,
+    // A quiet week is only worth calling out when nothing MOVED. Low send
+    // volume is the plan now, so it is no longer the thing to flag.
+    nothingMoved: team.meetings === 0 && team.replies === 0 && team.demos === 0,
+  }
+}
+
+/** The plain-text digest, rendered from computeDigest(). */
+export function composeDigest(args) {
+  const d = computeDigest(args)
+  const { team } = d
   const lines = []
-  lines.push(`Week of ${lastStart} – ${lastEnd} (vs prior week)`)
+  lines.push(`Week of ${d.week.start} – ${d.week.end} (vs prior week)`)
   lines.push('')
 
-  // Outcomes lead, volume is context (Dev's call, Aug 2026). Sales moved to a
-  // deliberately smaller, more targeted motion, so ranking by raw send count
-  // reported the new strategy as a decline. Meetings are the strongest signal
-  // available here, so they head the line, then replies, with touch count kept
-  // only as the denominator that makes the reply rate meaningful.
-  //
   // These are meetings HELD, and the wording says so. The meeting activity is
   // auto-logged when a lead LEAVES meeting_booked moving forward, because
   // meeting_booked means "agreed to meet", not "met" — so this number is
-  // conversations that happened, not bookings made. The comment here used to
-  // claim it counted leads "entering meeting_booked", which was wrong in both
-  // directions and is how the CRM scoreboard and this digest came to report
-  // different things under the same word.
+  // conversations that happened, not bookings made.
   lines.push(
     `TEAM — what moved: ${team.meetings} meetings held (${delta(team.meetings, team.prevMeetings)}) · ` +
-    `${team.replies} replies (${pct(team.replies, team.outreach)}% of ${team.outreach} touches, ${delta(team.replies, team.prevReplies)}) · ` +
+    `${team.replies} replies (${team.replyRate}% of ${team.outreach} touches, ${delta(team.replies, team.prevReplies)}) · ` +
     `${team.demos} demos${team.signups ? ` (${team.signups} signed up)` : ''}`
   )
   lines.push(`Volume: ${team.outreach} outreach (${delta(team.outreach, team.prevOutreach)})`)
   lines.push('')
 
-  // Every active person appears, zeros included — the digest is the
-  // accountability view, so a silent week must be visible (Dev, July 2026).
-  // Ranked by what moved (meetings, then replies, then reply rate) rather than
-  // who sent most.
-  const rows = people
-    .map(p => [p.name, perPerson.get(p.id) || blank()])
-    .sort((a, b) =>
-      b[1].meetings - a[1].meetings ||
-      b[1].replies - a[1].replies ||
-      pct(b[1].replies, b[1].outreach) - pct(a[1].replies, a[1].outreach) ||
-      a[0].localeCompare(b[0])
-    )
-  // Anyone with nothing at all collapses into a single named line. Dev's rule
-  // still holds — a silent week stays visible, every person is still named —
-  // but at a 14-person roster and a targeted motion, a dozen identical
-  // "0 meetings · 0 replies" rows every Monday just trains you to skip the
-  // digest. Doing real work with no outcome yet is NOT silence: anyone with
-  // touches logged keeps their own line (Dev's call, Aug 2026).
-  const didSomething = (s) => s.outreach > 0 || s.replies > 0 || s.meetings > 0 || s.demos > 0
-  const active = rows.filter(([, s]) => didSomething(s))
-  const quiet = rows.filter(([, s]) => !didSomething(s)).map(([name]) => name).sort()
-
-  for (const [name, s] of active) {
+  for (const s of d.active) {
     lines.push(
-      `${name}: ${s.meetings} meetings held (${delta(s.meetings, s.prevMeetings)}) · ` +
-      `${s.replies} replies (${pct(s.replies, s.outreach)}% of ${s.outreach} touches, ${delta(s.outreach, s.prevOutreach)})` +
+      `${s.name}: ${s.meetings} meetings held (${delta(s.meetings, s.prevMeetings)}) · ` +
+      `${s.replies} replies (${s.replyRate}% of ${s.outreach} touches, ${delta(s.outreach, s.prevOutreach)})` +
       `${s.demos ? ` · ${s.demos} demos` : ''}${s.signups ? ` · ${s.signups} signups` : ''}`
     )
   }
-  if (quiet.length) {
-    if (active.length) lines.push('')
-    lines.push(`No activity (${quiet.length}): ${quiet.join(', ')}`)
+  if (d.quiet.length) {
+    if (d.active.length) lines.push('')
+    lines.push(`No activity (${d.quiet.length}): ${d.quiet.join(', ')}`)
   }
-  // A quiet week is only worth calling out when nothing MOVED. Low send volume
-  // is the plan now, so it is no longer the thing to flag.
-  if (team.meetings === 0 && team.replies === 0 && team.demos === 0) {
+  if (d.nothingMoved) {
     lines.push('', `Nothing moved last week — no replies, meetings or demos logged${team.outreach ? ` (${team.outreach} touches went out).` : '.'}`)
   }
 
-  return { weekKey: lastStart, title: `Weekly Outreach Digest — w/o ${lastStart}`, body: lines.join('\n') }
+  return { weekKey: d.week.start, title: `Weekly Outreach Digest — w/o ${d.week.start}`, body: lines.join('\n') }
 }
 
 /**
@@ -234,9 +254,9 @@ async function callSyncWarningLines() {
   }
 }
 
-async function buildDigest() {
+async function buildDigest({ week } = {}) {
   const today = istDateStr()
-  const lastStart = addDays(weekStart(today), -7)
+  const lastStart = week ? weekStart(week) : addDays(weekStart(today), -7)
   const lastEnd = addDays(lastStart, 6)
   const prevStart = addDays(lastStart, -7)
 
@@ -244,7 +264,7 @@ async function buildDigest() {
   // a busy fortnight, and a truncated page comes back with no error — the
   // digest would just quietly under-report everyone.
   const [people, outreach, meetings, demos] = await Promise.all([
-    fetchAllRows(() => supabase.from('people').select('id, name, is_archived')),
+    fetchAllRows(() => supabase.from('people').select('id, name, email, is_archived')),
     fetchAllRows(() => supabase.from('crm_outreach_log')
       .select('logged_by, outreach_date, status')
       .gte('outreach_date', prevStart).lte('outreach_date', lastEnd)),
@@ -264,14 +284,18 @@ async function buildDigest() {
       .gte('demo_date', prevStart).lte('demo_date', lastEnd))
   ])
 
-  const digest = composeDigest({ people, outreach, meetings, demos, today })
+  const input = { people, outreach, meetings, demos, today, week: lastStart }
+  const data = computeDigest(input)
+  const digest = composeDigest(input)
 
   // Appended after composing so composeDigest stays pure and synchronous —
   // its guardrail tests depend on that.
   const warning = await callSyncWarningLines()
-  return warning.length
-    ? { ...digest, body: `${digest.body}\n${warning.join('\n')}` }
-    : digest
+  return {
+    data,
+    warnings: warning.filter(l => l.trim()),
+    digest: warning.length ? { ...digest, body: `${digest.body}\n${warning.join('\n')}` } : digest,
+  }
 }
 
 // Heartbeat. Best-effort by design: a logging failure must never be the reason
@@ -343,7 +367,73 @@ async function alertFailure(weekKey, err) {
   }
 }
 
+// Header-only API key, as everywhere else (api/_auth.js). Boolean(validKey)
+// first, or an unset CRM_API_KEY authenticates `undefined === undefined`.
+function hasApiKey(req) {
+  const validKey = process.env.CRM_API_KEY
+  return Boolean(validKey) && req.headers['x-api-key'] === validKey
+}
+
+/**
+ * GET ?view=data[&week=YYYY-MM-DD] — the digest as JSON, for the task
+ * tracker's /plan page (which calls it server-side with CRM_API_KEY, so the
+ * key never reaches a browser). Read-only: files nothing, records no run.
+ */
+async function handleData(req, res) {
+  if (!requireEnv(res, ['VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CRM_API_KEY'])) return
+  if (!hasApiKey(req)) return res.status(401).json({ success: false, error: 'Unauthorized' })
+  const week = req.query?.week
+  if (week && (!/^\d{4}-\d{2}-\d{2}$/.test(week) || isNaN(Date.parse(`${week}T00:00:00Z`)))) {
+    return res.status(400).json({ success: false, error: 'week must be YYYY-MM-DD' })
+  }
+  if (week && weekStart(week) > weekStart(istDateStr())) {
+    return res.status(400).json({ success: false, error: 'week is in the future' })
+  }
+  try {
+    const { data, warnings } = await buildDigest({ week })
+    return res.status(200).json({ success: true, data: { ...data, warnings } })
+  } catch (e) {
+    console.error('weekly-digest data error:', e)
+    return res.status(500).json({ success: false, error: e.message })
+  }
+}
+
+/**
+ * The CallHippo watchdog still needs a voice now that the digest is not a task:
+ * when it fires, file ONE task for that week (idempotent via crm_tt_mappings),
+ * because "dials are being permanently lost" is an action, not a report.
+ */
+async function fileWarningTask(weekKey, warnings) {
+  const { data: existing } = await supabase
+    .from('crm_tt_mappings')
+    .select('tt_task_id')
+    .eq('entity_type', 'weekly_digest_warning')
+    .eq('entity_key', weekKey)
+    .maybeSingle()
+  if (existing?.tt_task_id) return existing.tt_task_id
+
+  const assignee = await resolveAssignee()
+  const task = await tt.createTask({
+    title: `⚠️ CallHippo call sync needs attention — w/o ${weekKey}`,
+    description: `${warnings.join('\n')}\n\nRaised by the Monday outreach check (/api/weekly-digest). The weekly numbers themselves are on the tracker's Plan page.`,
+    priority: 'high',
+    status: 'not_started',
+    due_date: istDateStr(),
+    assigned_to: assignee,
+    created_by: assignee
+  })
+  await supabase.from('crm_tt_mappings').upsert({
+    entity_type: 'weekly_digest_warning',
+    entity_key: weekKey,
+    tt_task_id: task.id,
+    metadata: { warnings }
+  }, { onConflict: 'entity_type,entity_key' })
+  return task.id
+}
+
 export default async function handler(req, res) {
+  if (req.method === 'GET' && req.query?.view === 'data') return handleData(req, res)
+
   if (!requireEnv(res, [
     'VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CRON_SECRET',
     'TASK_TRACKER_API_URL', 'TASK_TRACKER_API_KEY'
@@ -356,44 +446,22 @@ export default async function handler(req, res) {
 
   let weekKey = null
   try {
-    const digest = await buildDigest()
+    const { data, warnings, digest } = await buildDigest()
     weekKey = digest.weekKey
     const dryRun = req.query?.dry_run === '1'
-    if (dryRun) return res.status(200).json({ ok: true, dry_run: true, ...digest })
+    if (dryRun) return res.status(200).json({ ok: true, dry_run: true, ...digest, data, warnings })
 
-    // One digest per week, even if the cron double-fires.
-    const { data: existing } = await supabase
-      .from('crm_tt_mappings')
-      .select('tt_task_id')
-      .eq('entity_type', 'weekly_digest')
-      .eq('entity_key', digest.weekKey)
-      .maybeSingle()
-    if (existing?.tt_task_id) {
-      await recordRun(digest.weekKey, 'skipped', 'already_sent')
-      return res.status(200).json({ ok: true, skipped: 'already_sent', tt_task_id: existing.tt_task_id })
+    // The digest itself is no longer a Sage task (Dev, Nov 2026): it lives on
+    // the tracker's Plan page, read live from ?view=data. This run still does
+    // the two jobs that must not depend on anyone opening a page — the
+    // CallHippo watchdog, and the heartbeat that /api/health reports.
+    if (warnings.length) {
+      const ttTaskId = await fileWarningTask(digest.weekKey, warnings)
+      await recordRun(digest.weekKey, 'ok', `warning filed, tt_task_id=${ttTaskId}`)
+      return res.status(200).json({ ok: true, week: digest.weekKey, warning_task_id: ttTaskId })
     }
-
-    const assignee = await resolveAssignee()
-
-    const task = await tt.createTask({
-      title: digest.title,
-      description: digest.body,
-      priority: 'medium',
-      status: 'not_started',
-      due_date: istDateStr(), // today (Monday) — every task gets a due date
-      assigned_to: assignee,
-      created_by: assignee
-    })
-
-    await supabase.from('crm_tt_mappings').upsert({
-      entity_type: 'weekly_digest',
-      entity_key: digest.weekKey,
-      tt_task_id: task.id,
-      metadata: { title: digest.title }
-    }, { onConflict: 'entity_type,entity_key' })
-
-    await recordRun(digest.weekKey, 'ok', `tt_task_id=${task.id}`)
-    return res.status(200).json({ ok: true, tt_task_id: task.id, week: digest.weekKey })
+    await recordRun(digest.weekKey, 'ok', 'no task: digest lives on the tracker Plan page')
+    return res.status(200).json({ ok: true, week: digest.weekKey, filed: false })
   } catch (e) {
     console.error('weekly-digest error:', e)
     await recordRun(weekKey, 'failed', e.message)
