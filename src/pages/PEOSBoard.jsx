@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   getDemos, createDemo, updateDemo, moveDemo, deleteDemo,
@@ -14,6 +14,7 @@ import { istToday, istAddDays } from '../lib/dateUtils'
 import { isAdminUser } from '../lib/admin'
 import { runBulk } from '../lib/bulkActions'
 import { DEMO_STAGES } from '../lib/pipelines'
+import { BoardColumnHeader, BoardColumnEmpty } from '../components/BoardColumn'
 
 // Effective YYYY-MM-DD (IST) for a demo. Prefers the timed datetime,
 // falls back to the date-only field. en-CA locale yields YYYY-MM-DD.
@@ -201,6 +202,8 @@ function PEOSBoard() {
         ? null
         : viewing
   const [demos, setDemos] = useState([])
+  const loadedScopeRef = useRef(null)
+  const loadSeqRef = useRef(0)
   const [loading, setLoading] = useState(true)
   const [editingDemo, setEditingDemo] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -221,12 +224,21 @@ function PEOSBoard() {
 
   async function loadDemos() {
     if (!currentPerson?.id) return
-    setLoading(true)
+    // Spinner on the first load of THIS view only. A refresh after a save or
+    // bulk action keeps the board on screen instead of blanking it (Nov 2026);
+    // switching whose demos you're viewing is a new view, so it blanks — showing
+    // the previous person's demos under the new name would be worse.
+    const scopeKey = `${viewingPersonId ?? 'all'}`
+    if (loadedScopeRef.current !== scopeKey) setLoading(true)
     try {
       // viewingPersonId is null when an admin selects 'Everyone' — getDemos
       // with no person filter returns all rows RLS permits.
+      const seq = ++loadSeqRef.current
       const data = await getDemos(viewingPersonId)
+      // Switch people twice quickly and a slow first response must not land last.
+      if (seq !== loadSeqRef.current) return
       setDemos(data)
+      loadedScopeRef.current = scopeKey
     } catch (err) {
       console.error('Failed to load demos:', err)
       toast.error('Failed to load demos')
@@ -556,11 +568,7 @@ function PEOSBoard() {
                   minHeight: '300px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }}></span>
-                  <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
-                </div>
+                <BoardColumnHeader label={stage.label} color={stage.color} count={items.length} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {items.map(d => (
@@ -569,16 +577,13 @@ function PEOSBoard() {
                       demo={d}
                       showCreator={isAdmin && viewing === 'all'}
                       onEdit={() => setEditingDemo(d)}
-                      onDelete={() => handleDelete(d.id)}
                       onDragStart={handleDragStart}
                       selected={selectedIds.has(d.id)}
                       onToggleSelect={() => toggleSelect(d.id)}
                     />
                   ))}
                   {items.length === 0 && (
-                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
-                      Drag a demo here
-                    </div>
+                    <BoardColumnEmpty noun="demos" />
                   )}
                 </div>
               </div>
@@ -616,7 +621,7 @@ function PEOSBoard() {
   )
 }
 
-function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, selected, onToggleSelect }) {
+function DemoCard({ demo, showCreator = false, onEdit, onDragStart, selected, onToggleSelect }) {
   return (
     <div
       draggable
@@ -672,13 +677,6 @@ function DemoCard({ demo, showCreator = false, onEdit, onDelete, onDragStart, se
             </div>
           )}
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          title="Delete"
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
-        >
-          <Trash2 size={12} />
-        </button>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>

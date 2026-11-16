@@ -1,36 +1,18 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { getPartners, createPartner, updatePartner, movePartner, deletePartner } from '../lib/crm-api'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
-import { Plus, Search, Trash2, ExternalLink, Linkedin, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Search, Trash2, ExternalLink, Linkedin, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
-import { istToday } from '../lib/dateUtils'
 import { runBulk } from '../lib/bulkActions'
 import { PARTNER_STAGES, categoryKeyFromLabel } from '../lib/partners'
+import { BoardColumnHeader, BoardColumnEmpty } from '../components/BoardColumn'
+import FollowUpBadge from '../components/FollowUpBadge'
+import { daysUntil, followUpStatus } from '../lib/followUpBadge'
 
-const todayStr = istToday
 
-// Days until / since a YYYY-MM-DD date relative to today. Negative = overdue.
-function daysUntil(dateStr) {
-  if (!dateStr) return null
-  const today = new Date(todayStr() + 'T00:00:00')
-  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00')
-  if (Number.isNaN(d.getTime())) return null
-  return Math.round((d - today) / (1000 * 60 * 60 * 24))
-}
-
-// Bucket a partner's follow-up date for badges + the due-list at the top.
-// Returns null if there's no follow-up scheduled or it's still far out.
-function followUpStatus(dateStr) {
-  const days = daysUntil(dateStr)
-  if (days === null) return null
-  if (days < 0) return { kind: 'overdue', label: `${-days}d overdue`, color: '#dc2626' }
-  if (days === 0) return { kind: 'today', label: 'Due today', color: '#d97706' }
-  if (days <= 3) return { kind: 'soon', label: `In ${days}d`, color: '#ca8a04' }
-  return null
-}
 
 const STAGES = PARTNER_STAGES
 
@@ -177,6 +159,7 @@ function PartnersBoard() {
   )
   const isMobile = useIsMobileDevice()
   const [partners, setPartners] = useState([])
+  const loadedScopeRef = useRef(false)
   const [loading, setLoading] = useState(true)
   const [editingPartner, setEditingPartner] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -229,10 +212,13 @@ function PartnersBoard() {
 
   async function loadPartners() {
     if (!currentPerson?.id) return
-    setLoading(true)
+    // Spinner on the first load only. A refresh after a save or bulk action
+    // keeps the board on screen instead of blanking it (Nov 2026).
+    if (!loadedScopeRef.current) setLoading(true)
     try {
       const data = await getPartners()
       setPartners(data)
+      loadedScopeRef.current = true
     } catch (err) {
       console.error('Failed to load partners:', err)
       toast.error('Failed to load partners')
@@ -605,15 +591,7 @@ function PartnersBoard() {
                     }}
                   >
                     <span style={{ fontWeight: 600, fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{p.name}</span>
-                    {status && (
-                      <span style={{
-                        fontSize: 'var(--fs-xs)', fontWeight: 600,
-                        padding: '2px 6px', borderRadius: 'var(--radius-pill)',
-                        background: status.color + '22', color: status.color
-                      }}>
-                        {status.label}
-                      </span>
-                    )}
+                    {status && <FollowUpBadge status={status} date={p.next_follow_up_date} />}
                   </button>
                 )
               })}
@@ -662,11 +640,7 @@ function PartnersBoard() {
                   minHeight: '300px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }}></span>
-                  <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
-                </div>
+                <BoardColumnHeader label={stage.label} color={stage.color} count={items.length} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {items.map(p => (
@@ -675,16 +649,13 @@ function PartnersBoard() {
                       partner={p}
                       creator={peopleById[p.created_by]}
                       onEdit={() => setEditingPartner(p)}
-                      onDelete={() => handleDelete(p.id)}
                       onDragStart={handleDragStart}
                       selected={selectedIds.has(p.id)}
                       onToggleSelect={() => toggleSelect(p.id)}
                     />
                   ))}
                   {items.length === 0 && (
-                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
-                      Drag a partner here
-                    </div>
+                    <BoardColumnEmpty noun="partners" />
                   )}
                 </div>
               </div>
@@ -722,7 +693,7 @@ function PartnersBoard() {
   )
 }
 
-function PartnerCard({ partner, creator, onEdit, onDelete, onDragStart, selected, onToggleSelect }) {
+function PartnerCard({ partner, creator, onEdit, onDragStart, selected, onToggleSelect }) {
   const cats = (partner.categories || []).map(k => ({
     key: k,
     label: labelForCategory(k),
@@ -760,13 +731,6 @@ function PartnerCard({ partner, creator, onEdit, onDelete, onDragStart, selected
             {partner.name}
           </div>
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          title="Delete"
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
-        >
-          <Trash2 size={12} />
-        </button>
       </div>
 
       {partner.handle && (
@@ -785,16 +749,7 @@ function PartnerCard({ partner, creator, onEdit, onDelete, onDragStart, selected
         </div>
       )}
 
-      {followUp && (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px',
-          fontSize: 'var(--fs-xs)', fontWeight: 600,
-          padding: '2px 6px', borderRadius: 'var(--radius-pill)',
-          background: followUp.color + '22', color: followUp.color
-        }}>
-          <Calendar size={10} />
-          {followUp.label}
-        </div>
-      )}
+      {followUp && <FollowUpBadge status={followUp} date={partner.next_follow_up_date} className="fu-badge--card" />}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
         {cats.map(c => (
@@ -917,16 +872,7 @@ function MobilePartnerCard({ partner, stages, onEdit, onDelete, onMove }) {
         <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '6px' }}>{partner.handle}</div>
       )}
 
-      {followUp && (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '8px',
-          fontSize: 'var(--fs-xs)', fontWeight: 600,
-          padding: '3px 8px', borderRadius: 'var(--radius-pill)',
-          background: followUp.color + '22', color: followUp.color
-        }}>
-          <Calendar size={11} />
-          {followUp.label}
-        </div>
-      )}
+      {followUp && <FollowUpBadge status={followUp} date={partner.next_follow_up_date} className="fu-badge--card" />}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginBottom: '10px' }}>
         {cats.map(c => (

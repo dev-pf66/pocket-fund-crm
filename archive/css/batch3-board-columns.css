@@ -1,0 +1,35 @@
+/* Superseded by .board-col-head / .board-col-empty (src/components/BoardColumn.jsx),
+   UI batch 3, Nov 2026. Nothing renders these classes any more; kept, not deleted. */
+
+.crm-column-header {
+  padding: 1rem;
+  border-top: 4px solid;
+  background: white;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.crm-column-header h3 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.count-badge {
+  background: var(--primary);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.empty-column {
+  text-align: center;
+  color: var(--gray-500);
+  padding: 2rem 1rem;
+  font-size: var(--fs-md);
+}

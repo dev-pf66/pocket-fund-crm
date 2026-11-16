@@ -5041,31 +5041,8 @@ input, select, textarea {
   flex-direction: column;
 }
 
-.crm-column-header {
-  padding: 1rem;
-  border-top: 4px solid;
-  background: white;
-  border-radius: 8px 8px 0 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
 
-.crm-column-header h3 {
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
-}
 
-.count-badge {
-  background: var(--primary);
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: var(--fs-md);
-  font-weight: 600;
-}
 
 .crm-column-content {
   flex: 1;
@@ -5076,12 +5053,6 @@ input, select, textarea {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.empty-column {
-  text-align: center;
-  color: var(--gray-500);
-  padding: 2rem 1rem;
-  font-size: var(--fs-md);
-}
 
 /* Lead Card */
 .lead-card {
@@ -7025,8 +6996,9 @@ input, select, textarea {
 }
 
 .investor-status-passed {
-  background: var(--danger-bg-strong);
-  color: var(--danger-text-strong);
+  /* Grey, like Passed on every other board. Red is for overdue/stale. */
+  background: var(--gray-100);
+  color: var(--text-2);
 }
 
 /* =============================================
@@ -8355,5 +8327,90 @@ input, select, textarea {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   UI batch 3 (Nov 2026) — one column header, one empty state and one
+   follow-up badge across the Pipeline, Sellers, Partners, Italy and PE OS
+   boards. src/components/BoardColumn.jsx, src/components/FollowUpBadge.jsx.
+   ========================================================================== */
+.board-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 8px;
+  margin-bottom: 10px;
+  border-bottom: 2px solid var(--col-color, var(--border));
+}
+.board-col-head__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--col-color, var(--gray-400));
+  flex-shrink: 0;
+}
+.board-col-head__label {
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-col-head__count {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--gray-100);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.board-col-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.fu-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.fu-badge--overdue { background: var(--danger-bg-strong); color: var(--danger-text); }
+.fu-badge--today { background: var(--warning-bg-strong); color: var(--warning-text-strong); }
+.fu-badge--soon { background: var(--warning-bg); color: var(--warning-text); }
+/* On a card the badge sits on its own line above the owner row. */
+.fu-badge--card { margin: 0 6px 6px 0; }
+/* Pipeline columns match the other boards: same width, gap and surface.
+   (.crm-column used to be 300-350px with a white shadowed header and a
+   grey shadowed body; every other board is a flat 280px column.) Desktop
+   only — on phones the earlier max-width:768px rules stack the columns. */
+.crm-column {
+  background: var(--surface-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+.crm-column-content {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  min-height: 300px;
+}
+@media (min-width: 769px) {
+  .crm-board { gap: 12px; }
+  .crm-column {
+    flex: 0 0 280px;
+    min-width: 0;
+    max-width: none;
   }
 }

@@ -1,15 +1,16 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { getItalyPipeline, createItalyContact, updateItalyContact, moveItalyContact, deleteItalyContact } from '../lib/crm-api'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
-import { istToday } from '../lib/dateUtils'
 import { runBulk } from '../lib/bulkActions'
 import { ITALY_CONTACT_TYPES, ITALY_STAGES } from '../lib/pipelines'
+import { BoardColumnHeader, BoardColumnEmpty } from '../components/BoardColumn'
+import FollowUpBadge from '../components/FollowUpBadge'
+import { daysUntil, followUpStatus } from '../lib/followUpBadge'
 
-const todayStr = istToday
 
 // Italy mixed-ecosystem buyside pipeline. Deliberately separate from the
 // sales leads board and from the Indian sellers board — this one holds
@@ -23,24 +24,6 @@ const STAGES = ITALY_STAGES
 // Terminal stages don't need follow-up nudges.
 const TERMINAL_STAGES = new Set(['closed', 'passed'])
 
-// Days until / since a YYYY-MM-DD date relative to today. Negative = overdue.
-function daysUntil(dateStr) {
-  if (!dateStr) return null
-  const today = new Date(todayStr() + 'T00:00:00')
-  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00')
-  if (Number.isNaN(d.getTime())) return null
-  return Math.round((d - today) / (1000 * 60 * 60 * 24))
-}
-
-// Bucket a contact's follow-up date for badges + the due-list at the top.
-function followUpStatus(dateStr) {
-  const days = daysUntil(dateStr)
-  if (days === null) return null
-  if (days < 0) return { kind: 'overdue', label: `${-days}d overdue`, color: '#dc2626' }
-  if (days === 0) return { kind: 'today', label: 'Due today', color: '#d97706' }
-  if (days <= 3) return { kind: 'soon', label: `In ${days}d`, color: '#ca8a04' }
-  return null
-}
 
 function initials(name) {
   return (name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'
@@ -51,6 +34,7 @@ function ItalyBoard() {
   const { toast } = useToast()
   const isMobile = useIsMobileDevice()
   const [contacts, setContacts] = useState([])
+  const loadedScopeRef = useRef(false)
   const [loading, setLoading] = useState(true)
   const [editingContact, setEditingContact] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -74,10 +58,13 @@ function ItalyBoard() {
   }, [])
 
   async function loadContacts() {
-    setLoading(true)
+    // Spinner on the first load only. A refresh after a save or bulk action
+    // keeps the board on screen instead of blanking it (Nov 2026).
+    if (!loadedScopeRef.current) setLoading(true)
     try {
       const data = await getItalyPipeline()
       setContacts(data)
+      loadedScopeRef.current = true
     } catch (err) {
       console.error('Failed to load Italy pipeline:', err)
       toast.error('Failed to load Italy pipeline')
@@ -374,11 +361,7 @@ function ItalyBoard() {
                   >
                     <span style={{ fontWeight: 600, fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{c.name}</span>
                     {c.company_name && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{c.company_name}</span>}
-                    {status && (
-                      <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 6px', borderRadius: 'var(--radius-pill)', background: status.color + '22', color: status.color }}>
-                        {status.label}
-                      </span>
-                    )}
+                    {status && <FollowUpBadge status={status} date={c.next_follow_up_date} />}
                   </button>
                 )
               })}
@@ -412,11 +395,7 @@ function ItalyBoard() {
                 onDrop={e => handleDrop(e, stage.key)}
                 style={{ flex: '0 0 280px', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)', padding: '12px', minHeight: '300px' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }}></span>
-                  <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
-                </div>
+                <BoardColumnHeader label={stage.label} color={stage.color} count={items.length} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {items.map(c => (
                     <ContactCard
@@ -425,16 +404,13 @@ function ItalyBoard() {
                       owner={peopleById[c.assigned_to]}
                       creator={peopleById[c.created_by]}
                       onEdit={() => setEditingContact(c)}
-                      onDelete={() => handleDelete(c.id)}
                       onDragStart={handleDragStart}
                       selected={selectedIds.has(c.id)}
                       onToggleSelect={() => toggleSelect(c.id)}
                     />
                   ))}
                   {items.length === 0 && (
-                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
-                      Drag a contact here
-                    </div>
+                    <BoardColumnEmpty noun="contacts" />
                   )}
                 </div>
               </div>
@@ -492,7 +468,7 @@ function ContactMeta({ contact }) {
   )
 }
 
-function ContactCard({ contact, owner, creator, onEdit, onDelete, onDragStart, selected, onToggleSelect }) {
+function ContactCard({ contact, owner, creator, onEdit, onDragStart, selected, onToggleSelect }) {
   const followUp = followUpStatus(contact.next_follow_up_date)
   return (
     <div
@@ -516,13 +492,6 @@ function ContactCard({ contact, owner, creator, onEdit, onDelete, onDragStart, s
           )}
           <div style={{ fontWeight: 600, fontSize: 'var(--fs-base)', color: 'var(--text)', lineHeight: 1.3 }}>{contact.name}</div>
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          title="Delete"
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
-        >
-          <Trash2 size={12} />
-        </button>
       </div>
 
       <div style={{ marginBottom: '4px' }}>
@@ -543,11 +512,7 @@ function ContactCard({ contact, owner, creator, onEdit, onDelete, onDragStart, s
         </div>
       )}
 
-      {followUp && (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 6px', borderRadius: 'var(--radius-pill)', background: followUp.color + '22', color: followUp.color }}>
-          <Calendar size={10} /> {followUp.label}
-        </div>
-      )}
+      {followUp && <FollowUpBadge status={followUp} date={contact.next_follow_up_date} className="fu-badge--card" />}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         {owner && (

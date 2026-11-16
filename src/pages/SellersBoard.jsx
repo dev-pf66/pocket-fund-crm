@@ -1,15 +1,16 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { getSellers, createSeller, updateSeller, moveSeller, deleteSeller } from '../lib/crm-api'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 import { Plus, Search, Trash2, ExternalLink, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
-import { istToday } from '../lib/dateUtils'
 import { runBulk } from '../lib/bulkActions'
 import { SELLER_STAGES } from '../lib/pipelines'
+import { BoardColumnHeader, BoardColumnEmpty } from '../components/BoardColumn'
+import FollowUpBadge from '../components/FollowUpBadge'
+import { daysUntil, followUpStatus } from '../lib/followUpBadge'
 
-const todayStr = istToday
 
 // Indian-sellers buyside acquisition pipeline. Deliberately separate from the
 // sales leads board — sellers are acquisition targets, not sales leads, and
@@ -19,24 +20,6 @@ const STAGES = SELLER_STAGES
 // Terminal stages don't need follow-up nudges.
 const TERMINAL_STAGES = new Set(['acquired', 'passed'])
 
-// Days until / since a YYYY-MM-DD date relative to today. Negative = overdue.
-function daysUntil(dateStr) {
-  if (!dateStr) return null
-  const today = new Date(todayStr() + 'T00:00:00')
-  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00')
-  if (Number.isNaN(d.getTime())) return null
-  return Math.round((d - today) / (1000 * 60 * 60 * 24))
-}
-
-// Bucket a seller's follow-up date for badges + the due-list at the top.
-function followUpStatus(dateStr) {
-  const days = daysUntil(dateStr)
-  if (days === null) return null
-  if (days < 0) return { kind: 'overdue', label: `${-days}d overdue`, color: '#dc2626' }
-  if (days === 0) return { kind: 'today', label: 'Due today', color: '#d97706' }
-  if (days <= 3) return { kind: 'soon', label: `In ${days}d`, color: '#ca8a04' }
-  return null
-}
 
 function initials(name) {
   return (name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'
@@ -47,6 +30,7 @@ function SellersBoard() {
   const { toast } = useToast()
   const isMobile = useIsMobileDevice()
   const [sellers, setSellers] = useState([])
+  const loadedScopeRef = useRef(false)
   const [loading, setLoading] = useState(true)
   const [editingSeller, setEditingSeller] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -69,10 +53,13 @@ function SellersBoard() {
   }, [])
 
   async function loadSellers() {
-    setLoading(true)
+    // Spinner on the first load only. A refresh after a save or bulk action
+    // keeps the board on screen instead of blanking it (Nov 2026).
+    if (!loadedScopeRef.current) setLoading(true)
     try {
       const data = await getSellers()
       setSellers(data)
+      loadedScopeRef.current = true
     } catch (err) {
       console.error('Failed to load sellers:', err)
       toast.error('Failed to load sellers')
@@ -356,11 +343,7 @@ function SellersBoard() {
                   >
                     <span style={{ fontWeight: 600, fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{s.name}</span>
                     {s.business_name && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{s.business_name}</span>}
-                    {status && (
-                      <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 6px', borderRadius: 'var(--radius-pill)', background: status.color + '22', color: status.color }}>
-                        {status.label}
-                      </span>
-                    )}
+                    {status && <FollowUpBadge status={status} date={s.next_follow_up_date} />}
                   </button>
                 )
               })}
@@ -394,11 +377,7 @@ function SellersBoard() {
                 onDrop={e => handleDrop(e, stage.key)}
                 style={{ flex: '0 0 280px', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)', padding: '12px', minHeight: '300px' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stage.color }}></span>
-                  <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--text)' }}>{stage.label}</strong>
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
-                </div>
+                <BoardColumnHeader label={stage.label} color={stage.color} count={items.length} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {items.map(s => (
                     <SellerCard
@@ -407,16 +386,13 @@ function SellersBoard() {
                       owner={peopleById[s.assigned_to]}
                       creator={peopleById[s.created_by]}
                       onEdit={() => setEditingSeller(s)}
-                      onDelete={() => handleDelete(s.id)}
                       onDragStart={handleDragStart}
                       selected={selectedIds.has(s.id)}
                       onToggleSelect={() => toggleSelect(s.id)}
                     />
                   ))}
                   {items.length === 0 && (
-                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
-                      Drag a seller here
-                    </div>
+                    <BoardColumnEmpty noun="sellers" />
                   )}
                 </div>
               </div>
@@ -464,7 +440,7 @@ function SellerMeta({ seller }) {
   )
 }
 
-function SellerCard({ seller, owner, creator, onEdit, onDelete, onDragStart, selected, onToggleSelect }) {
+function SellerCard({ seller, owner, creator, onEdit, onDragStart, selected, onToggleSelect }) {
   const followUp = followUpStatus(seller.next_follow_up_date)
   return (
     <div
@@ -488,13 +464,6 @@ function SellerCard({ seller, owner, creator, onEdit, onDelete, onDragStart, sel
           )}
           <div style={{ fontWeight: 600, fontSize: 'var(--fs-base)', color: 'var(--text)', lineHeight: 1.3 }}>{seller.name}</div>
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          title="Delete"
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
-        >
-          <Trash2 size={12} />
-        </button>
       </div>
 
       <SellerMeta seller={seller} />
@@ -511,11 +480,7 @@ function SellerCard({ seller, owner, creator, onEdit, onDelete, onDragStart, sel
         </div>
       )}
 
-      {followUp && (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '2px 6px', borderRadius: 'var(--radius-pill)', background: followUp.color + '22', color: followUp.color }}>
-          <Calendar size={10} /> {followUp.label}
-        </div>
-      )}
+      {followUp && <FollowUpBadge status={followUp} date={seller.next_follow_up_date} className="fu-badge--card" />}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         {owner && (

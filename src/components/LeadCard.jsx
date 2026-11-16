@@ -2,6 +2,7 @@ import { useState, useCallback, memo } from 'react'
 import { logActivity } from '../lib/crm-api'
 import { useApp } from '../App'
 import StalenessBadge from './StalenessBadge'
+import FollowUpBadge from './FollowUpBadge'
 import { Phone, Mail, MessageCircle, AtSign, Linkedin } from 'lucide-react'
 
 // Pick a single urgency cue for the card header. Priority order matters
@@ -147,15 +148,12 @@ const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, 
           </div>
         )}
 
-        {lead.next_follow_up_date && (
-          <div className="lead-flag" style={{
-            fontSize: 'var(--fs-xs)',
-            color: urgency?.color === '#dc2626' ? 'var(--danger)'
-                 : urgency?.color === '#d97706' ? 'var(--warning-text)'
-                 : undefined
-          }}>
-            📅 Follow up: {new Date(lead.next_follow_up_date).toLocaleDateString()}
-          </div>
+        {/* Same relative badge as every other board (overdue / today / in Nd);
+            a far-off reminder isn't shown on the card — most replied leads carry
+            an automatic 30-day check-in, and the date is on the lead page. */}
+        {/* Settled leads (client, passed) don't get nudged — same rule as the other boards. */}
+        {!['client', 'passed'].includes(lead.stage) && (
+          <FollowUpBadge date={lead.next_follow_up_date} className="fu-badge--card" />
         )}
 
         {lead.reach_out_later_date && (
