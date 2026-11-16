@@ -14,6 +14,7 @@ import { isAdminUser } from '../lib/admin'
 import { runBulk } from '../lib/bulkActions'
 import { HEALTH_FILTERS, matchesHealthFilter, healthFilterCounts } from '../lib/leadFilters'
 import { BoardColumnHeader, BoardColumnEmpty } from '../components/BoardColumn'
+import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 
 const STAGES = [
   { key: 'outreach', label: 'New Leads (Outreach)', color: '#60a5fa' },
@@ -112,6 +113,7 @@ function countActiveAdvancedFilters(filters) {
 function LeadsBoard() {
   const { currentPerson, people } = useApp()
   const { toast } = useToast()
+  const isMobile = useIsMobileDevice()
   const navigate = useNavigate()
   const leadTypes = useLeadTypes()
   const isAdmin = isAdminUser(currentPerson)
@@ -242,12 +244,23 @@ function LeadsBoard() {
     }
 
     try {
-      await moveLead(draggedLead.id, newStage, currentPerson.id)
+      await moveLeadTo(draggedLead, newStage)
+    } finally {
+      setDraggedLead(null)
+    }
+  }
+
+  // One path for drag-and-drop (desktop) and the card's "Move to" (phone —
+  // drag events don't fire on touch). A failed move used to be console-only,
+  // so the card just snapped back with no reason given.
+  async function moveLeadTo(lead, newStage) {
+    if (!lead || lead.stage === newStage) return
+    try {
+      await moveLead(lead.id, newStage, currentPerson.id)
       await loadLeads()
     } catch (error) {
       console.error('Failed to move lead:', error)
-    } finally {
-      setDraggedLead(null)
+      toast.error(`Could not move ${lead.name || 'the lead'}: ${error.message}`)
     }
   }
 
@@ -691,7 +704,7 @@ function LeadsBoard() {
     <div>
       <div className="page-header">
         <h1>Pipeline</h1>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="page-header-actions">
           <button
             className="btn btn-secondary"
             onClick={() => setShowFilters(!showFilters)}
@@ -1233,6 +1246,8 @@ function LeadsBoard() {
                     settings={settings}
                     latestOutreachStatus={responseStatusByLead.get(lead.id)}
                     onDragStart={handleDragStart}
+                    onMove={isMobile ? moveLeadTo : undefined}
+                    stages={STAGES}
                     onClick={() => setEditingLead(lead)}
                     onRefresh={loadLeads}
                     selected={selectedIds.has(lead.id)}

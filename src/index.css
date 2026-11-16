@@ -8414,3 +8414,34 @@ input, select, textarea {
     max-width: none;
   }
 }
+
+/* Finish-up (Nov 2026): Pipeline header buttons wrap on a phone instead of
+   running off the edge; the card's mobile "Move to". */
+.page-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lead-card-move {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.lead-card-move select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
+  background: var(--surface);
+  color: var(--text);
+}
+/* Search + Saved + Save Search wrap on a phone instead of clipping. */
+.saved-search-bar { flex-wrap: wrap; }
+.saved-search-bar .search-box { min-width: 220px; }

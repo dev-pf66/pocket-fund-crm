@@ -21,7 +21,7 @@ function urgencyForLead(lead, latestOutreachStatus) {
   return null
 }
 
-const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, onDragStart, onClick, onRefresh, selected, onToggleSelect }) {
+const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, onDragStart, onClick, onRefresh, selected, onToggleSelect, onMove, stages }) {
   const { currentPerson, people } = useApp()
   const [logging, setLogging] = useState(false)
   const addedByName = people?.find(p => p.id === lead.created_by)?.name
@@ -194,6 +194,24 @@ const LeadCard = memo(function LeadCard({ lead, settings, latestOutreachStatus, 
           </button>
         </div>
       </div>
+      {/* Phones only (the board passes onMove on a mobile device): drag-and-drop
+          doesn't fire on touch, so this is how a lead moves one stage there —
+          same as the Sellers / Partners / Italy / PE OS mobile cards. */}
+      {onMove && stages && (
+        <label className="lead-card-move" onClick={(e) => e.stopPropagation()}>
+          <span>Move to</span>
+          <select
+            value=""
+            onChange={(e) => { if (e.target.value) onMove(lead, e.target.value) }}
+            aria-label={`Move ${lead.name || 'lead'} to another stage`}
+          >
+            <option value="">Choose a stage…</option>
+            {stages.filter(s => s.key !== lead.stage).map(s => (
+              <option key={s.key} value={s.key}>{s.label}</option>
+            ))}
+          </select>
+        </label>
+      )}
     </div>
   )
 })
