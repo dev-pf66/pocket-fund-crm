@@ -77,3 +77,15 @@ describe('kanban boards share one column anatomy', () => {
     expect(read('Investors')).toMatch(/setLoadError\(error/)
   })
 })
+
+describe('Pipeline on a phone', () => {
+  it('cards get a "Move to" on mobile devices, through the same path as drag-and-drop', () => {
+    const s = read('LeadsBoard')
+    expect(s).toMatch(/onMove=\{isMobile \? moveLeadTo : undefined\}/)
+    expect(s).toMatch(/await moveLeadTo\(draggedLead, newStage\)/)
+  })
+
+  it('a failed move says so instead of the card silently snapping back', () => {
+    expect(read('LeadsBoard')).toMatch(/toast\.error\(`Could not move/)
+  })
+})
