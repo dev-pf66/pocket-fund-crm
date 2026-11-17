@@ -104,3 +104,29 @@ export function phoneKey(value) {
   // line itself in every numbering plan we call into.
   return digits.length > 10 ? digits.slice(-10) : digits
 }
+
+/**
+ * `lead_source` stamped on every lead created from a pasted call list
+ * (`bulkCreateCallLeads`). It is the only marker that says "this row exists
+ * because it is on someone's dial sheet", so the importer and the board read
+ * the same constant.
+ */
+export const CALL_LIST_SOURCE = 'Call List'
+
+/**
+ * Is this lead a cold-call queue entry that has not gone anywhere yet?
+ *
+ * Dev, 2026-11-17: "remove the cold call queue leads that go in the pipeline."
+ * A call list lands every number at stage `outreach`, so one pasted sheet
+ * (97 rows of "Chemicals List") swamped the Pipeline board's Outreach column
+ * with names nobody had spoken to. Those rows belong to Cold Calls → Queue.
+ *
+ * Only the Pipeline BOARD hides them. They are not archived, not deleted and
+ * not touched: the call queue, the lead page, the API, dedupe and every count
+ * still see them. The moment a call moves one forward (`responded` or beyond,
+ * via advanceLeadStage), this returns false and the lead appears on the board
+ * like any other — a cold-call lead that replied IS pipeline.
+ */
+export function isUnworkedCallListLead(lead) {
+  return lead?.lead_source === CALL_LIST_SOURCE && lead?.stage === 'outreach'
+}

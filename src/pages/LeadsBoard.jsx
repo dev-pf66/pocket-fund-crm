@@ -13,6 +13,7 @@ import { useLeadTypes } from '../hooks/useLeadTypes'
 import { isAdminUser } from '../lib/admin'
 import { runBulk } from '../lib/bulkActions'
 import { HEALTH_FILTERS, matchesHealthFilter, healthFilterCounts } from '../lib/leadFilters'
+import { isUnworkedCallListLead } from '../lib/callList'
 import { BoardColumnHeader, BoardColumnEmpty } from '../components/BoardColumn'
 import { useIsMobileDevice } from '../hooks/useIsMobileDevice'
 
@@ -349,6 +350,14 @@ function LeadsBoard() {
 
   const activeFilterCount = countActiveAdvancedFilters(getCurrentFilters())
 
+  // Cold-call list rows nobody has reached yet live on Cold Calls → Queue, not
+  // here (Dev, 2026-11-17). One pasted dial sheet put ~100 never-spoken-to
+  // numbers in the Outreach column. They are only hidden from this board —
+  // the moment a call moves one to responded it shows up like any other lead.
+  // See isUnworkedCallListLead in src/lib/callList.js.
+  const boardLeads = useMemo(() => leads.filter(l => !isUnworkedCallListLead(l)), [leads])
+  const hiddenCallListCount = leads.length - boardLeads.length
+
   const leadsByStage = useMemo(() => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -360,7 +369,7 @@ function LeadsBoard() {
 
     const queryLower = searchQuery ? searchQuery.toLowerCase() : ''
 
-    for (const lead of leads) {
+    for (const lead of boardLeads) {
       if (!result[lead.stage]) continue
 
       // Search filter
@@ -500,15 +509,15 @@ function LeadsBoard() {
     }
 
     return result
-  }, [leads, searchQuery, assignmentFilter, currentPerson?.id, coveredOwnerIds, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead, tagFilter, tagsByLead, healthFilter])
+  }, [boardLeads, searchQuery, assignmentFilter, currentPerson?.id, coveredOwnerIds, filterType, scoreMin, scoreMax, sourceFilter, activityFilter, followUpFilter, hasLinkedin, demoLeadIds, analystFilter, responseFilter, createdFilter, hasEmail, hasPhone, responseStatusByLead, tagFilter, tagsByLead, healthFilter])
 
   // Counts for the "needs attention" dropdown, over the leads this board can
   // actually render. Counting stages the board never shows (passed,
   // reach_out_later) would promise rows that never appear when you pick one.
   const healthCounts = useMemo(() => {
     const stageKeys = new Set(STAGES.map(s => s.key))
-    return healthFilterCounts(leads.filter(l => stageKeys.has(l.stage)), { now: new Date() })
-  }, [leads])
+    return healthFilterCounts(boardLeads.filter(l => stageKeys.has(l.stage)), { now: new Date() })
+  }, [boardLeads])
 
   const filteredLeadCount = useMemo(
     () => Object.values(leadsByStage).reduce((sum, list) => sum + list.length, 0),
@@ -1118,9 +1127,19 @@ function LeadsBoard() {
               {filteredLeadCount}
             </strong>
             {' of '}
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{leads.length}</span>
-            {' lead'}{leads.length === 1 ? '' : 's'}{' shown'}
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{boardLeads.length}</span>
+            {' lead'}{boardLeads.length === 1 ? '' : 's'}{' shown'}
           </span>
+          {hiddenCallListCount > 0 && (
+            <a
+              href="/cold-calls"
+              onClick={(e) => { e.preventDefault(); navigate('/cold-calls') }}
+              title="Call-list leads nobody has reached yet are worked from Cold Calls → Queue. They appear here once a call moves them to Responded."
+              style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}
+            >
+              {hiddenCallListCount} uncalled call-list lead{hiddenCallListCount === 1 ? '' : 's'} in Cold Calls
+            </a>
+          )}
           {(activeFilterCount > 0 || searchQuery) && (
             <span style={{
               fontSize: 'var(--fs-xs)', fontWeight: 600,
