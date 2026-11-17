@@ -165,6 +165,15 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
     by hand — `logCall`/`updateCall` derive it.
   - `not_interested` maps to `replied` on purpose: they responded. It advances the lead to
     `responded`, and the caller moves it to `passed` from there.
+  - **Uncalled call-list leads are NOT on the Pipeline board (Dev, 2026-11-17: "remove the cold
+    call queue leads that go in the pipeline").** `bulkCreateCallLeads` creates every pasted number
+    at stage `outreach` with `lead_source = 'Call List'`, and one sheet ("Chemicals List", 97 rows)
+    swamped the Outreach column. `isUnworkedCallListLead` (`src/lib/callList.js`) hides
+    `Call List` + `outreach` from the board only — not archived, not deleted, still in the call
+    queue, the API, dedupe and every count; the board's results bar links the hidden count to Cold
+    Calls. A call that advances one to `responded`+ puts it back on the board. The marker is the
+    source, not "has a phone": 33 hand-entered outreach leads carry a number and stay visible.
+    Guardrail: `test/call-list-off-board.test.js`.
   - `do_not_call` is a real column on `crm_leads`, filtered in SQL — the call queue must never
     load someone who asked not to be called.
   - Recordings are a pasted CallHippo URL on the call row (`recording_url`).

@@ -23,7 +23,7 @@ import { advanceLeadStage } from './leads.js'
 import { promoteOutreachToLead } from './outreach.js'
 import { logActivityManual } from './misc.js'
 import { statusForOutcome, isPickup, isConversation, summarizeCalls, rate } from '../callOutcomes.js'
-import { phoneKey } from '../callList.js'
+import { phoneKey, CALL_LIST_SOURCE } from '../callList.js'
 
 /**
  * Bulk-create leads for the call queue from a parsed call list.
@@ -86,7 +86,7 @@ export async function bulkCreateCallLeads(entries, batchLabel, currentPersonId, 
     firm_name: entry.firm_name || null,
     phone: entry.phone,
     stage: 'outreach',
-    lead_source: 'Call List',
+    lead_source: CALL_LIST_SOURCE,
     // Explicit rather than relying on the column default: the call queue
     // filters on do_not_call = false, and a null would drop the whole import.
     do_not_call: false,
