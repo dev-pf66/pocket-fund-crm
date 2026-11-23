@@ -404,6 +404,8 @@ function LeadForm({ onClose, onSave, lead = null }) {
                 <option value="">Not set</option>
                 <option value="cold">Cold</option>
                 <option value="messaged">Messaged</option>
+                <option value="followup_1">Follow-up 1</option>
+                <option value="followup_2">Follow-up 2</option>
                 <option value="replied">Replied</option>
                 <option value="meeting">Meeting</option>
               </select>
