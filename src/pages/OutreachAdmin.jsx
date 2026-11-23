@@ -608,8 +608,8 @@ function MobileEntryCard({
               <option value="">—</option>
               <option value="cold">Cold</option>
               <option value="messaged">Messaged</option>
-              <option value="followup_1">Followup 1</option>
-              <option value="followup_2">Followup 2</option>
+              <option value="followup_1">Follow-up 1</option>
+              <option value="followup_2">Follow-up 2</option>
               <option value="replied">Replied</option>
               <option value="meeting">Meeting</option>
             </select>
@@ -802,8 +802,8 @@ function LeadEditCard({ entry, currentPersonId, onSaved }) {
             <option value="">—</option>
             <option value="cold">Cold</option>
             <option value="messaged">Messaged</option>
-            <option value="followup_1">Followup 1</option>
-            <option value="followup_2">Followup 2</option>
+            <option value="followup_1">Follow-up 1</option>
+            <option value="followup_2">Follow-up 2</option>
             <option value="replied">Replied</option>
             <option value="meeting">Meeting</option>
           </select>
@@ -1574,8 +1574,8 @@ function OutreachAdmin() {
                                 <option value="">—</option>
                                 <option value="cold">Cold</option>
                                 <option value="messaged">Messaged</option>
-                                <option value="followup_1">Followup 1</option>
-                                <option value="followup_2">Followup 2</option>
+                                <option value="followup_1">Follow-up 1</option>
+                                <option value="followup_2">Follow-up 2</option>
                                 <option value="replied">Replied</option>
                                 <option value="meeting">Meeting</option>
                               </select>

@@ -709,8 +709,8 @@ function LeadDetail() {
                   <option value="">Not set</option>
                   <option value="cold">Cold</option>
                   <option value="messaged">Messaged</option>
-                  <option value="followup_1">Followup 1</option>
-                  <option value="followup_2">Followup 2</option>
+                  <option value="followup_1">Follow-up 1</option>
+                  <option value="followup_2">Follow-up 2</option>
                   <option value="replied">Replied</option>
                   <option value="meeting">Meeting</option>
                 </select>
@@ -1126,8 +1126,8 @@ function LeadDetail() {
                     { value: '',         label: 'Not set' },
                     { value: 'cold',       label: 'Cold' },
                     { value: 'messaged',   label: 'Messaged' },
-                    { value: 'followup_1', label: 'Followup 1' },
-                    { value: 'followup_2', label: 'Followup 2' },
+                    { value: 'followup_1', label: 'Follow-up 1' },
+                    { value: 'followup_2', label: 'Follow-up 2' },
                     { value: 'replied',    label: 'Replied' },
                     { value: 'meeting',    label: 'Meeting' },
                   ]}
