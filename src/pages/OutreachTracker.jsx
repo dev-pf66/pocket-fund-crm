@@ -1246,6 +1246,8 @@ Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM 
                         <option value="">—</option>
                         <option value="cold">Cold</option>
                         <option value="messaged">Messaged</option>
+                        <option value="followup_1">Followup 1</option>
+                        <option value="followup_2">Followup 2</option>
                         <option value="replied">Replied</option>
                         <option value="meeting">Meeting</option>
                       </select>

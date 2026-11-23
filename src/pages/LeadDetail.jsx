@@ -709,6 +709,8 @@ function LeadDetail() {
                   <option value="">Not set</option>
                   <option value="cold">Cold</option>
                   <option value="messaged">Messaged</option>
+                  <option value="followup_1">Followup 1</option>
+                  <option value="followup_2">Followup 2</option>
                   <option value="replied">Replied</option>
                   <option value="meeting">Meeting</option>
                 </select>
@@ -1122,10 +1124,12 @@ function LeadDetail() {
                   type="select"
                   options={[
                     { value: '',         label: 'Not set' },
-                    { value: 'cold',     label: 'Cold' },
-                    { value: 'messaged', label: 'Messaged' },
-                    { value: 'replied',  label: 'Replied' },
-                    { value: 'meeting',  label: 'Meeting' },
+                    { value: 'cold',       label: 'Cold' },
+                    { value: 'messaged',   label: 'Messaged' },
+                    { value: 'followup_1', label: 'Followup 1' },
+                    { value: 'followup_2', label: 'Followup 2' },
+                    { value: 'replied',    label: 'Replied' },
+                    { value: 'meeting',    label: 'Meeting' },
                   ]}
                   placeholder="Click to set"
                   renderValue={(v) => <span className="stage-badge">{v.charAt(0).toUpperCase() + v.slice(1)}</span>}
