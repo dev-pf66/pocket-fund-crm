@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { createLead, updateLead, previewLinkedInEnrichment, findDuplicateLead } from '../lib/crm-api'
+import { createLead, updateLead, previewLinkedInEnrichment, findDuplicateLead, getTags, getTagsByLead, addTagToLeads, createTag, removeTagFromLead } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { Link } from 'react-router-dom'
 import { useApp } from '../App'
 import { useToast } from '../components/Toast'
 import { useSessionState } from '../hooks/useSessionState'
 import { useLeadTypes } from '../hooks/useLeadTypes'
-import { Sparkles, AlertTriangle, ExternalLink } from 'lucide-react'
+import { Sparkles, AlertTriangle, ExternalLink, X, Plus } from 'lucide-react'
 
 const DUPLICATE_MATCH_LABELS = {
   linkedin_url: 'the same LinkedIn profile',
@@ -39,6 +39,60 @@ function LeadForm({ onClose, onSave, lead = null }) {
   // A lead already on file matching what's being typed. A warning, not a block —
   // the form is the deliberate path, so it tells you and lets you decide.
   const [duplicate, setDuplicate] = useState(null)
+  const [allTags, setAllTags] = useState([])
+  const [leadTags, setLeadTags] = useState([])
+  const [tagSelectVal, setTagSelectVal] = useState('')
+  const [newTagName, setNewTagName] = useState('')
+  const [tagBusy, setTagBusy] = useState(false)
+
+  useEffect(() => {
+    if (!lead?.id) return
+    Promise.all([getTags(), getTagsByLead()]).then(([all, byLead]) => {
+      setAllTags(all)
+      setLeadTags(byLead.get(lead.id) || [])
+    }).catch(() => {})
+  }, [lead?.id])
+
+  async function handleAddTag() {
+    const id = parseInt(tagSelectVal, 10)
+    if (!id || !lead?.id) return
+    if (leadTags.some(t => t.id === id)) { setTagSelectVal(''); return }
+    setTagBusy(true)
+    try {
+      await addTagToLeads([lead.id], id)
+      const tag = allTags.find(t => t.id === id)
+      if (tag) setLeadTags(prev => [...prev, tag])
+      setTagSelectVal('')
+    } catch { toast.error('Failed to add tag') }
+    finally { setTagBusy(false) }
+  }
+
+  async function handleCreateTag() {
+    const name = newTagName.trim()
+    if (!name || !lead?.id) return
+    setTagBusy(true)
+    try {
+      const tag = await createTag(name)
+      setAllTags(prev => prev.some(t => t.id === tag.id) ? prev : [...prev, tag])
+      if (!leadTags.some(t => t.id === tag.id)) {
+        await addTagToLeads([lead.id], tag.id)
+        setLeadTags(prev => [...prev, tag])
+      }
+      setNewTagName('')
+    } catch { toast.error('Failed to create tag') }
+    finally { setTagBusy(false) }
+  }
+
+  async function handleRemoveTag(tagId) {
+    if (!lead?.id) return
+    setTagBusy(true)
+    try {
+      await removeTagFromLead(lead.id, tagId)
+      setLeadTags(prev => prev.filter(t => t.id !== tagId))
+    } catch { toast.error('Failed to remove tag') }
+    finally { setTagBusy(false) }
+  }
+
   const initialForm = formFrom(lead)
   // Only the NEW-lead draft persists across navigation. Edit mode used to
   // persist too (key `lf:edit:<id>`), which meant a popup left by any route
@@ -364,6 +418,64 @@ function LeadForm({ onClose, onSave, lead = null }) {
               rows={3}
             />
           </div>
+
+          {lead?.id && (
+            <div className="form-group">
+              <label>Tags</label>
+              {leadTags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                  {leadTags.map(tag => (
+                    <span key={tag.id} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      background: 'var(--blue-50, #eff6ff)', color: 'var(--blue-700, #1d4ed8)',
+                      border: '1px solid var(--blue-200, #bfdbfe)',
+                      borderRadius: '12px', padding: '2px 8px', fontSize: '12px', fontWeight: 500
+                    }}>
+                      {tag.name}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag.id)}
+                        disabled={tagBusy}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'inherit', opacity: 0.6 }}
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <select
+                  value={tagSelectVal}
+                  onChange={e => setTagSelectVal(e.target.value)}
+                  style={{ flex: 1, fontSize: '13px' }}
+                  disabled={tagBusy}
+                >
+                  <option value="">Add existing tag…</option>
+                  {allTags.filter(t => !leadTags.some(lt => lt.id === t.id)).map(t => (
+                    <option key={t.id} value={String(t.id)}>{t.name}</option>
+                  ))}
+                </select>
+                <button type="button" className="btn btn-secondary" onClick={handleAddTag} disabled={!tagSelectVal || tagBusy} style={{ padding: '6px 10px', fontSize: '13px' }}>
+                  Add
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                <input
+                  type="text"
+                  value={newTagName}
+                  onChange={e => setNewTagName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTag() } }}
+                  placeholder="Or create new tag…"
+                  style={{ flex: 1, fontSize: '13px' }}
+                  disabled={tagBusy}
+                />
+                <button type="button" className="btn btn-secondary" onClick={handleCreateTag} disabled={!newTagName.trim() || tagBusy} style={{ padding: '6px 10px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Plus size={13} /> Create
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={close}>
