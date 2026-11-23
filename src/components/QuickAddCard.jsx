@@ -32,7 +32,7 @@ function parseQuickInput(text) {
       name: nameFromLinkedInUrl(trimmed),
       firm_name: '',
       linkedin_url: trimmed,
-      lead_source: 'LinkedIn'
+      lead_source: ''
     }
   }
 

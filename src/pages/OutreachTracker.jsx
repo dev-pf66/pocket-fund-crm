@@ -181,7 +181,7 @@ function OutreachTracker() {
           name: guessedName,
           linkedin_url: url,
           stage: 'cold_outreach',
-          lead_source: 'LinkedIn'
+          lead_source: ''
         }, currentPerson?.id)
         leadCreated = true
       }

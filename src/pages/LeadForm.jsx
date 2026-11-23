@@ -364,7 +364,9 @@ function LeadForm({ onClose, onSave, lead = null }) {
               <label>Lead Source</label>
               <select name="lead_source" value={formData.lead_source} onChange={handleChange}>
                 <option value="">Select source...</option>
-                <option value="LinkedIn">LinkedIn</option>
+                <option value="Dev's LinkedIn">Dev's LinkedIn</option>
+                <option value="Siddhant's LinkedIn">Siddhant's LinkedIn</option>
+                <option value="Aum's LinkedIn">Aum's LinkedIn</option>
                 <option value="Referral">Referral</option>
                 <option value="Cold Email">Cold Email</option>
                 <option value="Event">Event</option>

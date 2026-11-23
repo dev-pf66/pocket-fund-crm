@@ -980,7 +980,7 @@ function DemoForm({ demo, currentPersonId, onClose, onSave }) {
           name: guessedName,
           linkedin_url: url,
           stage: 'outreach',
-          lead_source: 'LinkedIn'
+          lead_source: ''
         }, currentPersonId)
         toast.success(`Created lead "${lead.name}"`)
       }
