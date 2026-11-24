@@ -20,13 +20,14 @@ const FIELD_LIMITS = {
 
 function ImportLeads() {
   const navigate = useNavigate()
-  const { currentPerson } = useApp()
+  const { currentPerson, people } = useApp()
   const { toast } = useToast()
   const [csvData, setCsvData] = useState([])
   const [headers, setHeaders] = useState([])
   const [mapping, setMapping] = useState({})
   const [step, setStep] = useState(1) // 1=upload, 2=map, 3=preview, 4=importing, 5=complete
   const [results, setResults] = useState({ success: 0, duplicates: 0, failed: 0, errors: [] })
+  const [assignedToId, setAssignedToId] = useState(null) // null = default to currentPerson at import time
   // Dial code applied to a number that arrives without one. Never guessed —
   // a 10-digit number is a valid local number in a dozen countries, and
   // silently picking the wrong one produces a number that looks fine and
@@ -132,7 +133,8 @@ function ImportLeads() {
 
   function getMappedLeads() {
     return csvData.map(row => {
-      const lead = { stage: 'outreach', created_by: currentPerson?.id }
+      const targetPersonId = assignedToId ?? currentPerson?.id
+      const lead = { stage: 'outreach', created_by: currentPerson?.id, assigned_to: targetPersonId, assigned_by: currentPerson?.id }
 
       Object.entries(mapping).forEach(([csvHeader, fieldName]) => {
         if (!fieldName) return
@@ -286,6 +288,22 @@ function ImportLeads() {
               onChange={handleFileChange}
               style={{ display: 'none' }}
             />
+          </div>
+
+          <div style={{ padding: '0 4px 16px' }}>
+            <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '13px' }}>
+              Assign leads to
+            </label>
+            <select
+              value={assignedToId ?? ''}
+              onChange={e => setAssignedToId(e.target.value ? Number(e.target.value) : null)}
+              style={{ width: '100%', maxWidth: '320px' }}
+            >
+              <option value="">Myself ({currentPerson?.name})</option>
+              {(people || []).filter(p => p.id !== currentPerson?.id && !p.is_archived).map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
           </div>
 
           <div className="import-instructions">
