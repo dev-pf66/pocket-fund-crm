@@ -390,13 +390,12 @@ function LeadForm({ onClose, onSave, lead = null }) {
               <label>Lead Source</label>
               <select name="lead_source" value={formData.lead_source} onChange={handleChange}>
                 <option value="">Select source...</option>
-                <option value="Dev's LinkedIn">Dev's LinkedIn</option>
-                <option value="Siddhant's LinkedIn">Siddhant's LinkedIn</option>
-                <option value="Aum's LinkedIn">Aum's LinkedIn</option>
+                <option value="LinkedIn">LinkedIn</option>
                 <option value="Referral">Referral</option>
+                <option value="Conference">Conference</option>
                 <option value="Cold Email">Cold Email</option>
-                <option value="Event">Event</option>
                 <option value="Website">Website</option>
+                <option value="Other">Other</option>
               </select>
             </div>
           </div>
@@ -421,6 +420,8 @@ function LeadForm({ onClose, onSave, lead = null }) {
                 <option value="meeting_booked">Meeting Booked</option>
                 <option value="warm_active">Warm / Active</option>
                 <option value="client">Client</option>
+                <option value="reach_out_later">Reach Out Later</option>
+                <option value="passed">Passed</option>
               </select>
             </div>
 

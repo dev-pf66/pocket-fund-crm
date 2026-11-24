@@ -809,8 +809,8 @@ function OutreachTracker() {
             <summary style={{ cursor: 'pointer', fontWeight: '600' }}>Example CSV Format</summary>
             <pre style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', overflow: 'auto' }}>
 {`name,firm_name,linkedin_url,lead_type,lead_source,stage,outreach_stage,tags,email,phone,deal_criteria,notes
-John Smith,Acme Capital,https://linkedin.com/in/johnsmith,PE Fund,Dev's LinkedIn,outreach,messaged,"SaaS,PE",,+91 98765 43210,,Met at conference
-Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office,Referral,responded,replied,,sarah@growthpartners.com,,$1-5M revenue,Interested in Q1`}
+John Smith,Acme Capital,https://linkedin.com/in/johnsmith,PE Firm,LinkedIn,outreach,messaged,"High Priority,Q1 Target",,+91 98765 43210,,Met at conference
+Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office,Conference,responded,replied,,sarah@growthpartners.com,,$1-5M revenue,Interested in Q1`}
             </pre>
           </details>
         </div>
@@ -867,11 +867,12 @@ Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office
               <label>Lead Type</label>
               <select value={newLeadForm.lead_type} onChange={(e) => setNewLeadForm({ ...newLeadForm, lead_type: e.target.value })}>
                 <option value="">Select type…</option>
-                <option value="PE Fund">PE Fund</option>
+                <option value="PE Firm">PE Firm</option>
                 <option value="Family Office">Family Office</option>
-                <option value="HNI">HNI</option>
-                <option value="VC Fund">VC Fund</option>
-                <option value="Corporate">Corporate</option>
+                <option value="Independent Sponsor">Independent Sponsor</option>
+                <option value="Partner">Partner</option>
+                <option value="Corporate Strategic">Corporate Strategic</option>
+                <option value="PE OS">PE OS</option>
                 <option value="Other">Other</option>
               </select>
             </div>
@@ -880,13 +881,12 @@ Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office
               <label>Lead Source</label>
               <select value={newLeadForm.lead_source} onChange={(e) => setNewLeadForm({ ...newLeadForm, lead_source: e.target.value })}>
                 <option value="">Select source…</option>
-                <option value="Dev's LinkedIn">Dev&apos;s LinkedIn</option>
-                <option value="Siddhant's LinkedIn">Siddhant&apos;s LinkedIn</option>
-                <option value="Aum's LinkedIn">Aum&apos;s LinkedIn</option>
+                <option value="LinkedIn">LinkedIn</option>
                 <option value="Referral">Referral</option>
+                <option value="Conference">Conference</option>
                 <option value="Cold Email">Cold Email</option>
-                <option value="Event">Event</option>
                 <option value="Website">Website</option>
+                <option value="Other">Other</option>
               </select>
             </div>
 
@@ -898,6 +898,8 @@ Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office
                 <option value="meeting_booked">Meeting Booked</option>
                 <option value="warm_active">Warm / Active</option>
                 <option value="client">Client</option>
+                <option value="reach_out_later">Reach Out Later</option>
+                <option value="passed">Passed</option>
               </select>
             </div>
 
