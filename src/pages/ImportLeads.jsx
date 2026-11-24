@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createLead, getLeads } from '../lib/crm-api'
+import { createLead, getLeads, getTags, createTag, addTagToLeads } from '../lib/crm-api'
 import { normalizeLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Upload, X, Check, AlertCircle } from 'lucide-react'
@@ -37,12 +37,16 @@ function ImportLeads() {
     { value: '', label: '-- Skip --' },
     { value: 'name', label: 'Name *' },
     { value: 'firm_name', label: 'Firm Name' },
-    { value: 'email', label: 'Email' },
-    { value: 'phone', label: 'Phone' },
     { value: 'linkedin_url', label: 'LinkedIn URL' },
     { value: 'lead_type', label: 'Lead Type' },
+    { value: 'lead_source', label: 'Lead Source' },
+    { value: 'stage', label: 'Stage' },
+    { value: 'outreach_stage', label: 'Outreach Stage' },
+    { value: 'tags', label: 'Tags (comma-separated)' },
+    { value: 'email', label: 'Email' },
+    { value: 'phone', label: 'Phone' },
     { value: 'deal_criteria', label: 'Deal Criteria' },
-    { value: 'notes', label: 'Notes' }
+    { value: 'notes', label: 'Notes' },
   ]
 
   function handleFileChange(e) {
@@ -95,6 +99,14 @@ function ImportLeads() {
           autoMapping[header] = 'linkedin_url'
         } else if (lower.includes('type')) {
           autoMapping[header] = 'lead_type'
+        } else if (lower.includes('source')) {
+          autoMapping[header] = 'lead_source'
+        } else if (lower === 'stage' || lower === 'pipeline stage') {
+          autoMapping[header] = 'stage'
+        } else if (lower.includes('outreach_stage') || lower === 'outreach stage') {
+          autoMapping[header] = 'outreach_stage'
+        } else if (lower.includes('tag')) {
+          autoMapping[header] = 'tags'
         } else if (lower.includes('criteria')) {
           autoMapping[header] = 'deal_criteria'
         } else if (lower.includes('note')) {
@@ -121,6 +133,11 @@ function ImportLeads() {
         if (!fieldName) return
         const raw = row[csvHeader]
         if (!raw) return
+        if (fieldName === 'tags') {
+          // Store as _tags (array) — handled post-create, not a lead column
+          lead._tags = raw.split(',').map(t => t.trim()).filter(Boolean)
+          return
+        }
         const limit = FIELD_LIMITS[fieldName]
         lead[fieldName] = limit ? String(raw).slice(0, limit) : raw
       })
@@ -191,10 +208,18 @@ function ImportLeads() {
       }
 
       try {
-        // _phone is preview metadata, not a column — it would break the insert.
-        const { _phone, ...leadRow } = lead
+        // _phone and _tags are preview/post-create metadata, not columns.
+        const { _phone, _tags, ...leadRow } = lead
         void _phone
-        await createLead(leadRow, currentPerson?.id)
+        const created = await createLead(leadRow, currentPerson?.id)
+        if (_tags?.length && created?.id) {
+          const allTags = await getTags()
+          for (const tagName of _tags) {
+            let tag = allTags.find(t => t.name.toLowerCase() === tagName.toLowerCase())
+            if (!tag) tag = await createTag(tagName)
+            if (tag?.id) await addTagToLeads([created.id], tag.id)
+          }
+        }
         results.success++
         // Register keys so duplicates within the same CSV are caught too.
         if (emailKey) existingEmails.add(emailKey)

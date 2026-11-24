@@ -423,9 +423,11 @@ function LeadForm({ onClose, onSave, lead = null }) {
             />
           </div>
 
-          {lead?.id && (
-            <div className="form-group">
-              <label>Tags</label>
+          <div className="form-group">
+            <label>Tags</label>
+            {!lead?.id ? (
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>Save the lead first to add tags.</p>
+            ) : (<>
               {leadTags.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                   {leadTags.map(tag => (
@@ -478,8 +480,8 @@ function LeadForm({ onClose, onSave, lead = null }) {
                   <Plus size={13} /> Create
                 </button>
               </div>
-            </div>
-          )}
+            </>)}
+          </div>
 
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={close}>
