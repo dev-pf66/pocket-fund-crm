@@ -193,7 +193,8 @@ function LeadsBoard() {
   useEffect(() => {
     loadLeads()
     getCRMSettings().then(setSettings).catch(console.error)
-  }, [currentPerson?.id, isAdmin, showArchived])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadLeads])
 
   const loadLeads = useCallback(async function loadLeads() {
     if (!currentPerson?.id) return

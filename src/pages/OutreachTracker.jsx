@@ -198,7 +198,7 @@ function OutreachTracker() {
         lead = await createLead({
           name: guessedName,
           linkedin_url: url,
-          stage: 'cold_outreach',
+          stage: 'outreach',
           lead_source: ''
         }, currentPerson?.id)
         leadCreated = true
@@ -244,7 +244,7 @@ function OutreachTracker() {
           firm_name: outreachData.firm_name || null,
           lead_source: outreachData.lead_source || null,
           industry: outreachData.industry || null,
-          stage: 'cold_outreach'
+          stage: 'outreach'
         }, currentPerson?.id)
         outreachData = { ...outreachData, lead_id: lead.id }
       }
@@ -304,8 +304,13 @@ function OutreachTracker() {
         const changes = {}
         if (existing) {
           for (const k of Object.keys(leadFields)) {
-            if (leadFields[k] !== undefined && String(leadFields[k]) !== String(existing[k] ?? '')) {
-              changes[k] = leadFields[k] || null
+            const newVal = leadFields[k]
+            const oldVal = existing[k] ?? null
+            // Treat '' and null as equivalent (no change) unless the form is
+            // explicitly clearing a field that had a real value.
+            const effectiveNew = newVal === '' ? null : newVal
+            if (effectiveNew !== oldVal) {
+              changes[k] = effectiveNew
             }
           }
         }
@@ -407,7 +412,7 @@ function OutreachTracker() {
       const COMPARABLE = [...LEAD_FIELDS.filter(f => f !== 'tags'), 'location', 'fit_score', 'first_contact_date', 'message_content']
       let createdCount = 0, updatedCount = 0, unchangedCount = 0
 
-      const allTags = await getTags()
+      const allTags = await getTags().catch(() => [])
 
       for (const row of parsedRows) {
         const { _tags, ...leadFields } = row

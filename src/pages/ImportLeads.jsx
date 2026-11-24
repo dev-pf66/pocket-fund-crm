@@ -197,7 +197,7 @@ function ImportLeads() {
     }
 
     const COMPARABLE = ['name', 'firm_name', 'email', 'phone', 'linkedin_url', 'lead_type', 'lead_source', 'stage', 'outreach_stage', 'deal_criteria', 'notes', 'message_content']
-    const allTags = await getTags()
+    const allTags = await getTags().catch(() => [])
 
     for (const lead of leads) {
       const { _phone, _tags, ...leadRow } = lead
