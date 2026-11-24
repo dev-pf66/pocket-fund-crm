@@ -8,6 +8,27 @@ import { useToast } from '../components/Toast'
 import { parseCSVText } from '../lib/csv'
 import { normalizePhone, DIAL_CODES } from '../lib/phone'
 
+// Map CSV display names to the canonical DB stage keys.
+const STAGE_MAP = {
+  'new lead / outreach': 'outreach', 'new lead': 'outreach', 'cold outreach': 'outreach', 'outreach': 'outreach',
+  'responded': 'responded', 'response': 'responded',
+  'meeting booked': 'meeting_booked', 'meeting_booked': 'meeting_booked', 'meeting scheduled': 'meeting_booked',
+  'warm / active': 'warm_active', 'warm_active': 'warm_active', 'warm active': 'warm_active', 'warm lead': 'warm_active', 'active': 'warm_active', 'active conversation': 'warm_active',
+  'client': 'client',
+  'reach out later': 'reach_out_later', 'reach_out_later': 'reach_out_later', 'later': 'reach_out_later',
+  'passed': 'passed', 'dead': 'passed',
+}
+
+// Map CSV display names to the canonical DB outreach_stage keys.
+const OUTREACH_STAGE_MAP = {
+  'cold': 'cold', 'cold outreach': 'cold',
+  'messaged': 'messaged', 'message sent': 'messaged',
+  'follow-up 1': 'followup_1', 'followup 1': 'followup_1', 'followup_1': 'followup_1', 'follow up 1': 'followup_1', 'fu1': 'followup_1',
+  'follow-up 2': 'followup_2', 'followup 2': 'followup_2', 'followup_2': 'followup_2', 'follow up 2': 'followup_2', 'fu2': 'followup_2',
+  'replied': 'replied', 'reply': 'replied',
+  'meeting': 'meeting', 'meeting booked': 'meeting',
+}
+
 // Mirrors VARCHAR limits in supabase-crm-schema.sql so we fail soft on long
 // inputs instead of letting Postgres reject the row with a cryptic error.
 const FIELD_LIMITS = {
@@ -162,6 +183,16 @@ function ImportLeads() {
         if (fieldName === 'first_contact_date') {
           // Accept YYYY-MM-DD or leave as-is; DB enforces DATE format
           lead.first_contact_date = raw
+          return
+        }
+        if (fieldName === 'stage') {
+          const mapped = STAGE_MAP[raw.toLowerCase().trim()]
+          if (mapped) lead.stage = mapped
+          return
+        }
+        if (fieldName === 'outreach_stage') {
+          const mapped = OUTREACH_STAGE_MAP[raw.toLowerCase().trim()]
+          if (mapped) lead.outreach_stage = mapped
           return
         }
         const limit = FIELD_LIMITS[fieldName]
@@ -432,9 +463,12 @@ function ImportLeads() {
                 <tr>
                   <th>Name</th>
                   <th>Firm</th>
+                  <th>Type</th>
+                  <th>Source</th>
+                  <th>Stage</th>
+                  <th>Outreach Stage</th>
                   <th>Email</th>
                   <th>Phone</th>
-                  <th>Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -442,6 +476,10 @@ function ImportLeads() {
                   <tr key={idx}>
                     <td>{lead.name}</td>
                     <td>{lead.firm_name || '-'}</td>
+                    <td>{lead.lead_type || '-'}</td>
+                    <td>{lead.lead_source || '-'}</td>
+                    <td>{lead.stage || '-'}</td>
+                    <td>{lead.outreach_stage || '-'}</td>
                     <td>{lead.email || '-'}</td>
                     <td>
                       {lead.phone || '-'}
@@ -456,7 +494,6 @@ function ImportLeads() {
                         </div>
                       )}
                     </td>
-                    <td>{lead.lead_type || '-'}</td>
                   </tr>
                 ))}
               </tbody>

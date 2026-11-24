@@ -374,8 +374,29 @@ function OutreachTracker() {
           else if (header.includes('linkedin')) lead.linkedin_url = value
           else if (header === 'lead_type' || header === 'type') lead.lead_type = value
           else if (header === 'lead_source' || header === 'source') lead.lead_source = value
-          else if (header === 'stage' || header === 'pipeline stage') lead.stage = value
-          else if (header === 'outreach_stage' || header === 'outreach stage') lead.outreach_stage = value
+          else if (header === 'stage' || header === 'pipeline stage') {
+            const STAGE_MAP = {
+              'new lead / outreach': 'outreach', 'new lead': 'outreach', 'cold outreach': 'outreach', 'outreach': 'outreach',
+              'responded': 'responded', 'response': 'responded',
+              'meeting booked': 'meeting_booked', 'meeting_booked': 'meeting_booked', 'meeting scheduled': 'meeting_booked',
+              'warm / active': 'warm_active', 'warm_active': 'warm_active', 'warm active': 'warm_active', 'warm lead': 'warm_active', 'active': 'warm_active', 'active conversation': 'warm_active',
+              'client': 'client',
+              'reach out later': 'reach_out_later', 'reach_out_later': 'reach_out_later', 'later': 'reach_out_later',
+              'passed': 'passed', 'dead': 'passed',
+            }
+            lead.stage = STAGE_MAP[value.toLowerCase()] || value
+          }
+          else if (header === 'outreach_stage' || header === 'outreach stage') {
+            const OUTREACH_STAGE_MAP = {
+              'cold': 'cold', 'cold outreach': 'cold',
+              'messaged': 'messaged', 'message sent': 'messaged',
+              'follow-up 1': 'followup_1', 'followup 1': 'followup_1', 'followup_1': 'followup_1', 'follow up 1': 'followup_1', 'fu1': 'followup_1',
+              'follow-up 2': 'followup_2', 'followup 2': 'followup_2', 'followup_2': 'followup_2', 'follow up 2': 'followup_2', 'fu2': 'followup_2',
+              'replied': 'replied', 'reply': 'replied',
+              'meeting': 'meeting', 'meeting booked': 'meeting',
+            }
+            lead.outreach_stage = OUTREACH_STAGE_MAP[value.toLowerCase()] || value
+          }
           else if (header === 'tags' || header === 'tag') lead._tags = value.split(',').map(t => t.trim()).filter(Boolean)
           else if (header.includes('location')) lead.location = value
           else if (header.includes('fit') || header.includes('score')) {
