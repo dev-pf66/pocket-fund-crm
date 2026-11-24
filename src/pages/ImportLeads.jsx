@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createLead, getLeads, getTags, createTag, addTagToLeads } from '../lib/crm-api'
+import { createLead, updateLead, getLeads, getTags, createTag, addTagToLeads } from '../lib/crm-api'
 import { normalizeLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Upload, X, Check, AlertCircle } from 'lucide-react'
@@ -165,66 +165,73 @@ function ImportLeads() {
 
     setStep(4)
 
-    const results = { success: 0, duplicates: 0, failed: 0, errors: [] }
+    const results = { success: 0, updated: 0, unchanged: 0, failed: 0, errors: [] }
 
-    // Build duplicate lookups once from existing leads (email, LinkedIn URL,
-    // name+firm pair) so re-uploading a list doesn't create duplicates.
-    const existingEmails = new Set()
-    const existingLinkedIns = new Set()
-    const existingNameFirms = new Set()
+    // Build lookup maps: existing leads keyed by linkedin_url, email, name+firm.
+    const existingByLinkedIn = new Map()
+    const existingByEmail = new Map()
+    const existingByNameFirm = new Map()
     try {
       const existingLeads = await getLeads({}, null)
       for (const existing of existingLeads || []) {
-        if (existing.email) existingEmails.add(existing.email.toLowerCase())
         if (existing.linkedin_url) {
           const normalized = normalizeLinkedInUrl(existing.linkedin_url)
-          if (normalized) existingLinkedIns.add(normalized)
+          if (normalized) existingByLinkedIn.set(normalized, existing)
         }
-        if (existing.name) {
-          existingNameFirms.add(`${existing.name.toLowerCase()}|${(existing.firm_name || '').toLowerCase()}`)
-        }
+        if (existing.email) existingByEmail.set(existing.email.toLowerCase(), existing)
+        if (existing.name) existingByNameFirm.set(`${existing.name.toLowerCase()}|${(existing.firm_name || '').toLowerCase()}`, existing)
       }
     } catch (error) {
-      // If the lookup fails, proceed without duplicate detection rather than
-      // blocking the import entirely.
-      console.error('Failed to load existing leads for duplicate check:', error)
+      console.error('Failed to load existing leads for dedup:', error)
     }
 
+    const COMPARABLE = ['name', 'firm_name', 'email', 'phone', 'linkedin_url', 'lead_type', 'lead_source', 'stage', 'outreach_stage', 'deal_criteria', 'notes']
+    const allTags = await getTags()
+
     for (const lead of leads) {
-      const emailKey = lead.email ? lead.email.toLowerCase() : null
-      const linkedinKey = lead.linkedin_url ? normalizeLinkedInUrl(lead.linkedin_url) : null
-      const nameFirmKey = lead.name
-        ? `${lead.name.toLowerCase()}|${(lead.firm_name || '').toLowerCase()}`
-        : null
+      const { _phone, _tags, ...leadRow } = lead
+      void _phone
+      const emailKey = leadRow.email ? leadRow.email.toLowerCase() : null
+      const linkedinKey = leadRow.linkedin_url ? normalizeLinkedInUrl(leadRow.linkedin_url) : null
+      const nameFirmKey = leadRow.name ? `${leadRow.name.toLowerCase()}|${(leadRow.firm_name || '').toLowerCase()}` : null
 
-      const isDuplicate =
-        (emailKey && existingEmails.has(emailKey)) ||
-        (linkedinKey && existingLinkedIns.has(linkedinKey)) ||
-        (nameFirmKey && existingNameFirms.has(nameFirmKey))
-
-      if (isDuplicate) {
-        results.duplicates++
-        continue
-      }
+      const existing =
+        (linkedinKey && existingByLinkedIn.get(linkedinKey)) ||
+        (emailKey && existingByEmail.get(emailKey)) ||
+        (nameFirmKey && existingByNameFirm.get(nameFirmKey))
 
       try {
-        // _phone and _tags are preview/post-create metadata, not columns.
-        const { _phone, _tags, ...leadRow } = lead
-        void _phone
-        const created = await createLead(leadRow, currentPerson?.id)
-        if (_tags?.length && created?.id) {
-          const allTags = await getTags()
+        let leadId
+        if (existing) {
+          const changes = {}
+          for (const field of COMPARABLE) {
+            if (leadRow[field] !== undefined && String(leadRow[field]) !== String(existing[field] ?? '')) {
+              changes[field] = leadRow[field]
+            }
+          }
+          if (Object.keys(changes).length > 0) {
+            await updateLead(existing.id, changes, currentPerson?.id)
+            results.updated++
+          } else {
+            results.unchanged++
+          }
+          leadId = existing.id
+        } else {
+          const created = await createLead(leadRow, currentPerson?.id)
+          leadId = created?.id
+          results.success++
+          if (linkedinKey) existingByLinkedIn.set(linkedinKey, { ...leadRow, id: leadId })
+          if (emailKey) existingByEmail.set(emailKey, { ...leadRow, id: leadId })
+          if (nameFirmKey) existingByNameFirm.set(nameFirmKey, { ...leadRow, id: leadId })
+        }
+
+        if (_tags?.length && leadId) {
           for (const tagName of _tags) {
             let tag = allTags.find(t => t.name.toLowerCase() === tagName.toLowerCase())
             if (!tag) tag = await createTag(tagName)
-            if (tag?.id) await addTagToLeads([created.id], tag.id)
+            if (tag?.id) await addTagToLeads([leadId], tag.id)
           }
         }
-        results.success++
-        // Register keys so duplicates within the same CSV are caught too.
-        if (emailKey) existingEmails.add(emailKey)
-        if (linkedinKey) existingLinkedIns.add(linkedinKey)
-        if (nameFirmKey) existingNameFirms.add(nameFirmKey)
       } catch (error) {
         results.failed++
         results.errors.push(`${lead.name}: ${error.message}`)
@@ -276,9 +283,9 @@ function ImportLeads() {
             <h4>CSV Format Tips:</h4>
             <ul>
               <li>First row should contain column headers</li>
-              <li>Required: Name column</li>
-              <li>Recommended: Firm Name, Email, Phone, LinkedIn URL</li>
-              <li>Example: Name, Firm, Email, Phone, LinkedIn, Type, Criteria</li>
+              <li><strong>Required:</strong> Name</li>
+              <li><strong>Optional:</strong> Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated), Email, Phone, Deal Criteria, Notes</li>
+              <li>Existing leads (matched by LinkedIn URL, email, or name + firm) are updated with any new information</li>
             </ul>
           </div>
         </div>
@@ -448,8 +455,11 @@ function ImportLeads() {
                 <Check size={64} color="var(--success-text)" />
                 <h2>Import Complete! ✓</h2>
                 <p>
-                  Successfully imported {results.success} leads
-                  {results.duplicates > 0 && <> · {results.duplicates} duplicates skipped</>}
+                  {[
+                    results.success > 0 && `${results.success} added`,
+                    results.updated > 0 && `${results.updated} updated`,
+                    results.unchanged > 0 && `${results.unchanged} unchanged`,
+                  ].filter(Boolean).join(' · ')}
                 </p>
               </>
             ) : (
@@ -457,8 +467,9 @@ function ImportLeads() {
                 <AlertCircle size={64} color="var(--warning-text)" />
                 <h2>Import Finished</h2>
                 <p>
-                  ✓ {results.success} succeeded<br />
-                  {results.duplicates > 0 && <>⊘ {results.duplicates} duplicates skipped<br /></>}
+                  {results.success > 0 && <>✓ {results.success} added<br /></>}
+                  {results.updated > 0 && <>↑ {results.updated} updated<br /></>}
+                  {results.unchanged > 0 && <>— {results.unchanged} unchanged<br /></>}
                   ✗ {results.failed} failed
                 </p>
                 {results.errors.length > 0 && (

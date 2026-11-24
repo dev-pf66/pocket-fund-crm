@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead, getEmailTemplates } from '../lib/crm-api'
+import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead, getEmailTemplates, getTags, createTag, addTagToLeads } from '../lib/crm-api'
 import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap, X, AlertTriangle, ExternalLink } from 'lucide-react'
@@ -256,129 +256,106 @@ function OutreachTracker() {
     setCsvUploading(true)
     try {
       const text = await csvFile.text()
-      const rows = parseCSVText(text)
-      if (rows.length < 2) {
+      const parsed = parseCSVText(text)
+      if (parsed.length < 2) {
         toast.warn('CSV has no data rows')
         return
       }
-      const headers = rows[0].map(h => h.trim().toLowerCase())
+      const headers = parsed[0].map(h => h.trim().toLowerCase())
 
-      const validRows = []
+      const LEAD_FIELDS = ['name', 'firm_name', 'linkedin_url', 'lead_type', 'lead_source',
+        'stage', 'outreach_stage', 'email', 'phone', 'deal_criteria', 'notes', 'tags']
+
+      const parsedRows = []
       let skipped = 0
-      for (let i = 1; i < rows.length; i++) {
-        const outreach = {}
+      for (let i = 1; i < parsed.length; i++) {
+        const lead = {}
         headers.forEach((header, idx) => {
-          const raw = rows[i][idx]
-          if (raw === undefined) return
+          const raw = parsed[i][idx]
+          if (!raw) return
           const value = String(raw).trim()
           if (!value) return
-
-          // Map CSV columns to fields. Order matters — check for more
-          // specific headers (deal + size, lead + name) before generic ones.
-          if (header.includes('lead') && header.includes('name')) outreach.lead_name = value
-          else if (header.includes('firm') || header.includes('company')) outreach.firm_name = value
-          else if (header.includes('type') || header.includes('channel')) {
-            const t = normalizeOutreachType(value)
-            if (t) outreach.outreach_type = t
-          }
-          else if (header.includes('status') || header === 'response' || header === 'replied') {
-            const s = normalizeOutreachStatus(value)
-            if (s) outreach.status = s
-          }
-          else if (header.includes('message') || header.includes('content')) outreach.message_content = value
-          else if (header.includes('platform') || header.includes('where')) outreach.platform_details = value
-          else if (header.includes('fit') || header.includes('score')) {
-            const n = parseInt(value, 10)
-            if (Number.isFinite(n)) outreach.fit_score = n
-          }
-          else if (header.includes('industry')) outreach.industry = value
-          else if (header.includes('deal') && header.includes('size')) outreach.deal_size = value
-          else if (header.includes('location')) outreach.location = value
-          else if (header.includes('source')) outreach.lead_source = value
-          else if (header.includes('note')) outreach.notes = value
-          else if (header.includes('date')) {
-            const d = parseDateCell(value)
-            if (d) outreach.outreach_date = d
-          }
+          if (header === 'name' || (header.includes('name') && !header.includes('firm') && !header.includes('company'))) lead.name = value
+          else if (header.includes('firm') || header.includes('company')) lead.firm_name = value
+          else if (header.includes('linkedin')) lead.linkedin_url = value
+          else if (header === 'lead_type' || header === 'type') lead.lead_type = value
+          else if (header === 'lead_source' || header === 'source') lead.lead_source = value
+          else if (header === 'stage' || header === 'pipeline stage') lead.stage = value
+          else if (header === 'outreach_stage' || header === 'outreach stage') lead.outreach_stage = value
+          else if (header === 'tags' || header === 'tag') lead._tags = value.split(',').map(t => t.trim()).filter(Boolean)
+          else if (header.includes('email')) lead.email = value
+          else if (header.includes('phone')) lead.phone = value
+          else if (header.includes('criteria') || header.includes('deal')) lead.deal_criteria = value
+          else if (header.includes('note')) lead.notes = value
         })
-
-        if (!outreach.lead_name) { skipped += 1; continue }
-
-        // Set defaults
-        if (!outreach.outreach_type) outreach.outreach_type = 'cold_email'
-        if (!outreach.status) outreach.status = 'sent'
-
-        validRows.push(outreach)
+        if (!lead.name) { skipped++; continue }
+        parsedRows.push(lead)
       }
 
-      if (validRows.length === 0) {
-        toast.warn(skipped > 0
-          ? `All ${skipped} rows were skipped — no lead_name found`
-          : 'No valid rows found in CSV')
+      if (parsedRows.length === 0) {
+        toast.warn(skipped > 0 ? `All ${skipped} rows skipped — no Name found` : 'No valid rows in CSV')
         return
       }
 
-      // Apply the same date default logOutreachBatch would apply, so the
-      // dedup key matches what is already stored.
-      const today = istToday()
-      const rowsWithDefaults = validRows.map(r => ({
-        ...r,
-        outreach_date: r.outreach_date || today,
-      }))
-
-      // Load existing log (90 days back) for dedup matching.
-      const existingLog = await getOutreachLog({ days_back: 90 }, currentPerson?.id)
-
-      // Key: "lead_name|date|type" — first match wins if multiple exist.
-      const existingMap = new Map()
-      for (const entry of existingLog) {
-        const key = `${(entry.lead_name || '').toLowerCase().trim()}|${entry.outreach_date}|${entry.outreach_type}`
-        if (!existingMap.has(key)) existingMap.set(key, entry)
+      // Load existing leads once for dedup: match by linkedin_url → email → name+firm
+      const existingLeads = await getLeads({}, null)
+      const byLinkedIn = new Map()
+      const byEmail = new Map()
+      const byNameFirm = new Map()
+      for (const l of existingLeads || []) {
+        if (l.linkedin_url) byLinkedIn.set(l.linkedin_url.replace(/\/$/, '').toLowerCase(), l)
+        if (l.email) byEmail.set(l.email.toLowerCase(), l)
+        if (l.name) byNameFirm.set(`${l.name.toLowerCase()}|${(l.firm_name || '').toLowerCase()}`, l)
       }
 
-      // Fields that can meaningfully change on a re-upload.
-      const COMPARABLE = ['status', 'notes', 'message_content', 'platform_details', 'fit_score']
+      const COMPARABLE = LEAD_FIELDS.filter(f => f !== 'tags')
+      let createdCount = 0, updatedCount = 0, unchangedCount = 0
 
-      const toInsert = []
-      const toUpdate = [] // { id, changes }
-      let unchangedCount = 0
+      const allTags = await getTags()
 
-      for (const row of rowsWithDefaults) {
-        const key = `${(row.lead_name || '').toLowerCase().trim()}|${row.outreach_date}|${row.outreach_type}`
-        const existing = existingMap.get(key)
+      for (const row of parsedRows) {
+        const { _tags, ...leadFields } = row
+        const liKey = leadFields.linkedin_url ? leadFields.linkedin_url.replace(/\/$/, '').toLowerCase() : null
+        const emailKey = leadFields.email ? leadFields.email.toLowerCase() : null
+        const nameFirmKey = `${leadFields.name.toLowerCase()}|${(leadFields.firm_name || '').toLowerCase()}`
 
-        if (!existing) {
-          toInsert.push(row)
-          continue
-        }
+        const existing =
+          (liKey && byLinkedIn.get(liKey)) ||
+          (emailKey && byEmail.get(emailKey)) ||
+          byNameFirm.get(nameFirmKey)
 
-        const changes = {}
-        for (const field of COMPARABLE) {
-          const newVal = row[field] ?? null
-          const oldVal = existing[field] ?? null
-          if (String(newVal ?? '') !== String(oldVal ?? '')) changes[field] = newVal
-        }
-
-        if (Object.keys(changes).length === 0) {
-          unchangedCount++
+        let leadId
+        if (existing) {
+          const changes = {}
+          for (const field of COMPARABLE) {
+            if (leadFields[field] !== undefined && String(leadFields[field]) !== String(existing[field] ?? '')) {
+              changes[field] = leadFields[field]
+            }
+          }
+          if (Object.keys(changes).length > 0) {
+            await updateLead(existing.id, changes, currentPerson?.id)
+            updatedCount++
+          } else {
+            unchangedCount++
+          }
+          leadId = existing.id
         } else {
-          toUpdate.push({ id: existing.id, changes })
+          const created = await createLead({ ...leadFields, stage: leadFields.stage || 'outreach' }, currentPerson?.id)
+          leadId = created?.id
+          createdCount++
         }
-      }
 
-      let insertedCount = 0
-      if (toInsert.length > 0) {
-        insertedCount = await logOutreachBatch(toInsert, currentPerson?.id)
-      }
-
-      let updatedCount = 0
-      for (const { id, changes } of toUpdate) {
-        await updateOutreach(id, changes)
-        updatedCount++
+        if (_tags?.length && leadId) {
+          for (const tagName of _tags) {
+            let tag = allTags.find(t => t.name.toLowerCase() === tagName.toLowerCase())
+            if (!tag) tag = await createTag(tagName)
+            if (tag?.id) await addTagToLeads([leadId], tag.id)
+          }
+        }
       }
 
       const parts = []
-      if (insertedCount > 0) parts.push(`${insertedCount} added`)
+      if (createdCount > 0) parts.push(`${createdCount} added`)
       if (updatedCount > 0) parts.push(`${updatedCount} updated`)
       if (unchangedCount > 0) parts.push(`${unchangedCount} unchanged`)
       if (skipped > 0) parts.push(`${skipped} skipped (no name)`)
@@ -386,7 +363,7 @@ function OutreachTracker() {
 
       setCsvFile(null)
       setShowCsvUpload(false)
-      setFilter(f => ({ ...f, view: 'all' }))
+      setLeads(await getLeads({}, currentPerson?.id))
     } catch (error) {
       console.error('CSV upload failed:', error)
       toast.error('Failed to upload CSV: ' + error.message)
@@ -700,11 +677,11 @@ function OutreachTracker() {
             Bulk Upload from CSV
           </h3>
           <p style={{ color: 'var(--gray-600)', marginBottom: '16px' }}>
-            Upload a CSV file with your outreach data. Required columns: <strong>lead_name</strong>
+            Import or update leads. Required: <strong>name</strong>
           </p>
 
           <div style={{ marginBottom: '16px' }}>
-            <strong>Optional columns:</strong> firm_name, type, status, message_content, platform_details, fit_score (1-5), industry, deal_size, location, lead_source, notes, date
+            <strong>Optional columns:</strong> firm_name, linkedin_url, lead_type, lead_source, stage, outreach_stage, tags, email, phone, deal_criteria, notes
           </div>
 
           <form onSubmit={handleCsvUpload}>
@@ -737,9 +714,9 @@ function OutreachTracker() {
           <details style={{ marginTop: '16px', padding: '12px', background: 'white', borderRadius: 'var(--radius-md)' }}>
             <summary style={{ cursor: 'pointer', fontWeight: '600' }}>Example CSV Format</summary>
             <pre style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', overflow: 'auto' }}>
-{`lead_name,firm_name,type,status,fit_score,industry,message_content
-John Smith,Acme Capital,cold_email,sent,5,SaaS,Sent intro email about our services
-Sarah Johnson,Growth Partners,linkedin_message,replied,4,E-commerce,LinkedIn DM - she's interested!`}
+{`name,firm_name,linkedin_url,lead_type,lead_source,stage,outreach_stage,tags,email,phone,notes
+John Smith,Acme Capital,https://linkedin.com/in/johnsmith,PE Fund,Dev's LinkedIn,outreach,messaged,SaaS;PE,,+91 98765 43210,Met at conference
+Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office,Referral,responded,replied,,"sarah@growthpartners.com",,Interested in Q1`}
             </pre>
           </details>
         </div>
