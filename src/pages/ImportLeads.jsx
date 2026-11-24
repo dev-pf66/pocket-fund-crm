@@ -190,7 +190,7 @@ function ImportLeads() {
           if (normalized) existingByLinkedIn.set(normalized, existing)
         }
         if (existing.email) existingByEmail.set(existing.email.toLowerCase(), existing)
-        if (existing.name) existingByNameFirm.set(`${existing.name.toLowerCase()}|${(existing.firm_name || '').toLowerCase()}`, existing)
+        if (existing.name && existing.firm_name) existingByNameFirm.set(`${existing.name.toLowerCase()}|${existing.firm_name.toLowerCase()}`, existing)
       }
     } catch (error) {
       console.error('Failed to load existing leads for dedup:', error)
@@ -204,7 +204,7 @@ function ImportLeads() {
       void _phone
       const emailKey = leadRow.email ? leadRow.email.toLowerCase() : null
       const linkedinKey = leadRow.linkedin_url ? normalizeLinkedInUrl(leadRow.linkedin_url) : null
-      const nameFirmKey = leadRow.name ? `${leadRow.name.toLowerCase()}|${(leadRow.firm_name || '').toLowerCase()}` : null
+      const nameFirmKey = (leadRow.name && leadRow.firm_name) ? `${leadRow.name.toLowerCase()}|${leadRow.firm_name.toLowerCase()}` : null
 
       const existing =
         (linkedinKey && existingByLinkedIn.get(linkedinKey)) ||
