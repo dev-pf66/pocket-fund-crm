@@ -40,6 +40,23 @@ const EMPTY_OUTREACH = {
   lead_source: ''
 }
 
+const EMPTY_LEAD_FORM = {
+  lead_id: null,
+  name: '',
+  firm_name: '',
+  linkedin_url: '',
+  lead_type: '',
+  lead_source: '',
+  stage: 'outreach',
+  outreach_stage: '',
+  tags: '',
+  email: '',
+  phone: '',
+  deal_criteria: '',
+  notes: '',
+  message_content: ''
+}
+
 function OutreachTracker() {
   const { currentPerson, people } = useApp()
   const { toast } = useToast()
@@ -58,6 +75,7 @@ function OutreachTracker() {
   // Persist in-progress form input across page navigations within the tab.
   const [showForm, setShowForm] = useSessionState('ot:showForm', false)
   const [newOutreach, setNewOutreach, clearNewOutreach] = useSessionState('ot:newOutreach', EMPTY_OUTREACH)
+  const [newLeadForm, setNewLeadForm, clearNewLeadForm] = useSessionState('ot:newLeadForm', EMPTY_LEAD_FORM)
   const [quickUrl, setQuickUrl] = useSessionState('ot:quickUrl', '')
 
   const [showCsvUpload, setShowCsvUpload] = useState(false)
@@ -243,6 +261,77 @@ function OutreachTracker() {
     } catch (error) {
       console.error('Failed to log outreach:', error)
       toast.error('Failed to log outreach')
+    }
+  }
+
+  function handleLeadSelectForForm(e) {
+    const leadId = parseInt(e.target.value)
+    if (!leadId) { setNewLeadForm(EMPTY_LEAD_FORM); return }
+    const lead = leads.find(l => l.id === leadId)
+    if (lead) {
+      setNewLeadForm({
+        ...EMPTY_LEAD_FORM,
+        lead_id: lead.id,
+        name: lead.name || '',
+        firm_name: lead.firm_name || '',
+        linkedin_url: lead.linkedin_url || '',
+        lead_type: lead.lead_type || '',
+        lead_source: lead.lead_source || '',
+        stage: lead.stage || 'outreach',
+        outreach_stage: lead.outreach_stage || '',
+        email: lead.email || '',
+        phone: lead.phone || '',
+        deal_criteria: lead.deal_criteria || '',
+        notes: lead.notes || '',
+        message_content: lead.message_content || ''
+      })
+    }
+  }
+
+  async function handleAddLead() {
+    if (!newLeadForm.name.trim() && !newLeadForm.lead_id) {
+      toast.warn('Name is required')
+      return
+    }
+    try {
+      const { lead_id, tags: tagStr, ...leadFields } = newLeadForm
+      const tagList = tagStr ? tagStr.split(',').map(t => t.trim()).filter(Boolean) : []
+      const payload = { ...leadFields, outreach_stage: leadFields.outreach_stage || null }
+
+      let leadId
+      if (lead_id) {
+        const existing = leads.find(l => l.id === lead_id)
+        const changes = {}
+        if (existing) {
+          for (const k of Object.keys(leadFields)) {
+            if (leadFields[k] !== undefined && String(leadFields[k]) !== String(existing[k] ?? '')) {
+              changes[k] = leadFields[k] || null
+            }
+          }
+        }
+        if (Object.keys(changes).length) await updateLead(lead_id, changes, currentPerson?.id)
+        leadId = lead_id
+      } else {
+        const created = await createLead(payload, currentPerson?.id)
+        leadId = created?.id
+      }
+
+      if (tagList.length && leadId) {
+        const allTags = await getTags()
+        for (const tagName of tagList) {
+          let tag = allTags.find(t => t.name.toLowerCase() === tagName.toLowerCase())
+          if (!tag) tag = await createTag(tagName)
+          if (tag?.id) await addTagToLeads([leadId], tag.id)
+        }
+      }
+
+      toast.success(lead_id ? 'Lead updated' : 'Lead added')
+      clearNewLeadForm()
+      setShowForm(false)
+      setLeads(await getLeads({}, currentPerson?.id))
+    } catch (error) {
+      console.error('Failed to save lead:', error)
+      toast.error('Failed to save lead: ' + error.message)
     }
   }
 
@@ -730,40 +819,27 @@ Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office
       {/* Quick Add Form */}
       {showForm && (
         <div className="card" style={{ marginBottom: '24px' }}>
-          <h3>Log New Outreach</h3>
+          <h3>{newLeadForm.lead_id ? 'Update Lead' : 'Add New Lead'}</h3>
           <div className="form-grid">
             <div className="form-group">
-              <label>Select Lead (Optional)</label>
-              <select value={newOutreach.lead_id || ''} onChange={handleLeadSelect}>
-                <option value="">-- Or enter manually below --</option>
+              <label>Select existing lead to update (optional)</label>
+              <select value={newLeadForm.lead_id || ''} onChange={handleLeadSelectForForm}>
+                <option value="">-- Or enter new lead below --</option>
                 {leads.map(lead => (
                   <option key={lead.id} value={lead.id}>
-                    {lead.name} - {lead.firm_name}
+                    {lead.name}{lead.firm_name ? ` — ${lead.firm_name}` : ''}
                   </option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
-              <label>Outreach Type *</label>
-              <select
-                value={newOutreach.outreach_type}
-                onChange={(e) => setNewOutreach({ ...newOutreach, outreach_type: e.target.value })}
-              >
-                <option value="cold_email">Cold Email</option>
-                <option value="linkedin_message">LinkedIn Message</option>
-                <option value="phone_call">Phone Call</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Lead Name *</label>
+              <label>Name *</label>
               <input
                 type="text"
-                value={newOutreach.lead_name}
-                onChange={(e) => setNewOutreach({ ...newOutreach, lead_name: e.target.value })}
-                placeholder="John Smith"
+                value={newLeadForm.name}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
+                placeholder="Full Name"
               />
             </div>
 
@@ -771,118 +847,139 @@ Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office
               <label>Firm Name</label>
               <input
                 type="text"
-                value={newOutreach.firm_name}
-                onChange={(e) => setNewOutreach({ ...newOutreach, firm_name: e.target.value })}
-                placeholder="Acme Capital"
+                value={newLeadForm.firm_name}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, firm_name: e.target.value })}
+                placeholder="Company/Fund Name"
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>LinkedIn URL</label>
+              <input
+                type="url"
+                value={newLeadForm.linkedin_url}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, linkedin_url: e.target.value })}
+                placeholder="https://linkedin.com/in/..."
               />
             </div>
 
             <div className="form-group">
-              <label>Status</label>
-              <select
-                value={newOutreach.status}
-                onChange={(e) => setNewOutreach({ ...newOutreach, status: e.target.value })}
-              >
-                {OUTREACH_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Fit Score (1-5)</label>
-              <select
-                value={newOutreach.fit_score || ''}
-                onChange={(e) => setNewOutreach({ ...newOutreach, fit_score: parseInt(e.target.value) || null })}
-              >
-                <option value="">Not rated</option>
-                <option value="5">5 - Perfect Fit 🎯</option>
-                <option value="4">4 - Good Fit ✅</option>
-                <option value="3">3 - Okay Fit 👌</option>
-                <option value="2">2 - Poor Fit ⚠️</option>
-                <option value="1">1 - Bad Fit ❌</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Industry</label>
-              <select value={newOutreach.industry} onChange={(e) => setNewOutreach({ ...newOutreach, industry: e.target.value })}>
-                <option value="">Select industry…</option>
-                {industryOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Deal Size</label>
-              <select value={newOutreach.deal_size} onChange={(e) => setNewOutreach({ ...newOutreach, deal_size: e.target.value })}>
-                <option value="">Select deal size…</option>
-                {dealSizeOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Location</label>
-              <select value={newOutreach.location} onChange={(e) => setNewOutreach({ ...newOutreach, location: e.target.value })}>
-                <option value="">Select location…</option>
-                {locationOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+              <label>Lead Type</label>
+              <select value={newLeadForm.lead_type} onChange={(e) => setNewLeadForm({ ...newLeadForm, lead_type: e.target.value })}>
+                <option value="">Select type…</option>
+                <option value="PE Fund">PE Fund</option>
+                <option value="Family Office">Family Office</option>
+                <option value="HNI">HNI</option>
+                <option value="VC Fund">VC Fund</option>
+                <option value="Corporate">Corporate</option>
+                <option value="Other">Other</option>
               </select>
             </div>
 
             <div className="form-group">
               <label>Lead Source</label>
-              <select value={newOutreach.lead_source} onChange={(e) => setNewOutreach({ ...newOutreach, lead_source: e.target.value })}>
+              <select value={newLeadForm.lead_source} onChange={(e) => setNewLeadForm({ ...newLeadForm, lead_source: e.target.value })}>
                 <option value="">Select source…</option>
-                {leadSourceOptions.map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                <option value="Dev's LinkedIn">Dev&apos;s LinkedIn</option>
+                <option value="Siddhant's LinkedIn">Siddhant&apos;s LinkedIn</option>
+                <option value="Aum's LinkedIn">Aum&apos;s LinkedIn</option>
+                <option value="Referral">Referral</option>
+                <option value="Cold Email">Cold Email</option>
+                <option value="Event">Event</option>
+                <option value="Website">Website</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Stage</label>
+              <select value={newLeadForm.stage} onChange={(e) => setNewLeadForm({ ...newLeadForm, stage: e.target.value })}>
+                <option value="outreach">New Lead / Outreach</option>
+                <option value="responded">Responded</option>
+                <option value="meeting_booked">Meeting Booked</option>
+                <option value="warm_active">Warm / Active</option>
+                <option value="client">Client</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Outreach Stage</label>
+              <select value={newLeadForm.outreach_stage} onChange={(e) => setNewLeadForm({ ...newLeadForm, outreach_stage: e.target.value })}>
+                <option value="">Not set</option>
+                <option value="cold">Cold</option>
+                <option value="messaged">Messaged</option>
+                <option value="followup_1">Follow-up 1</option>
+                <option value="followup_2">Follow-up 2</option>
+                <option value="replied">Replied</option>
+                <option value="meeting">Meeting</option>
               </select>
             </div>
 
             <div className="form-group full-width">
-              <label>Platform Details (Where?)</label>
+              <label>Tags (comma-separated)</label>
               <input
                 type="text"
-                value={newOutreach.platform_details}
-                onChange={(e) => setNewOutreach({ ...newOutreach, platform_details: e.target.value })}
-                placeholder="e.g., LinkedIn DM, Email to john@acme.com, Phone +1234567890"
+                value={newLeadForm.tags}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, tags: e.target.value })}
+                placeholder="e.g. SaaS, PE, Conference"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Email</label>
+              <input
+                type="email"
+                value={newLeadForm.email}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, email: e.target.value })}
+                placeholder="email@example.com"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Phone</label>
+              <input
+                type="tel"
+                value={newLeadForm.phone}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, phone: e.target.value })}
+                placeholder="+1 (555) 123-4567"
               />
             </div>
 
             <div className="form-group full-width">
-              <label>Message Sent</label>
-              {templates.length > 0 && (
-                <select
-                  style={{ marginBottom: '6px' }}
-                  defaultValue=""
-                  onChange={(e) => {
-                    const t = templates.find(t => String(t.id) === e.target.value)
-                    if (t) setNewOutreach({ ...newOutreach, message_content: t.body })
-                    e.target.value = ''
-                  }}
-                >
-                  <option value="">Use a template…</option>
-                  {templates.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              )}
+              <label>Deal Criteria</label>
               <textarea
-                value={newOutreach.message_content}
-                onChange={(e) => setNewOutreach({ ...newOutreach, message_content: e.target.value })}
-                placeholder="Copy/paste or type the message you sent…"
-                rows={5}
-              />
-            </div>
-
-            <div className="form-group full-width">
-              <label>Additional Notes</label>
-              <textarea
-                value={newOutreach.notes}
-                onChange={(e) => setNewOutreach({ ...newOutreach, notes: e.target.value })}
-                placeholder="Any other notes about this outreach..."
+                value={newLeadForm.deal_criteria}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, deal_criteria: e.target.value })}
+                placeholder="e.g., B2B SaaS, $1-5M revenue, 80%+ margins"
                 rows={2}
               />
             </div>
 
             <div className="form-group full-width">
-              <button className="btn btn-primary" onClick={handleAddOutreach}>
-                Log Outreach
+              <label>Notes</label>
+              <textarea
+                value={newLeadForm.notes}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, notes: e.target.value })}
+                placeholder="Initial conversation notes, context, etc."
+                rows={2}
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Message Content</label>
+              <textarea
+                value={newLeadForm.message_content}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, message_content: e.target.value })}
+                placeholder="The outreach message sent to this lead…"
+                rows={3}
+              />
+            </div>
+
+            <div className="form-group full-width" style={{ display: 'flex', gap: '8px' }}>
+              <button className="btn btn-primary" onClick={handleAddLead}>
+                {newLeadForm.lead_id ? 'Update Lead' : 'Add Lead'}
+              </button>
+              <button className="btn btn-secondary" onClick={() => { clearNewLeadForm(); setShowForm(false) }}>
+                Cancel
               </button>
             </div>
           </div>
