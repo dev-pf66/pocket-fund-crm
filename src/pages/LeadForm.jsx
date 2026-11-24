@@ -26,7 +26,11 @@ function formFrom(lead) {
     deal_criteria: lead?.deal_criteria || '',
     stage: lead?.stage || 'outreach',
     lead_source: lead?.lead_source || '',
-    notes: lead?.notes || ''
+    notes: lead?.notes || '',
+    location: lead?.location || '',
+    fit_score: lead?.fit_score != null ? String(lead.fit_score) : '',
+    first_contact_date: lead?.first_contact_date || '',
+    message_content: lead?.message_content || ''
   }
 }
 
@@ -213,7 +217,8 @@ function LeadForm({ onClose, onSave, lead = null }) {
       // Coerce empty string to null so the row inserts cleanly.
       const payload = {
         ...formData,
-        outreach_stage: formData.outreach_stage || null
+        outreach_stage: formData.outreach_stage || null,
+        fit_score: formData.fit_score ? parseInt(formData.fit_score, 10) : null
       }
       let saved
       if (lead?.id) {
@@ -224,7 +229,15 @@ function LeadForm({ onClose, onSave, lead = null }) {
         // missing" filters look for NULL.
         const changed = {}
         for (const k of Object.keys(formData)) {
-          if (formData[k] !== initialForm[k]) changed[k] = formData[k] === '' ? null : formData[k]
+          if (formData[k] !== initialForm[k]) {
+            if (formData[k] === '') {
+              changed[k] = null
+            } else if (k === 'fit_score') {
+              changed[k] = parseInt(formData[k], 10)
+            } else {
+              changed[k] = formData[k]
+            }
+          }
         }
         saved = Object.keys(changed).length
           ? await updateLead(lead.id, changed, currentPerson.id)
@@ -420,6 +433,52 @@ function LeadForm({ onClose, onSave, lead = null }) {
               onChange={handleChange}
               placeholder="Initial conversation notes, context, etc."
               rows={3}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Message Content</label>
+            <textarea
+              name="message_content"
+              value={formData.message_content}
+              onChange={handleChange}
+              placeholder="The outreach message sent to this lead…"
+              rows={3}
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Location</label>
+              <input
+                type="text"
+                name="location"
+                value={formData.location}
+                onChange={handleChange}
+                placeholder="City, Country"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Fit Score (1–5)</label>
+              <select name="fit_score" value={formData.fit_score} onChange={handleChange}>
+                <option value="">Not rated</option>
+                <option value="1">1 — Poor fit</option>
+                <option value="2">2 — Weak fit</option>
+                <option value="3">3 — Moderate fit</option>
+                <option value="4">4 — Good fit</option>
+                <option value="5">5 — Excellent fit</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>First Contact Date</label>
+            <input
+              type="date"
+              name="first_contact_date"
+              value={formData.first_contact_date}
+              onChange={handleChange}
             />
           </div>
 
