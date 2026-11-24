@@ -676,12 +676,10 @@ function OutreachTracker() {
             <Upload size={20} />
             Bulk Upload from CSV
           </h3>
-          <p style={{ color: 'var(--gray-600)', marginBottom: '16px' }}>
-            Import or update leads. Required: <strong>name</strong>
-          </p>
-
-          <div style={{ marginBottom: '16px' }}>
-            <strong>Optional columns:</strong> firm_name, linkedin_url, lead_type, lead_source, stage, outreach_stage, tags, email, phone, deal_criteria, notes
+          <div style={{ marginBottom: '16px', fontSize: '13px', color: 'var(--gray-600)', lineHeight: 1.6 }}>
+            <div><strong>Required:</strong> Name</div>
+            <div><strong>Optional:</strong> Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated), Email, Phone, Deal Criteria, Notes</div>
+            <div style={{ marginTop: '4px' }}>Existing leads are matched by LinkedIn URL → Email → Name + Firm and updated with any new information.</div>
           </div>
 
           <form onSubmit={handleCsvUpload}>
@@ -714,9 +712,9 @@ function OutreachTracker() {
           <details style={{ marginTop: '16px', padding: '12px', background: 'white', borderRadius: 'var(--radius-md)' }}>
             <summary style={{ cursor: 'pointer', fontWeight: '600' }}>Example CSV Format</summary>
             <pre style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', overflow: 'auto' }}>
-{`name,firm_name,linkedin_url,lead_type,lead_source,stage,outreach_stage,tags,email,phone,notes
-John Smith,Acme Capital,https://linkedin.com/in/johnsmith,PE Fund,Dev's LinkedIn,outreach,messaged,SaaS;PE,,+91 98765 43210,Met at conference
-Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office,Referral,responded,replied,,"sarah@growthpartners.com",,Interested in Q1`}
+{`name,firm_name,linkedin_url,lead_type,lead_source,stage,outreach_stage,tags,email,phone,deal_criteria,notes
+John Smith,Acme Capital,https://linkedin.com/in/johnsmith,PE Fund,Dev's LinkedIn,outreach,messaged,"SaaS,PE",,+91 98765 43210,,Met at conference
+Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office,Referral,responded,replied,,sarah@growthpartners.com,,$1-5M revenue,Interested in Q1`}
             </pre>
           </details>
         </div>

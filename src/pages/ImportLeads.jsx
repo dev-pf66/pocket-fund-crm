@@ -285,7 +285,7 @@ function ImportLeads() {
               <li>First row should contain column headers</li>
               <li><strong>Required:</strong> Name</li>
               <li><strong>Optional:</strong> Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated), Email, Phone, Deal Criteria, Notes</li>
-              <li>Existing leads (matched by LinkedIn URL, email, or name + firm) are updated with any new information</li>
+              <li>Existing leads are matched by LinkedIn URL → Email → Name + Firm and updated with any new information</li>
             </ul>
           </div>
         </div>
