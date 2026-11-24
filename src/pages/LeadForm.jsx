@@ -48,6 +48,8 @@ function LeadForm({ onClose, onSave, lead = null }) {
   const [tagSelectVal, setTagSelectVal] = useState('')
   const [newTagName, setNewTagName] = useState('')
   const [tagBusy, setTagBusy] = useState(false)
+  // For new leads: comma-separated tag names entered before save
+  const [pendingTags, setPendingTags] = useState('')
 
   useEffect(() => {
     if (!lead?.id) return
@@ -244,8 +246,19 @@ function LeadForm({ onClose, onSave, lead = null }) {
           : lead
       } else {
         saved = await createLead(payload, currentPerson.id)
+        // Apply any tags typed before save
+        const tagList = pendingTags.split(',').map(t => t.trim()).filter(Boolean)
+        if (tagList.length && saved?.id) {
+          const allTagsData = await getTags()
+          for (const tagName of tagList) {
+            let tag = allTagsData.find(t => t.name.toLowerCase() === tagName.toLowerCase())
+            if (!tag) tag = await createTag(tagName)
+            if (tag?.id) await addTagToLeads([saved.id], tag.id)
+          }
+        }
       }
       clearFormData()
+      setPendingTags('')
       onSave(saved)
     } catch (error) {
       console.error('Failed to save lead:', error)
@@ -485,7 +498,13 @@ function LeadForm({ onClose, onSave, lead = null }) {
           <div className="form-group">
             <label>Tags</label>
             {!lead?.id ? (
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)' }}>Save the lead first to add tags.</p>
+              <input
+                type="text"
+                value={pendingTags}
+                onChange={e => setPendingTags(e.target.value)}
+                placeholder="e.g. SaaS, PE, Conference (comma-separated)"
+                style={{ fontSize: '13px' }}
+              />
             ) : (<>
               {leadTags.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
