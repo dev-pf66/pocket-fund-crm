@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getOutreachLog, logOutreach, logOutreachBatch, updateOutreach, deleteOutreach, getPersonDashboardStats, getLeads, createLead, findLeadByLinkedInUrl, updateLead, getEmailTemplates, getTags, createTag, addTagToLeads } from '../lib/crm-api'
-import { isLinkedInUrl, nameFromLinkedInUrl } from '../lib/linkedin'
+import { isLinkedInUrl, nameFromLinkedInUrl, normalizeLinkedInUrl } from '../lib/linkedin'
 import { useApp } from '../App'
 import { Target, Mail, Linkedin, Phone, MessageSquare, Trash2, CheckCircle, XCircle, Clock, TrendingUp, Upload, Edit2, Zap, X, AlertTriangle, ExternalLink } from 'lucide-react'
 import { useFieldOptions } from '../hooks/useFieldOptions'
@@ -399,14 +399,15 @@ function OutreachTracker() {
       }
 
       // Load existing leads once for dedup: match by linkedin_url → email → name+firm
-      const existingLeads = await getLeads({}, null)
+      // includeArchived: true — dedup must see archived leads or they get re-created.
+      const existingLeads = await getLeads({ includeArchived: true }, null)
       const byLinkedIn = new Map()
       const byEmail = new Map()
       const byNameFirm = new Map()
       for (const l of existingLeads || []) {
-        if (l.linkedin_url) byLinkedIn.set(l.linkedin_url.replace(/\/$/, '').toLowerCase(), l)
+        if (l.linkedin_url) { const k = normalizeLinkedInUrl(l.linkedin_url); if (k) byLinkedIn.set(k, l) }
         if (l.email) byEmail.set(l.email.toLowerCase(), l)
-        if (l.name) byNameFirm.set(`${l.name.toLowerCase()}|${(l.firm_name || '').toLowerCase()}`, l)
+        if (l.name && l.firm_name) byNameFirm.set(`${l.name.toLowerCase()}|${l.firm_name.toLowerCase()}`, l)
       }
 
       const COMPARABLE = [...LEAD_FIELDS.filter(f => f !== 'tags'), 'location', 'fit_score', 'first_contact_date', 'message_content']
@@ -416,14 +417,14 @@ function OutreachTracker() {
 
       for (const row of parsedRows) {
         const { _tags, ...leadFields } = row
-        const liKey = leadFields.linkedin_url ? leadFields.linkedin_url.replace(/\/$/, '').toLowerCase() : null
+        const liKey = leadFields.linkedin_url ? normalizeLinkedInUrl(leadFields.linkedin_url) : null
         const emailKey = leadFields.email ? leadFields.email.toLowerCase() : null
-        const nameFirmKey = `${leadFields.name.toLowerCase()}|${(leadFields.firm_name || '').toLowerCase()}`
+        const nameFirmKey = (leadFields.name && leadFields.firm_name) ? `${leadFields.name.toLowerCase()}|${leadFields.firm_name.toLowerCase()}` : null
 
         const existing =
           (liKey && byLinkedIn.get(liKey)) ||
           (emailKey && byEmail.get(emailKey)) ||
-          byNameFirm.get(nameFirmKey)
+          (nameFirmKey && byNameFirm.get(nameFirmKey))
 
         let leadId
         if (existing) {
