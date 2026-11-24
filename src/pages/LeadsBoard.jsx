@@ -190,12 +190,6 @@ function LeadsBoard() {
   const [searchName, setSearchName] = useState('')
   const [showSavedDropdown, setShowSavedDropdown] = useState(false)
 
-  useEffect(() => {
-    loadLeads()
-    getCRMSettings().then(setSettings).catch(console.error)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadLeads])
-
   const loadLeads = useCallback(async function loadLeads() {
     if (!currentPerson?.id) return
     try {
@@ -225,6 +219,11 @@ function LeadsBoard() {
       setLoading(false)
     }
   }, [currentPerson?.id, leadScopeId, showArchived])
+
+  useEffect(() => {
+    loadLeads()
+    getCRMSettings().then(setSettings).catch(console.error)
+  }, [loadLeads])
 
   const handleDragStart = useCallback(function handleDragStart(e, lead) {
     setDraggedLead(lead)
