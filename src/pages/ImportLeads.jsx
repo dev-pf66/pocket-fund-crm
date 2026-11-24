@@ -15,7 +15,8 @@ const FIELD_LIMITS = {
   firm_name: 200,
   email: 255,
   phone: 50,
-  lead_type: 50
+  lead_type: 50,
+  location: 100,
 }
 
 function ImportLeads() {
@@ -51,6 +52,9 @@ function ImportLeads() {
     { value: 'deal_criteria', label: 'Deal Criteria' },
     { value: 'notes', label: 'Notes' },
     { value: 'message_content', label: 'Message Content' },
+    { value: 'location', label: 'Location' },
+    { value: 'fit_score', label: 'Fit Score (1–5)' },
+    { value: 'first_contact_date', label: 'First Contact Date' },
   ]
 
   function handleFileChange(e) {
@@ -117,6 +121,12 @@ function ImportLeads() {
           autoMapping[header] = 'message_content'
         } else if (lower.includes('note')) {
           autoMapping[header] = 'notes'
+        } else if (lower.includes('location')) {
+          autoMapping[header] = 'location'
+        } else if (lower.includes('fit') || lower.includes('score')) {
+          autoMapping[header] = 'fit_score'
+        } else if (lower === 'date' || lower.includes('contact date') || lower.includes('first contact')) {
+          autoMapping[header] = 'first_contact_date'
         }
       })
 
@@ -147,6 +157,11 @@ function ImportLeads() {
         if (fieldName === 'fit_score') {
           const n = parseInt(raw, 10)
           if (n >= 1 && n <= 5) lead.fit_score = n
+          return
+        }
+        if (fieldName === 'first_contact_date') {
+          // Accept YYYY-MM-DD or leave as-is; DB enforces DATE format
+          lead.first_contact_date = raw
           return
         }
         const limit = FIELD_LIMITS[fieldName]
@@ -198,7 +213,7 @@ function ImportLeads() {
       console.error('Failed to load existing leads for dedup:', error)
     }
 
-    const COMPARABLE = ['name', 'firm_name', 'email', 'phone', 'linkedin_url', 'lead_type', 'lead_source', 'stage', 'outreach_stage', 'deal_criteria', 'notes', 'message_content']
+    const COMPARABLE = ['name', 'firm_name', 'email', 'phone', 'linkedin_url', 'lead_type', 'lead_source', 'stage', 'outreach_stage', 'deal_criteria', 'notes', 'message_content', 'location', 'fit_score', 'first_contact_date']
     const allTags = await getTags().catch(() => [])
 
     for (const lead of leads) {
@@ -313,7 +328,7 @@ function ImportLeads() {
             <ul>
               <li>First row should contain column headers</li>
               <li><strong>Required:</strong> Name, Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags</li>
-              <li><strong>Optional:</strong> Email, Phone, Deal Criteria, Notes, Message Content</li>
+              <li><strong>Optional:</strong> Email, Phone, Deal Criteria, Notes, Message Content, Location, Fit Score (1–5), First Contact Date</li>
               <li>Existing leads are matched by LinkedIn URL → Email → Name + Firm and updated with any new information</li>
             </ul>
           </div>
