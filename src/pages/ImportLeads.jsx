@@ -35,21 +35,21 @@ function ImportLeads() {
 
   const fieldOptions = [
     { value: '', label: '-- Skip --' },
+    // Required fields
     { value: 'name', label: 'Name *' },
-    { value: 'firm_name', label: 'Firm Name' },
-    { value: 'linkedin_url', label: 'LinkedIn URL' },
-    { value: 'lead_type', label: 'Lead Type' },
-    { value: 'lead_source', label: 'Lead Source' },
-    { value: 'stage', label: 'Stage' },
-    { value: 'outreach_stage', label: 'Outreach Stage' },
-    { value: 'tags', label: 'Tags (comma-separated)' },
-    { value: 'location', label: 'Location' },
-    { value: 'fit_score', label: 'Fit Score (1–5)' },
-    { value: 'first_contact_date', label: 'Date' },
+    { value: 'firm_name', label: 'Firm Name *' },
+    { value: 'linkedin_url', label: 'LinkedIn URL *' },
+    { value: 'lead_type', label: 'Lead Type *' },
+    { value: 'lead_source', label: 'Lead Source *' },
+    { value: 'stage', label: 'Stage *' },
+    { value: 'outreach_stage', label: 'Outreach Stage *' },
+    { value: 'tags', label: 'Tags * (comma-separated)' },
+    // Optional fields
     { value: 'email', label: 'Email' },
     { value: 'phone', label: 'Phone' },
     { value: 'deal_criteria', label: 'Deal Criteria' },
     { value: 'notes', label: 'Notes' },
+    { value: 'message_content', label: 'Message Content' },
   ]
 
   function handleFileChange(e) {
@@ -110,14 +110,10 @@ function ImportLeads() {
           autoMapping[header] = 'outreach_stage'
         } else if (lower.includes('tag')) {
           autoMapping[header] = 'tags'
-        } else if (lower === 'location' || lower.includes('location')) {
-          autoMapping[header] = 'location'
-        } else if (lower.includes('fit') || lower.includes('score')) {
-          autoMapping[header] = 'fit_score'
-        } else if (lower === 'date' || lower.includes('contact date') || lower.includes('first contact')) {
-          autoMapping[header] = 'first_contact_date'
         } else if (lower.includes('criteria')) {
           autoMapping[header] = 'deal_criteria'
+        } else if (lower.includes('message') || lower.includes('content')) {
+          autoMapping[header] = 'message_content'
         } else if (lower.includes('note')) {
           autoMapping[header] = 'notes'
         }
@@ -198,7 +194,7 @@ function ImportLeads() {
       console.error('Failed to load existing leads for dedup:', error)
     }
 
-    const COMPARABLE = ['name', 'firm_name', 'email', 'phone', 'linkedin_url', 'lead_type', 'lead_source', 'stage', 'outreach_stage', 'deal_criteria', 'notes']
+    const COMPARABLE = ['name', 'firm_name', 'email', 'phone', 'linkedin_url', 'lead_type', 'lead_source', 'stage', 'outreach_stage', 'deal_criteria', 'notes', 'message_content']
     const allTags = await getTags()
 
     for (const lead of leads) {
@@ -296,8 +292,8 @@ function ImportLeads() {
             <h4>CSV Format Tips:</h4>
             <ul>
               <li>First row should contain column headers</li>
-              <li><strong>Required:</strong> Name</li>
-              <li><strong>Optional:</strong> Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated), Location, Fit Score (1–5), Date, Email, Phone, Deal Criteria, Notes</li>
+              <li><strong>Required:</strong> Name, Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags</li>
+              <li><strong>Optional:</strong> Email, Phone, Deal Criteria, Notes, Message Content</li>
               <li>Existing leads are matched by LinkedIn URL → Email → Name + Firm and updated with any new information</li>
             </ul>
           </div>

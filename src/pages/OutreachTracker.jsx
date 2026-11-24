@@ -292,6 +292,7 @@ function OutreachTracker() {
           else if (header.includes('email')) lead.email = value
           else if (header.includes('phone')) lead.phone = value
           else if (header.includes('criteria') || header.includes('deal')) lead.deal_criteria = value
+          else if (header.includes('message') || header.includes('content')) lead.message_content = value
           else if (header.includes('note')) lead.notes = value
         })
         if (!lead.name) { skipped++; continue }
@@ -314,7 +315,7 @@ function OutreachTracker() {
         if (l.name) byNameFirm.set(`${l.name.toLowerCase()}|${(l.firm_name || '').toLowerCase()}`, l)
       }
 
-      const COMPARABLE = [...LEAD_FIELDS.filter(f => f !== 'tags'), 'location', 'fit_score', 'first_contact_date']
+      const COMPARABLE = [...LEAD_FIELDS.filter(f => f !== 'tags'), 'location', 'fit_score', 'first_contact_date', 'message_content']
       let createdCount = 0, updatedCount = 0, unchangedCount = 0
 
       const allTags = await getTags()
@@ -683,8 +684,8 @@ function OutreachTracker() {
             Bulk Upload from CSV
           </h3>
           <div style={{ marginBottom: '16px', fontSize: '13px', color: 'var(--gray-600)', lineHeight: 1.6 }}>
-            <div><strong>Required:</strong> Name</div>
-            <div><strong>Optional:</strong> Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated), Location, Fit Score (1–5), Date, Email, Phone, Deal Criteria, Notes</div>
+            <div><strong>Required:</strong> Name, Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated)</div>
+            <div><strong>Optional:</strong> Email, Phone, Deal Criteria, Notes, Message Content</div>
             <div style={{ marginTop: '4px' }}>Existing leads are matched by LinkedIn URL → Email → Name + Firm and updated with any new information.</div>
           </div>
 
