@@ -43,6 +43,9 @@ function ImportLeads() {
     { value: 'stage', label: 'Stage' },
     { value: 'outreach_stage', label: 'Outreach Stage' },
     { value: 'tags', label: 'Tags (comma-separated)' },
+    { value: 'location', label: 'Location' },
+    { value: 'fit_score', label: 'Fit Score (1–5)' },
+    { value: 'first_contact_date', label: 'Date' },
     { value: 'email', label: 'Email' },
     { value: 'phone', label: 'Phone' },
     { value: 'deal_criteria', label: 'Deal Criteria' },
@@ -107,6 +110,12 @@ function ImportLeads() {
           autoMapping[header] = 'outreach_stage'
         } else if (lower.includes('tag')) {
           autoMapping[header] = 'tags'
+        } else if (lower === 'location' || lower.includes('location')) {
+          autoMapping[header] = 'location'
+        } else if (lower.includes('fit') || lower.includes('score')) {
+          autoMapping[header] = 'fit_score'
+        } else if (lower === 'date' || lower.includes('contact date') || lower.includes('first contact')) {
+          autoMapping[header] = 'first_contact_date'
         } else if (lower.includes('criteria')) {
           autoMapping[header] = 'deal_criteria'
         } else if (lower.includes('note')) {
@@ -134,8 +143,12 @@ function ImportLeads() {
         const raw = row[csvHeader]
         if (!raw) return
         if (fieldName === 'tags') {
-          // Store as _tags (array) — handled post-create, not a lead column
           lead._tags = raw.split(',').map(t => t.trim()).filter(Boolean)
+          return
+        }
+        if (fieldName === 'fit_score') {
+          const n = parseInt(raw, 10)
+          if (n >= 1 && n <= 5) lead.fit_score = n
           return
         }
         const limit = FIELD_LIMITS[fieldName]
@@ -284,7 +297,7 @@ function ImportLeads() {
             <ul>
               <li>First row should contain column headers</li>
               <li><strong>Required:</strong> Name</li>
-              <li><strong>Optional:</strong> Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated), Email, Phone, Deal Criteria, Notes</li>
+              <li><strong>Optional:</strong> Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated), Location, Fit Score (1–5), Date, Email, Phone, Deal Criteria, Notes</li>
               <li>Existing leads are matched by LinkedIn URL → Email → Name + Firm and updated with any new information</li>
             </ul>
           </div>

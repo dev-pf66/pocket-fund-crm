@@ -283,6 +283,12 @@ function OutreachTracker() {
           else if (header === 'stage' || header === 'pipeline stage') lead.stage = value
           else if (header === 'outreach_stage' || header === 'outreach stage') lead.outreach_stage = value
           else if (header === 'tags' || header === 'tag') lead._tags = value.split(',').map(t => t.trim()).filter(Boolean)
+          else if (header.includes('location')) lead.location = value
+          else if (header.includes('fit') || header.includes('score')) {
+            const n = parseInt(value, 10)
+            if (n >= 1 && n <= 5) lead.fit_score = n
+          }
+          else if (header === 'date' || header.includes('contact date') || header.includes('first contact')) lead.first_contact_date = value
           else if (header.includes('email')) lead.email = value
           else if (header.includes('phone')) lead.phone = value
           else if (header.includes('criteria') || header.includes('deal')) lead.deal_criteria = value
@@ -308,7 +314,7 @@ function OutreachTracker() {
         if (l.name) byNameFirm.set(`${l.name.toLowerCase()}|${(l.firm_name || '').toLowerCase()}`, l)
       }
 
-      const COMPARABLE = LEAD_FIELDS.filter(f => f !== 'tags')
+      const COMPARABLE = [...LEAD_FIELDS.filter(f => f !== 'tags'), 'location', 'fit_score', 'first_contact_date']
       let createdCount = 0, updatedCount = 0, unchangedCount = 0
 
       const allTags = await getTags()
@@ -678,7 +684,7 @@ function OutreachTracker() {
           </h3>
           <div style={{ marginBottom: '16px', fontSize: '13px', color: 'var(--gray-600)', lineHeight: 1.6 }}>
             <div><strong>Required:</strong> Name</div>
-            <div><strong>Optional:</strong> Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated), Email, Phone, Deal Criteria, Notes</div>
+            <div><strong>Optional:</strong> Firm Name, LinkedIn URL, Lead Type, Lead Source, Stage, Outreach Stage, Tags (comma-separated), Location, Fit Score (1–5), Date, Email, Phone, Deal Criteria, Notes</div>
             <div style={{ marginTop: '4px' }}>Existing leads are matched by LinkedIn URL → Email → Name + Firm and updated with any new information.</div>
           </div>
 
