@@ -24,7 +24,7 @@ const STAGES = [
   { key: 'client', label: 'Clients', color: '#22c55e' }
 ]
 
-const LEAD_SOURCES = ['LinkedIn', 'Referral', 'Conference', 'Cold Email', 'Website', 'Other']
+const LEAD_SOURCES = ["Dev's LinkedIn", "Aum's LinkedIn", "Siddhant's LinkedIn", 'LinkedIn', 'Referral', 'Conference', 'Cold Email', 'Website', 'Other']
 
 const ACTIVITY_PRESETS = [
   { value: 'all', label: 'Any Time' },

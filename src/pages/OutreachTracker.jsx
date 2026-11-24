@@ -870,6 +870,12 @@ Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office
                 <option value="PE Firm">PE Firm</option>
                 <option value="Family Office">Family Office</option>
                 <option value="Independent Sponsor">Independent Sponsor</option>
+                <option value="Search Fund (Funded)">Search Fund (Funded)</option>
+                <option value="Self-Funded Searcher">Self-Funded Searcher</option>
+                <option value="Aspiring Searcher">Aspiring Searcher</option>
+                <option value="Holdco / Roll-up">Holdco / Roll-up</option>
+                <option value="Search Fund Investor">Search Fund Investor</option>
+                <option value="Intermediary / Advisor">Intermediary / Advisor</option>
                 <option value="Partner">Partner</option>
                 <option value="Corporate Strategic">Corporate Strategic</option>
                 <option value="PE OS">PE OS</option>
@@ -881,6 +887,9 @@ Sarah Johnson,Growth Partners,https://linkedin.com/in/sarahjohnson,Family Office
               <label>Lead Source</label>
               <select value={newLeadForm.lead_source} onChange={(e) => setNewLeadForm({ ...newLeadForm, lead_source: e.target.value })}>
                 <option value="">Select source…</option>
+                <option value="Dev's LinkedIn">Dev's LinkedIn</option>
+                <option value="Aum's LinkedIn">Aum's LinkedIn</option>
+                <option value="Siddhant's LinkedIn">Siddhant's LinkedIn</option>
                 <option value="LinkedIn">LinkedIn</option>
                 <option value="Referral">Referral</option>
                 <option value="Conference">Conference</option>
