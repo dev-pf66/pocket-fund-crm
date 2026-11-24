@@ -176,14 +176,16 @@ function ImportLeads() {
 
     setStep(4)
 
-    const results = { success: 0, updated: 0, unchanged: 0, failed: 0, errors: [] }
+    const skipped = csvData.length - leads.length
+    const results = { success: 0, updated: 0, unchanged: 0, failed: 0, skipped, errors: [] }
 
     // Build lookup maps: existing leads keyed by linkedin_url, email, name+firm.
+    // includeArchived: true — dedup must see archived leads or they get re-created.
     const existingByLinkedIn = new Map()
     const existingByEmail = new Map()
     const existingByNameFirm = new Map()
     try {
-      const existingLeads = await getLeads({}, null)
+      const existingLeads = await getLeads({ includeArchived: true }, null)
       for (const existing of existingLeads || []) {
         if (existing.linkedin_url) {
           const normalized = normalizeLinkedInUrl(existing.linkedin_url)
@@ -486,7 +488,11 @@ function ImportLeads() {
                     results.success > 0 && `${results.success} added`,
                     results.updated > 0 && `${results.updated} updated`,
                     results.unchanged > 0 && `${results.unchanged} unchanged`,
+                    results.skipped > 0 && `${results.skipped} skipped (no name)`,
                   ].filter(Boolean).join(' · ')}
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  {csvData.length} rows in CSV
                 </p>
               </>
             ) : (
@@ -497,7 +503,11 @@ function ImportLeads() {
                   {results.success > 0 && <>✓ {results.success} added<br /></>}
                   {results.updated > 0 && <>↑ {results.updated} updated<br /></>}
                   {results.unchanged > 0 && <>— {results.unchanged} unchanged<br /></>}
+                  {results.skipped > 0 && <>⊘ {results.skipped} skipped (no name)<br /></>}
                   ✗ {results.failed} failed
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  {csvData.length} rows in CSV
                 </p>
                 {results.errors.length > 0 && (
                   <div className="error-list">
