@@ -32,7 +32,10 @@ async function getValidLeadTypes() {
     return DEFAULT_LEAD_TYPES
   }
 }
-const VALID_LEAD_SOURCES = ['LinkedIn', 'Referral', 'Cold Email', 'Event', 'Website']
+const VALID_LEAD_SOURCES = [
+  "Dev's LinkedIn", "Aum's LinkedIn", "Siddhant's LinkedIn",
+  'LinkedIn', 'Referral', 'Conference', 'Cold Email', 'Website', 'Other'
+]
 
 // Fields allowed when creating a lead.
 //
@@ -46,6 +49,7 @@ const VALID_LEAD_SOURCES = ['LinkedIn', 'Referral', 'Cold Email', 'Event', 'Webs
 const ALLOWED_FIELDS = [
   'name', 'email', 'phone', 'firm_name', 'linkedin_url',
   'lead_type', 'deal_criteria', 'lead_source', 'stage', 'notes',
+  'outreach_stage', 'location', 'fit_score', 'first_contact_date', 'message_content',
   'initial_conversation', 'needs_sample_deals', 'next_follow_up_date', 'follow_up_note',
   'reach_out_later_date', 'aum', 'investment_thesis', 'portfolio_size',
   'fund_vintage', 'assigned_to', 'created_by'
@@ -72,8 +76,9 @@ function authenticate(req) {
 // dropdown at a time is not a plan.
 const PATCH_FIELDS = [
   'assigned_to', 'stage', 'next_follow_up_date', 'follow_up_note', 'notes', 'is_archived',
-  'lead_type', 'lead_channel', 'buying_timeline', 'investment_thesis',
-  'prior_acquisitions', 'engagement_model'
+  'lead_type', 'lead_source', 'lead_channel', 'buying_timeline', 'investment_thesis',
+  'prior_acquisitions', 'engagement_model',
+  'outreach_stage', 'location', 'fit_score', 'first_contact_date', 'message_content'
 ]
 
 export default async function handler(req, res) {
