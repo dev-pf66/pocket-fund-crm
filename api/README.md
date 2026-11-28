@@ -500,6 +500,19 @@ curl -X POST \
 }
 ```
 
+**`action: "parse_reminder"`** (Nov 2026) — reads a typed reminder ("after Diwali") into a date.
+Same route because of the Hobby plan's 12-function cap; logic in `api/_reminder-ai.js`. The app
+calls it only when the browser parser (`src/lib/reminderParse.js`) finds no date, and always shows
+the answer for confirmation before saving.
+
+```json
+// request
+{ "action": "parse_reminder", "text": "reach out the week after Diwali", "today": "2026-11-28" }
+// 200
+{ "success": true, "date": "2027-11-08", "rule": "week after Diwali" }
+```
+`date` is `null` when no date can be told, and never today or earlier.
+
 **Analysis fields:**
 
 | Field | Type | Values |

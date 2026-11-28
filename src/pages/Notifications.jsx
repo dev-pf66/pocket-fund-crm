@@ -5,6 +5,7 @@ import {
   getNotificationFeed,
   logFollowUpTouch,
   snoozeFollowUp,
+  snoozeFollowUpTo,
   DEFAULT_FOLLOW_UP_DAYS,
   assignLead
 } from '../lib/crm-api'
@@ -12,6 +13,8 @@ import { useToast } from '../components/Toast'
 import { isAdminUser } from '../lib/admin'
 import { notifyFollowUpsChanged } from '../hooks/useNotificationCount'
 import StageChip from '../components/StageChip'
+import SnoozeMenu from '../components/SnoozeMenu'
+import { fmtDate } from '../lib/dateUtils'
 import {
   Bell, Check, X, ExternalLink, Repeat, AlarmClock, CalendarClock,
   RefreshCw, PhoneCall, Presentation, UserPlus, EyeOff, Store, Handshake, AlertTriangle
@@ -105,6 +108,12 @@ function Notifications() {
     logFollowUpTouch(item.lead, currentPerson.id))
   const handleSnooze = (item, days) => act(item, `${item.title} pushed ${days} day${days === 1 ? '' : 's'}`, () =>
     snoozeFollowUp(item.lead, days, { note: item.lead?.follow_up_note }, currentPerson.id))
+  // The longer menu (Dev, 2026-11-28: "more options to the snooze"). Same
+  // note rule as the inline buttons: whatever note the reminder had stays.
+  const handleSnoozePick = (item, pick) => pick.date
+    ? act(item, `${item.title} moved to ${fmtDate(pick.date)}`, () =>
+      snoozeFollowUpTo(item.lead, pick.date, { note: item.lead?.follow_up_note }, currentPerson.id))
+    : handleSnooze(item, pick.days)
   const handleClaim = item => act(item, `${item.title} assigned to you`, () =>
     assignLead(item.leadId, currentPerson.id, currentPerson.id))
 
@@ -228,7 +237,7 @@ function Notifications() {
           showOwner={isAdmin && showAllOwners}
           viewerId={currentPerson?.id}
           pendingId={pendingId}
-          handlers={{ handleTouch, handleSnooze, handleClaim }}
+          handlers={{ handleTouch, handleSnooze, handleSnoozePick, handleClaim }}
         />
       ))}
 
@@ -334,6 +343,8 @@ function Row({ item, ownerName, busy, handlers }) {
                   {label}
                 </button>
               ))}
+              <SnoozeMenu label="Later" onPick={pick => handlers.handleSnoozePick(item, pick)} disabled={busy}
+                title="More snooze options — 3 or 6 months, start of next month, a date" />
             </>
           )}
           {item.kind === 'unowned' && (

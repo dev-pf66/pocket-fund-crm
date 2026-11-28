@@ -12,13 +12,16 @@ import {
 import { istToday, istAddDays, fmtDate } from '../lib/dateUtils'
 import { useToast } from './Toast'
 import { notifyFollowUpsChanged } from '../hooks/useNotificationCount'
+import LeadUpdateBox from './LeadUpdateBox'
 
 const QUICK = [
   [1, 'Tomorrow'],
   [3, '3 days'],
   [7, '1 week'],
   [14, '2 weeks'],
-  [30, '1 month']
+  [30, '1 month'],
+  [91, '3 months'],
+  [182, '6 months']
 ]
 
 /**
@@ -186,6 +189,23 @@ function FollowUpCard({ lead, currentPerson, onChange }) {
           </div>
         )}
       </div>
+
+      {/* Typed update (Dev, 2026-11-28): say what happened, the date is read
+          from the words and confirmed before saving. */}
+      <label style={{ display: 'block', fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: '4px' }}>
+        Log an update
+      </label>
+      <div style={{ marginBottom: '14px' }}>
+        <LeadUpdateBox lead={lead} currentPerson={currentPerson} onSaved={res => {
+          // The lead row (new reminder) first, then null so the page also
+          // refetches activities — the update is a new activity too.
+          if (!onChange) return
+          if (res?.lead) onChange(res.lead)
+          onChange(null)
+        }} />
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--gray-100)', paddingTop: '12px' }} />
 
       {/* Note — carried onto whatever gets scheduled below */}
       <label style={{ display: 'block', fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: '4px' }}>

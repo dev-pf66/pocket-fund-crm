@@ -237,6 +237,31 @@ Unlike marseille, this worktree is simple: `origin` = github.com/dev-pf66/pocket
   - **Not done, by choice:** no backfill (a one-shot run would land hundreds of reminders on the
     same day 30 days later — they get one the next time they're touched), and none at lead
     creation. Explicitly blanking the date in a form or via the API is still allowed.
+- **Snooze menu + typed updates (Dev, 2026-11-28).** "Add more options to the snooze. And a manual
+  way to give an update ... I can type 'reach out in the start of the new year' and it pops up on
+  Today in Jan."
+  - **One snooze list** in `src/lib/snoozeOptions.js` (Tomorrow → 6 months, Next Monday, Start of
+    next month, Start of next year Oct–Nov, Pick a date), rendered by `SnoozeMenu.jsx` on the Today
+    row, Today's bulk bar and Notifications ("Later ▾" next to +1d/+1w/+30d). `{days}` options go
+    through `snoozeFollowUp`; `{date}` options through `snoozeFollowUpTo` (exact date, shifts a
+    running cadence, never deletes it). Today's row snooze used to write `next_follow_up_date` raw.
+  - **The Today queue now skips a lead with a deliberately set future date** (`hasFuturePromise`:
+    future and NOT the automatic "30-day check-in"). Before this the queue ignored the date entirely,
+    so a snooze lasted until the next page load. The automatic check-in still does not hide a lead —
+    if it did, every touched lead would vanish for 30 days. Snoozing drops the default note
+    (`snoozeNoteFor`) so a snooze counts as a promise.
+  - **Typed update** (`LeadUpdateBox.jsx`, "Update" on each Today row and "Log an update" on the lead
+    page): `src/lib/reminderParse.js` reads the date from the words in the browser (free, instant,
+    returns null rather than guessing); if it can't, "Read it with Claude" — a deliberate click —
+    asks `/api/analyze-transcript` with `action: 'parse_reminder'` (`api/_reminder-ai.js`; not its
+    own route because of the 12-function cap). **The date is always shown and editable before
+    saving.** `logLeadUpdate` writes a note activity (`Update — …`, or `Followed up (update) — …`
+    when the follow-up was due, so the scoreboard counts it) and sets the reminder with the words as
+    its note. It ends a running cadence: a date someone was told beats the automation.
+  - It surfaces in Today's "Follow-ups due" from 14 days before the date (`RECENT_WINDOW_DAYS`,
+    existing behaviour), and only for responded-and-beyond leads — an `outreach` lead never shows on
+    Today. Guardrails: `test/reminder-parse.test.js`, `test/snooze-options.test.js`,
+    `test/lead-update.test.js`.
 - **Archiving leads (migration 049).** `crm_leads.is_archived` / `archived_at` /
   `archived_reason`, mirroring `people.is_archived` (029). Archived leads are out of every board,
   count, queue and notification, but **nothing is deleted** and un-archiving is one flag flip.

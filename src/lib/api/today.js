@@ -8,7 +8,7 @@ import { istAddDays, istWeekStart, istToday } from '../dateUtils.js'
 import { cacheClear, istDateStr, getDaysBetween, fetchAllRows } from './core.js'
 import { logActivity, calculateStaleness, updateLead } from './leads.js'
 import { runBulk } from '../bulkActions.js'
-import { advanceFollowUpCadence, resetFollowUpToDefault, snoozeFollowUp } from './followups.js'
+import { advanceFollowUpCadence, resetFollowUpToDefault, snoozeFollowUp, snoozeFollowUpTo, snoozeNoteFor } from './followups.js'
 import { getCRMSettings } from './misc.js'
 import { getsDefaultReminder, isDefaultReminder, DEAD_REMINDER_RESET } from '../followUpPolicy.js'
 import { ownerScopeIds, scopeToOwners } from './cover.js'
@@ -116,6 +116,12 @@ export async function getTodayQueue(personId, { limit = 25 } = {}) {
     // Gone quiet longer than the recent window — still fully reachable via
     // Pipeline, just not surfaced here to nag about leads sitting for months.
     if (daysStaleFor(lead) > RECENT_WINDOW_DAYS) return false
+    // Someone promised a later date (snoozed it, or typed "start of the new
+    // year") — it comes back through "Follow-ups due" when that date is near,
+    // not as a queue row every morning in between. Without this a snooze only
+    // lasted until the next page load. The automatic 30-day check-in is a
+    // safety net, not a promise, so it does NOT hide a lead.
+    if (hasFuturePromise(lead, today)) return false
     return true
   })
 
@@ -127,6 +133,12 @@ export async function getTodayQueue(personId, { limit = 25 } = {}) {
   })
 
   return { leads: candidates.slice(0, limit), total: candidates.length }
+}
+
+/** A reminder someone deliberately set for a day after today (not the automatic check-in). */
+export function hasFuturePromise(lead, today = istToday()) {
+  const due = lead?.next_follow_up_date
+  return !!due && String(due).slice(0, 10) > today && !isDefaultReminder(lead)
 }
 
 /**
@@ -346,7 +358,12 @@ export async function bulkMarkTouched(leads, currentPersonId, note = '', opts = 
  * snooze.
  */
 export async function bulkSnoozeLeads(leads, days, currentPersonId) {
-  return runBulk(leads, lead => snoozeFollowUp(lead, days, {}, currentPersonId))
+  return runBulk(leads, lead => snoozeFollowUp(lead, days, { note: snoozeNoteFor(lead) }, currentPersonId))
+}
+
+/** Bulk snooze to an exact date (the menu's "Start of next month", "Pick a date"…). */
+export async function bulkSnoozeLeadsTo(leads, date, currentPersonId) {
+  return runBulk(leads, lead => snoozeFollowUpTo(lead, date, { note: snoozeNoteFor(lead) }, currentPersonId))
 }
 
 /** Bulk dismiss — marks every lead dead (stage → passed). */
