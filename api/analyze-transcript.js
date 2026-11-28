@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { isAuthorized } from './_auth.js'
 import { requireEnv } from './_env.js'
+import { handleParseReminder } from './_reminder-ai.js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY
@@ -29,6 +30,10 @@ export default async function handler(req, res) {
   if (!(await isAuthorized(req))) {
     return res.status(401).json({ error: 'Unauthorized. Sign in or provide a valid x-api-key header.' })
   }
+
+  // Typed reminders ("start of the new year") the browser parser couldn't
+  // read. Lives here because the Hobby plan allows 12 function files.
+  if (req.body?.action === 'parse_reminder') return handleParseReminder(req, res, anthropic)
 
   const { transcript_id, transcript_text } = req.body
 

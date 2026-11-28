@@ -118,16 +118,103 @@ export async function snoozeFollowUp(lead, days, { note = null } = {}, currentPe
   const current = lead?.next_follow_up_date
   // Defer from whichever is later: today, or the date already promised.
   const base = current && current > today ? current : today
-  const date = istAddDays(base, n)
+  return snoozeFollowUpTo(lead, istAddDays(base, n), { note }, currentPersonId)
+}
 
+/**
+ * Move a reach-out to an exact date — the snooze menu's "Start of next month",
+ * "New year", "Pick a date", and a typed update ("start of the new year").
+ * Unlike snoozeFollowUp it honours the date even when it is EARLIER than the
+ * one already set: the person picked that day on purpose.
+ *
+ * A running cadence is shifted by the same number of days, never deleted —
+ * the same rule as snoozeFollowUp, which routes through here.
+ */
+export async function snoozeFollowUpTo(lead, date, { note = null } = {}, currentPersonId = null) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) throw new Error('snoozeFollowUpTo needs a YYYY-MM-DD date')
+  const current = lead?.next_follow_up_date
   const cadence = lead?.follow_up_cadence
   let keepCadence
   if (cadence?.offsets?.length && current) {
-    const shift = daysBetween(current, date)
+    const shift = daysBetween(String(current).slice(0, 10), date)
     keepCadence = { ...cadence, anchor: istAddDays(cadence.anchor, shift) }
   }
-
   return setFollowUp(lead.id, { date, note, keepCadence }, currentPersonId)
+}
+
+/**
+ * The note to keep when someone snoozes from a list. The automatic "30-day
+ * check-in" note marks a reminder as a safety net (isDefaultReminder); once a
+ * person has deliberately pushed it, it is their decision, so the default note
+ * is dropped and the Today queue / "gone quiet" stop nagging until that date.
+ * A note somebody typed ("ask about the Q3 board") is carried over unchanged.
+ */
+export function snoozeNoteFor(lead) {
+  const note = lead?.follow_up_note
+  return note && note !== DEFAULT_FOLLOW_UP_NOTE ? note : null
+}
+
+/**
+ * A typed update after a conversation (Dev, 2026-11-28): "I can type in 'reach
+ * out in the start of the new year' and then it pops up on Today in Jan."
+ *
+ * Writes two things, in this order:
+ *   1. the update itself as a note activity on the lead — a conversation
+ *      happened, so it stamps last_activity_date like any touch, and the words
+ *      are in the lead's history for whoever picks it up in January;
+ *   2. the reminder, on the date the person confirmed, with their words as the
+ *      reminder note, so the Today row says why it is back.
+ * A running cadence is ended (setFollowUp): a date someone was told beats the
+ * automation.
+ *
+ * The date must come from the caller — parsed by src/lib/reminderParse.js or
+ * Claude, and SHOWN to the person before saving. This function never guesses.
+ */
+export async function logLeadUpdate(lead, { text, date }, currentPersonId = null, { followUp = false } = {}) {
+  const words = String(text || '').trim()
+  if (!words) throw new Error('Type what happened first')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) throw new Error('Pick the date to reach out')
+  if (date <= istToday()) throw new Error('The reminder date has to be after today')
+
+  const activity = await logActivity(lead.id, {
+    activity_type: 'note',
+    notes: updateNote(lead, words, { followUp })
+  }, currentPersonId)
+  const updated = await setFollowUp(lead.id, { date, note: words.slice(0, 280) }, currentPersonId)
+  return { activity, lead: updated }
+}
+
+/**
+ * The activity note an update writes. When the lead's follow-up was due (or the
+ * row came from Today's "Follow-ups due"), it carries the `Followed up` prefix
+ * the scoreboard counts — an update after a call IS the follow-up. Otherwise it
+ * is a plain `Update` note. Pure; pinned in test/lead-update.test.js.
+ */
+export function updateNote(lead, text, { followUp = false } = {}, today = istToday()) {
+  const due = lead?.next_follow_up_date
+  const isDue = followUp || (!!due && String(due).slice(0, 10) <= today)
+  return isDue ? `Followed up (update) — ${text}` : `Update — ${text}`
+}
+
+/**
+ * Ask Claude to read a typed reminder the local parser couldn't
+ * ("after Diwali", "when their fund closes in spring"). Dispatched from
+ * /api/analyze-transcript (action: parse_reminder) — the Hobby plan caps us at
+ * 12 function files, so this is not its own route. Returns { date, rule } or
+ * { date: null, rule } when Claude can't tell either.
+ */
+export async function parseReminderWithAI(text) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not signed in')
+  const response = await fetch('/api/analyze-transcript', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ action: 'parse_reminder', text, today: istToday() })
+  })
+  let result
+  try { result = await response.json() } catch { throw new Error(`Reminder reader unavailable (HTTP ${response.status})`) }
+  if (!response.ok || !result.success) throw new Error(result.error || 'Could not read that')
+  return { date: result.date || null, rule: result.rule || '' }
 }
 
 /**

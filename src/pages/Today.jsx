@@ -13,6 +13,10 @@ import {
   bulkClaimLeads,
   bulkMarkTouched,
   bulkSnoozeLeads,
+  bulkSnoozeLeadsTo,
+  snoozeFollowUp,
+  snoozeFollowUpTo,
+  snoozeNoteFor,
   bulkDismissLeads,
   markLeadTouched,
   pingDevOnLead,
@@ -27,6 +31,8 @@ import { notifyFollowUpsChanged } from '../hooks/useNotificationCount'
 import { isAdminUser } from '../lib/admin'
 import StageChip from '../components/StageChip'
 import StalenessBadge from '../components/StalenessBadge'
+import SnoozeMenu from '../components/SnoozeMenu'
+import LeadUpdateBox from '../components/LeadUpdateBox'
 import {
   Sun,
   Check,
@@ -38,7 +44,8 @@ import {
   RefreshCw,
   XCircle,
   Square,
-  CheckSquare
+  CheckSquare,
+  MessageSquarePlus
 } from 'lucide-react'
 
 // The pipeline owner sees the unassigned banner alongside admins. Matched
@@ -75,7 +82,6 @@ function Today() {
   const [pullingMore, setPullingMore] = useState(false)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
-  const [showBulkSnooze, setShowBulkSnooze] = useState(false)
 
   const personById = useMemo(() => {
     const map = new Map()
@@ -232,12 +238,13 @@ function Today() {
     }
   }
 
-  async function handleBulkSnooze(days) {
+  async function handleBulkSnooze(pick) {
     if (!selectedLeads.length) return
-    setShowBulkSnooze(false)
     setBulkBusy(true)
     try {
-      const { succeeded, failed } = await bulkSnoozeLeads(selectedLeads, days, currentPerson.id)
+      const { succeeded, failed } = pick.date
+        ? await bulkSnoozeLeadsTo(selectedLeads, pick.date, currentPerson.id)
+        : await bulkSnoozeLeads(selectedLeads, pick.days, currentPerson.id)
       removeFromQueues(succeeded)
       notifyFollowUpsChanged()
       clearSelection()
@@ -292,17 +299,20 @@ function Today() {
     }
   }
 
-  async function handleSnooze(lead, days) {
+  // Routes through snoozeFollowUp / snoozeFollowUpTo. This used to write
+  // next_follow_up_date raw, which left a running cadence on its old anchor
+  // (the next touch silently reverted the snooze) — and the queue ignored the
+  // date anyway, so the lead was back the next morning.
+  async function handleSnooze(lead, pick) {
     setPendingId(lead.id)
     try {
-      const until = istAddDays(istToday(), days)
-      await updateLead(lead.id, { next_follow_up_date: until }, currentPerson.id)
+      const opts = { note: snoozeNoteFor(lead) }
+      const updated = pick.date
+        ? await snoozeFollowUpTo(lead, pick.date, opts, currentPerson.id)
+        : await snoozeFollowUp(lead, pick.days, opts, currentPerson.id)
+      const until = updated?.next_follow_up_date || pick.date || istAddDays(istToday(), pick.days)
       notifyFollowUpsChanged()
-      setQueue(prev => ({
-        leads: prev.leads.filter(l => l.id !== lead.id),
-        total: Math.max(0, prev.total - 1)
-      }))
-      setFollowUps(prev => prev.filter(l => l.id !== lead.id))
+      removeLeadFromLists(lead)
       toast.success(`Snoozed ${lead.name} until ${fmtDate(until)}`)
     } catch (err) {
       console.error('Failed to snooze:', err)
@@ -310,6 +320,21 @@ function Today() {
     } finally {
       setPendingId(null)
     }
+  }
+
+  function removeLeadFromLists(lead) {
+    setQueue(prev => ({
+      leads: prev.leads.filter(l => l.id !== lead.id),
+      total: Math.max(0, prev.total - (prev.leads.some(l => l.id === lead.id) ? 1 : 0))
+    }))
+    setFollowUps(prev => prev.filter(l => l.id !== lead.id))
+  }
+
+  // A typed update ("reach out at the start of the new year") logs the note
+  // and sets the reminder; the lead leaves today's lists until that date.
+  function handleUpdated(lead) {
+    notifyFollowUpsChanged()
+    removeLeadFromLists(lead)
   }
 
   async function handleDismiss(lead) {
@@ -502,38 +527,7 @@ function Today() {
             <button className="btn btn-sm btn-primary" onClick={handleBulkTouch} disabled={bulkBusy}>
               <Check size={14} /> {bulkBusy ? 'Working…' : 'Mark touched'}
             </button>
-            <div style={{ position: 'relative' }}>
-              <button
-                className="btn btn-sm btn-secondary"
-                onClick={() => setShowBulkSnooze(v => !v)}
-                disabled={bulkBusy}
-              >
-                Snooze <ChevronDown size={12} />
-              </button>
-              {showBulkSnooze && (
-                <div
-                  style={{
-                    position: 'absolute', right: 0, top: '100%', marginTop: '4px', zIndex: 10,
-                    background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: '120px', overflow: 'hidden'
-                  }}
-                >
-                  {[[1, 'Tomorrow'], [3, '3 days'], [7, 'Next week']].map(([days, label]) => (
-                    <button
-                      key={days}
-                      onClick={() => handleBulkSnooze(days)}
-                      style={{
-                        display: 'block', width: '100%', padding: '8px 12px', border: 'none',
-                        background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--fs-base)',
-                        color: 'var(--text-2)'
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SnoozeMenu onPick={handleBulkSnooze} disabled={bulkBusy} title="Push every selected lead to a later day" />
             <button
               className="btn btn-sm btn-secondary"
               onClick={handleBulkDismiss}
@@ -582,6 +576,8 @@ function Today() {
               onTouched={handleTouched}
               onSnooze={handleSnooze}
               onDismiss={handleDismiss}
+              onUpdated={handleUpdated}
+              currentPerson={currentPerson}
               coveredOwner={coveredOwnerName(lead)}
               selected={selectedIds.has(lead.id)}
               onToggleSelect={() => toggleSelect(lead.id)}
@@ -615,6 +611,9 @@ function Today() {
               onTouched={handleTouched}
               onSnooze={handleSnooze}
               onDismiss={handleDismiss}
+              onUpdated={handleUpdated}
+              currentPerson={currentPerson}
+              isFollowUp
               coveredOwner={coveredOwnerName(lead)}
               contextOverride={followUpContext(lead)}
               selected={selectedIds.has(lead.id)}
@@ -725,10 +724,10 @@ function followUpContext(lead) {
   return `day ${daysStaleFor(lead)} since last touch — cadence mark`
 }
 
-function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contextOverride, coveredOwner, selected, onToggleSelect }) {
+function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, onUpdated, currentPerson, isFollowUp = false, contextOverride, coveredOwner, selected, onToggleSelect }) {
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
-  const [showSnooze, setShowSnooze] = useState(false)
+  const [showUpdate, setShowUpdate] = useState(false)
 
   function submitTouch() {
     onTouched(lead, note)
@@ -781,11 +780,19 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
           </button>
           <button
             className="btn btn-sm btn-secondary"
-            onClick={() => setShowNote(v => !v)}
+            onClick={() => { setShowNote(v => !v); setShowUpdate(false) }}
             disabled={busy}
             title="Add an optional one-line note to the touch"
           >
             + note
+          </button>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={() => { setShowUpdate(v => !v); setShowNote(false) }}
+            disabled={busy}
+            title="Type what happened and when to reach out (e.g. “start of the new year”) — it comes back on that day"
+          >
+            <MessageSquarePlus size={14} /> Update
           </button>
           <Link to={`/leads/${lead.id}`} className="btn btn-sm btn-secondary">
             Open
@@ -807,39 +814,7 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
               <ExternalLink size={14} />
             </span>
           )}
-          <div style={{ position: 'relative' }}>
-            <button
-              className="btn btn-sm btn-secondary"
-              onClick={() => setShowSnooze(v => !v)}
-              disabled={busy}
-              title="Push this lead to a later day"
-            >
-              Snooze <ChevronDown size={12} />
-            </button>
-            {showSnooze && (
-              <div
-                style={{
-                  position: 'absolute', right: 0, top: '100%', marginTop: '4px', zIndex: 10,
-                  background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: '120px', overflow: 'hidden'
-                }}
-              >
-                {[[1, 'Tomorrow'], [3, '3 days'], [7, 'Next week']].map(([days, label]) => (
-                  <button
-                    key={days}
-                    onClick={() => { setShowSnooze(false); onSnooze(lead, days) }}
-                    style={{
-                      display: 'block', width: '100%', padding: '8px 12px', border: 'none',
-                      background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--fs-base)',
-                      color: 'var(--text-2)'
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <SnoozeMenu onPick={pick => onSnooze(lead, pick)} disabled={busy} />
           <button
             className="btn btn-sm btn-secondary btn-danger-quiet"
             onClick={confirmDismiss}
@@ -850,6 +825,20 @@ function TodayRow({ lead, settings, busy, onTouched, onSnooze, onDismiss, contex
           </button>
         </div>
       </div>
+
+      {showUpdate && (
+        <div style={{ marginTop: '10px', paddingLeft: onToggleSelect ? '28px' : 0 }}>
+          <LeadUpdateBox
+            lead={lead}
+            currentPerson={currentPerson}
+            followUp={isFollowUp}
+            compact
+            autoFocus
+            onSaved={() => { setShowUpdate(false); onUpdated?.(lead) }}
+            onCancel={() => setShowUpdate(false)}
+          />
+        </div>
+      )}
 
       {showNote && (
         <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
